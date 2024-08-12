@@ -37,7 +37,7 @@ annotation:
     lr: 0.0001
     batch_size: 32
     eval_batch_size: 32
-    epochs: 1
+    epochs: 20
     schedule_ratio: 0.9  # ratio of epochs for learning rate schedule
     schedule_interval: 1  # interval of learning rate schedule
     amp: true  # Automatic Mixed Precision
@@ -55,7 +55,6 @@ annotation:
     DAB: false  # Domain adaptation by reverse backpropagation, set to 2 for separate optimizer
     INPUT_BATCH_LABELS: false  # TODO: have these help MLM and MVC, while not to classifier
     mvc_decoder_style: "inner product"
-    gpu: 0
     freeze: false  # whether to freeze the transformer layers
     do_sample_in_train: false
     DSBN: false  # Domain-specific batch normalization
@@ -85,4 +84,5 @@ annotation:
   log:
     log_interval: 100  # iterations
     save_eval_interval: 5  # epochs
-    do_eval_scib_metrics: true
+    do_eval_scib_metrics: true2
+    retain_best_model: True  # whether to retain the best model during training

@@ -1,0 +1,16 @@
+annotation:
+  n_clients: 2
+  n_rounds: 10
+  aggregation_type: "mean"
+  batch_key: "batch_id"
+  celltype_key: "celltype"
+  test_batches: null
+  condition_key: "condition"
+  dataset: "ms"
+  preprocess:
+    filter_gene_by_counts: false
+    filter_cell_by_counts: false
+    normalize_total: True
+    log1p: false
+    subset_hvg: false
+    binning: true

@@ -1,0 +1,421 @@
+import warnings
+
+from torch.utils.data import DataLoader
+import time
+import torch
+from typing import Dict, List
+from scgpt import SubsetsBatchSampler
+import os
+import copy
+import numpy as np
+from scgpt.tokenizer.gene_tokenizer import GeneVocab
+from torchtext.vocab import Vocab
+from torchtext._torchtext import (
+    Vocab as VocabPybind,
+)
+from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
+
+from scgpt.model import TransformerModel
+
+from FedscGPT.base import BaseMixin
+from FedscGPT.utils import SeqDataset
+
+
+class ScGPT(BaseMixin):
+    """
+    The main class for training and evaluating the model.
+    cell_id2type: Dict[int, str] - a dictionary mapping cell type id to cell type name. Useful only for evaluation
+    unique_cell_types: np.ndarray - a list of unique cell types
+    special_tokens = ["<pad>", "<cls>", "<eoc>"] - special tokens used in the model
+    """
+    cell_id2type: Dict[int, str]
+    unique_cell_types: List[str]
+    special_tokens = ["<pad>", "<cls>", "<eoc>"]
+    vocab: GeneVocab
+    tokenized_train: Dict[str, torch.Tensor]
+    tokenized_valid: Dict[str, torch.Tensor]
+    gene_ids: np.ndarray
+    input_layer_key: str
+    best_model: TransformerModel
+    best_model_epoch: int
+
+    def __init__(self, data_dir, pretrained_model_dir, **kwargs):
+        super().__init__(**kwargs)
+        self.data_dir = data_dir
+        self.pretrained_model_dir = pretrained_model_dir
+
+        self.sanity_check()
+        self.check_input_style()
+        self.train_kwarg = {
+                            "CLS": self.config.train.CLS,
+                            "CCE": self.config.train.CCE,
+                            "MVC": self.config.train.MVC,
+                            "ECS": self.config.train.ECS,
+                            "do_sample": self.config.train.do_sample_in_train,
+        }
+
+
+    def check_input_style(self):
+        if self.config.preprocess.input_style == "category":
+            self.config.preprocess.mask_value = self.config.preprocess.n_bins + 1
+            self.config.preprocess.pad_value = self.config.preprocess.n_bins
+            self.config.model.n_input_bins = self.config.preprocess.n_bins + 2
+        else:
+            self.config.preprocess.mask_value = -1
+            self.config.preprocess.pad_value = -2
+            self.config.model.n_input_bins = self.config.preprocess.n_bins
+
+    def create_vocabulary(self):
+        self.vocab = Vocab(
+            VocabPybind(self.adata.var["gene_name"].tolist() + self.config.preprocess.special_tokens, None)
+        )  # bidirectional lookup [gene <-> int]
+        self.vocab.set_default_index(self.vocab["<pad>"])
+
+    def tokenize_and_pad_batch(self, data):
+        return tokenize_and_pad_batch(
+            data,
+            self.gene_ids,
+            max_len=self.config.preprocess.max_seq_len,
+            vocab=self.vocab,
+            pad_token=self.config.preprocess.pad_token,
+            pad_value=self.config.preprocess.pad_value,
+            append_cls=True,  # append <cls> token at the beginning
+            include_zero_gene=self.config.preprocess.include_zero_gene,
+        )
+
+    def tokenize(self):
+        self.gene_ids = np.array(self.vocab(self.adata.var["gene_name"].tolist()), dtype=int)
+        self.tokenized_train = self.tokenize_and_pad_batch(self.train_data)
+        self.tokenized_valid = self.tokenize_and_pad_batch(self.valid_data)
+        self.log(
+            f"train set number of samples: {self.tokenized_train['genes'].shape[0]}, "
+            f"\n\t feature length: {self.tokenized_train['genes'].shape[1]}"
+        )
+        self.log(
+            f"valid set number of samples: {self.tokenized_valid['genes'].shape[0]}, "
+            f"\n\t feature length: {self.tokenized_valid['genes'].shape[1]}"
+        )
+
+    def instantiate_transformer_model(self):
+        kwargs = self.config.model.__dict__
+        self.model = TransformerModel(
+            len(self.vocab),
+            d_model=kwargs.pop("embsize"),
+            vocab=self.vocab,
+            pad_token=self.config.preprocess.pad_token,
+            pad_value=self.config.preprocess.pad_value,
+            **kwargs,
+        )
+
+    def load_pretrained_model(self, model_name="best_model.pt"):
+        if self.pretrained_model_dir is not None:
+            model_dir = os.path.join(self.pretrained_model_dir, model_name)
+            try:
+                self.model.load_state_dict(torch.load(model_dir))
+                self.log(f"Loading all model params from {self.pretrained_model_dir}")
+            except:
+                # only load params that are in the model and match the size
+                self.load_matched_param(model_dir)
+        self.freeze_params()
+        self.model.to(self.device)
+
+
+
+    def train_for_epoch(self, loader, epoch) -> None:
+        """
+        Train the model for one epoch.
+        """
+        self.model.train()
+        self.loss_meter.reset()
+        num_batches = len(loader)
+        if self.config.log.log_interval > num_batches:
+            self.config.log.log_interval = num_batches
+            self.log(f"Setting log_interval to {num_batches}")
+        for batch, batch_data in enumerate(loader, 1):
+            self.train_on_batch(batch_data)
+            if batch % self.config.log.log_interval == 0 and batch > 0:
+                lr = self.lr_schedulers['main'].get_last_lr()[0]
+                log_txt = self.loss_meter.log(self.config.log.log_interval)
+                log_txt = f"| epoch {epoch:3d} | {batch:3d}/{num_batches:3d} batches | lr {lr:05.4f} | " + log_txt
+                self.log(log_txt)
+                self.loss_meter.reset()
+
+    def train_on_batch(self, batch_data):
+        batch_labels, celltype_labels, input_gene_ids, input_values, target_values = self.unwrap_batch_data(batch_data)
+        src_key_padding_mask = input_gene_ids.eq(self.vocab[self.config.preprocess.pad_token])
+        with torch.cuda.amp.autocast(enabled=self.config.train.amp):
+            output_dict = self.model(
+                input_gene_ids,
+                input_values,
+                src_key_padding_mask=src_key_padding_mask,
+                batch_labels=batch_labels if self.config.train.INPUT_BATCH_LABELS or self.config.train.DSBN else None,
+                **self.train_kwarg
+            )
+
+            masked_positions = input_values.eq(self.config.preprocess.mask_value)  # the postions to predict
+            args_dict = {"batch_labels": batch_labels,
+                         "celltype_labels": celltype_labels,
+                         "masked_positions": masked_positions,
+                         "target_values": target_values,
+                         **output_dict}
+            self.apply_loss(**args_dict)
+            self.fedprox()
+
+        self.model.zero_grad()
+        self.scaler.scale(self.loss_meter.batch_loss).backward()
+        self.scaler.unscale_(self.optimizers["main"])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings("always")
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(),
+                1.0,
+                error_if_nonfinite=False if self.scaler.is_enabled() else True,
+            )
+            if len(w) > 0:
+                self.logger.warning(
+                    f"Found infinite gradient. This may be caused by the gradient "
+                    f"scaler. The current scale is {self.scaler.get_scale()}. This warning "
+                    "can be ignored if no longer occurs after autoscaling of the scaler."
+                )
+        self.scaler.step(self.optimizers["main"])
+        self.scaler.update()
+        if self.config.train.ADV:
+            self.adversarial_training(batch_labels, input_gene_ids, input_values, src_key_padding_mask)
+        self.loss_meter.reset_batch_loss()
+
+    def fedprox(self):
+        if self.use_fedprox and self.global_model:
+            prox_term = 0
+            for param, global_param in zip(self.model.parameters(), self.global_model.values()):
+                prox_term += ((param - global_param) ** 2).sum()
+            self.loss_meter.batch_loss += (self.mu / 2) * prox_term
+
+    def unwrap_batch_data(self, batch_data):
+        input_gene_ids = batch_data["gene_ids"].to(self.device)
+        input_values = batch_data["values"].to(self.device)
+        target_values = batch_data["target_values"].to(self.device)
+        batch_labels = batch_data["batch_labels"].to(self.device)
+        celltype_labels = batch_data["celltype_labels"].to(self.device)
+        return batch_labels, celltype_labels, input_gene_ids, input_values, target_values
+
+    def adversarial_training(self, batch_labels, input_gene_ids, input_values, src_key_padding_mask, epoch):
+        # rerun the model for adversarial training
+        output_dict = self.model(
+            input_gene_ids,
+            input_values,
+            src_key_padding_mask=src_key_padding_mask,
+            batch_labels=batch_labels if self.config.train.INPUT_BATCH_LABELS or self.config.train.DSBN else None,
+            CLS=self.config.train.CLS,
+            CCE=self.config.train.CCE,
+            MVC=self.config.train.MVC,
+            ECS=self.config.train.ECS,
+            do_sample=self.config.train.do_sample_in_train,
+            # generative_training=False
+        )
+        # TRAINING DISCRIMINATOR
+        loss_adv_D = self.losses['adv'](
+            self.discriminator(output_dict["cell_emb"].detach()), batch_labels
+        )
+        if epoch > self.config.train.ADV.D_delay_epochs:
+            self.discriminator.zero_grad()
+            loss_adv_D.backward()
+            self.optimizers['D'].step()
+        # TRAINING ENCODER
+        loss_adv_E = -self.losses['adv'](
+            self.discriminator(output_dict["cell_emb"]), batch_labels
+        )
+        # NOTE: the loss is negative here because we want to maximize
+        # the cross_entropy_loss, in other words, disguise against the discriminator
+        if epoch > self.config.train.ADV.E_delay_epochs:
+            self.model.zero_grad()
+            self.discriminator.zero_grad()
+            loss_adv_E.backward()
+            self.optimizers['E'].step()
+        self.loss_meter.update("adv_D", loss_adv_D.item())
+        self.loss_meter.update("adv_E", loss_adv_E.item())
+
+    def evaluate(self, model, loader: DataLoader, return_raw: bool = False) -> float:
+        """
+        Evaluate the model on the evaluation data.
+        """
+        model.eval()
+        total_loss, total_dab, total_num, total_error = 0.0, 0.0, 0, 0.0
+        predictions = []
+        with (torch.no_grad()):
+            for batch_data in loader:
+                batch_labels, celltype_labels, input_gene_ids, input_values, target_values = \
+                    self.unwrap_batch_data(batch_data)
+                src_key_padding_mask = input_gene_ids.eq(self.vocab[self.config.preprocess.pad_token])
+                with torch.cuda.amp.autocast(enabled=self.config.train.amp):
+                    output_dict = model(input_gene_ids,
+                                        input_values,
+                                        src_key_padding_mask=src_key_padding_mask,
+                                        batch_labels=batch_labels if self.config.train.INPUT_BATCH_LABELS or
+                                                                     self.config.train.DSBN else None,
+                                        CLS=self.config.train.CLS,  # evaluation does not need CLS or CCE
+                                        CCE=False,
+                                        MVC=False,
+                                        ECS=False,
+                                        do_sample=self.config.train.do_sample_in_train)
+                    loss = self.losses['cls'](output_dict["cls_output"], celltype_labels)
+                    total_loss += loss.item() * len(input_gene_ids)
+                    if self.config.train.DAB:
+                        loss_dab = self.losses['dab'](output_dict["dab_output"], batch_labels)
+                        total_dab += loss_dab.item() * len(input_gene_ids)
+
+                accuracy = (output_dict["cls_output"].argmax(1) == celltype_labels).sum().item()
+                total_error += (1 - accuracy / len(input_gene_ids)) * len(input_gene_ids)
+                total_num += len(input_gene_ids)
+                preds = output_dict["cls_output"].argmax(1).cpu().numpy()
+                predictions.append(preds)
+        if return_raw:
+            return np.concatenate(predictions, axis=0)
+
+        return total_loss / total_num, total_error / total_num
+
+    def random_mask_value(self, tokenized_values):
+        return random_mask_value(
+            tokenized_values,
+            mask_ratio=self.config.preprocess.mask_ratio,
+            mask_value=self.config.preprocess.mask_value,
+            pad_value=self.config.preprocess.pad_value,
+        )
+
+    def per_epoch_data_prep(self, epoch):
+        masked_values_train = self.random_mask_value(self.tokenized_train["values"])
+
+        masked_values_valid = self.random_mask_value(self.tokenized_valid["values"])
+        self.log(
+            f"random masking at epoch {epoch:3d}, ratio of masked values in train: {(masked_values_train == self.config.preprocess.mask_value).sum() / (masked_values_train - self.config.preprocess.pad_value).count_nonzero():.4f}",
+        )
+
+        input_gene_ids_train, input_gene_ids_valid = (
+            self.tokenized_train["genes"],
+            self.tokenized_valid["genes"],
+        )
+        input_values_train, input_values_valid = masked_values_train, masked_values_valid
+        target_values_train, target_values_valid = (
+            self.tokenized_train["values"],
+            self.tokenized_valid["values"],
+        )
+
+        tensor_batch_labels_train = torch.from_numpy(self.train_batch_labels).long()
+        tensor_batch_labels_valid = torch.from_numpy(self.valid_batch_labels).long()
+
+        tensor_celltype_labels_train = torch.from_numpy(self.train_celltype_labels).long()
+        tensor_celltype_labels_valid = torch.from_numpy(self.valid_celltype_labels).long()
+
+        if self.config.preprocess.per_seq_batch_sample:  # TODO: update to random pick seq source in each traning batch
+            train_sort_ids = np.argsort(self.train_batch_labels)
+            input_gene_ids_train = input_gene_ids_train[train_sort_ids]
+            input_values_train = input_values_train[train_sort_ids]
+            target_values_train = target_values_train[train_sort_ids]
+            tensor_batch_labels_train = tensor_batch_labels_train[train_sort_ids]
+            tensor_celltype_labels_train = tensor_celltype_labels_train[train_sort_ids]
+
+            valid_sort_ids = np.argsort(self.valid_batch_labels)
+            input_gene_ids_valid = input_gene_ids_valid[valid_sort_ids]
+            input_values_valid = input_values_valid[valid_sort_ids]
+            target_values_valid = target_values_valid[valid_sort_ids]
+            tensor_batch_labels_valid = tensor_batch_labels_valid[valid_sort_ids]
+            tensor_celltype_labels_valid = tensor_celltype_labels_valid[valid_sort_ids]
+
+        train_data_pt = {
+            "gene_ids": input_gene_ids_train,
+            "values": input_values_train,
+            "target_values": target_values_train,
+            "batch_labels": tensor_batch_labels_train,
+            "celltype_labels": tensor_celltype_labels_train,
+        }
+        valid_data_pt = {
+            "gene_ids": input_gene_ids_valid,
+            "values": input_values_valid,
+            "target_values": target_values_valid,
+            "batch_labels": tensor_batch_labels_valid,
+            "celltype_labels": tensor_celltype_labels_valid,
+        }
+
+        return train_data_pt, valid_data_pt
+
+    def per_epoch_dataloader(self,
+                             data_pt: Dict[str, torch.Tensor],
+                             batch_size: int,
+                             shuffle: bool = False,
+                             intra_domain_shuffle: bool = False,
+                             drop_last: bool = False,
+                             num_workers: int = 0,
+                             ) -> DataLoader:
+        if num_workers == 0:
+            num_workers = min(len(os.sched_getaffinity(0)), batch_size // 2)
+
+        dataset = SeqDataset(data_pt)
+
+        if self.config.preprocess.per_seq_batch_sample:
+            # find the indices of samples in each seq batch
+            subsets = []
+            batch_labels_array = data_pt["batch_labels"].numpy()
+            for batch_label in np.unique(batch_labels_array):
+                batch_indices = np.where(batch_labels_array == batch_label)[0].tolist()
+                subsets.append(batch_indices)
+            data_loader = DataLoader(
+                dataset=dataset,
+                batch_sampler=SubsetsBatchSampler(
+                    subsets,
+                    batch_size,
+                    intra_subset_shuffle=intra_domain_shuffle,
+                    inter_subset_shuffle=shuffle,
+                    drop_last=drop_last,
+                ),
+                num_workers=num_workers,
+                pin_memory=True,
+            )
+            return data_loader
+
+        data_loader = DataLoader(
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            drop_last=drop_last,
+            num_workers=num_workers,
+            pin_memory=True,
+        )
+        return data_loader
+
+    def train(self):
+        best_val_loss = float("inf")
+        for epoch in range(1, self.config.train.epochs + 1):
+            epoch_start_time = time.time()
+            train_data_pt, valid_data_pt = self.per_epoch_data_prep(epoch)
+            train_loader = self.per_epoch_dataloader(train_data_pt,
+                                                     batch_size=self.config.train.batch_size,
+                                                     shuffle=False,
+                                                     intra_domain_shuffle=True,
+                                                     drop_last=False)
+
+            valid_loader = self.per_epoch_dataloader(valid_data_pt,
+                                                     batch_size=self.config.train.eval_batch_size,
+                                                     shuffle=False,
+                                                     intra_domain_shuffle=False,
+                                                     drop_last=False)
+
+            self.train_for_epoch(train_loader, epoch)
+            val_loss, val_err = self.evaluate(self.model, valid_loader)
+            elapsed = time.time() - epoch_start_time
+            self.log("-" * 89)
+            self.log(
+                f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
+                f"valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
+            )
+            self.log("-" * 89)
+            if val_loss < best_val_loss:
+                self.update_best_model(val_loss, epoch)
+            self.lr_schedulers_step()
+
+    def update_best_model(self, val_loss, epoch):
+        if self.config.log.retain_best_model:
+            self.best_model = copy.deepcopy(self.model)
+            self.best_model_epoch = epoch
+            self.log(f"Best model with score {val_loss:5.4f}")
+        else:
+            self.log(f"New best model score {val_loss:5.4f}")
+            self.best_model = copy.deepcopy(self.model)
