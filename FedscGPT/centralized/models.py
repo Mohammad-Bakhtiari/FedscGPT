@@ -108,7 +108,10 @@ class ScGPT(BaseMixin):
         )
 
     def load_pretrained_model(self, model_name="best_model.pt"):
-        if self.pretrained_model_dir is not None:
+        save_init_weights = False
+        if self.init_weights_dir:
+            save_init_weights = self.load_init_weights()
+        if save_init_weights or self.pretrained_model_dir:
             model_dir = os.path.join(self.pretrained_model_dir, model_name)
             try:
                 self.model.load_state_dict(torch.load(model_dir))
@@ -117,8 +120,8 @@ class ScGPT(BaseMixin):
                 # only load params that are in the model and match the size
                 self.load_matched_param(model_dir)
         self.freeze_params()
+        self.save_init_weights()
         self.model.to(self.device)
-
 
 
     def train_for_epoch(self, loader, epoch) -> None:
