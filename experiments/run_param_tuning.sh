@@ -11,7 +11,7 @@ datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 
 root_dir="$(dirname "$PWD")"
-
+INTI_WEIGHTS_DIR="${root_dir}/init_weights"
 GPU=1
 N_ROUNDS=20
 # Loop through each dataset configuration
@@ -44,12 +44,9 @@ for key in "${!datasets[@]}"; do
          --fed_config_file "${root_dir}/experiments/configs/annotation/fed_config.yml" \
          --n_epochs "$epoch" \
          --n_rounds "$N_ROUNDS" \
-         --shared_res_file "${root_dir}/output/annotation/shared_res.csv" \
+         --param_tuning_res "${root_dir}/output/annotation/param-tuning-res" \
+         --init_weights_dir "$INTI_WEIGHTS_DIR/${args[0]}.pth" \
          --param_tuning
-
-
-
-
 
         if [ $? -ne 0 ]; then
             echo "Error processing dataset $key. Please check the configuration."
