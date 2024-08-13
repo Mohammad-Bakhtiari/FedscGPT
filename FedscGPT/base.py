@@ -18,7 +18,7 @@ class BaseMixin:
 
     """
     def __init__(self, task, config_file, celltype_key, batch_key, output_dir, logger=None,
-                 log_id: [str or None] = None, gpu: int = 0, verbose: bool = False, n_epochs=None, mu=None, use_fedprox=False, **kwargs):
+                 log_id: [str or None] = None, gpu: int = 0, verbose: bool = False, n_epochs=None, mu=None, use_fedprox=False, init_weights_dir=None, **kwargs):
         self.log_id = log_id
         self.log_level = "info" if log_id is None else log_id
         self.output_dir = output_dir
@@ -42,6 +42,7 @@ class BaseMixin:
         self.mu = mu
         self.use_fedprox = use_fedprox
         self.global_model = None
+        self.init_weights_dir = init_weights_dir
 
     def log(self, msg, log_level=None):
         if log_level is None:
@@ -202,6 +203,20 @@ class BaseMixin:
                 self.log(f"Loading params {k} with shape {v.shape}")
         model_dict.update(pretrained_dict)
         self.model.load_state_dict(model_dict)
+
+    def load_init_weights(self):
+        if os.path.exists(self.init_weights_dir):
+            if self.verbose:
+                self.log(f"Loading the initial model weights from {self.init_weights_dir}")
+            self.model.load_state_dict(torch.load(self.init_weights_dir))
+            return False
+        if self.verbose:
+            self.log(f"Initial model weights not found at {self.init_weights_dir} thw weights will be stored there...")
+        return True
+
+
+    def save_init_weights(self):
+        torch.save(self.model.state_dict(), self.init_weights_dir)
 
 class LossMeter:
     def __init__(self, MLM, CLS, CCE=False, MVC=False, ECS=False, DAB=False, ADV=False, explicit_zero_prob=False,
