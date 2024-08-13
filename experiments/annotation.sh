@@ -27,6 +27,7 @@ data_dir="${root_dir}/data/benchmark/${dataset}"
 reference="${data_dir}/${reference_file}"
 query="${data_dir}/${query_file}"
 output="${root_dir}/output/annotation/${dataset}/${general_mode}"
+INTI_WEIGHTS_DIR="${root_dir}/init_weights"
 
 cmd="python ${root_dir}/tasks/annotation.py \
  --dataset_name $dataset \
@@ -40,7 +41,8 @@ cmd="python ${root_dir}/tasks/annotation.py \
  --gpu $gpu \
  --pretrained_model_dir ${root_dir}/pretrained_models/scGPT_human \
  --config_file ${root_dir}/experiments/configs/annotation/config.yml \
- --fed_config_file ${root_dir}/experiments/configs/annotation/fed_config.yml"
+ --fed_config_file ${root_dir}/experiments/configs/annotation/fed_config.yml \
+ --init_weights_dir ${INTI_WEIGHTS_DIR}/${dataset}.pth"
 
 
 # Add optional arguments if they are set
