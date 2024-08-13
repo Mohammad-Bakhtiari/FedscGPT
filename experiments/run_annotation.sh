@@ -11,13 +11,13 @@ chmod +x annotation.sh
 # Declare an associative array to store dataset configurations
 declare -A datasets
 
-GPU=1
+GPU=0
 
 # Add dataset configurations
 # format: data_folder|adata_file|test_adata_file|celltype_key|batch_key|gpu
-#datasets["MS"]="ms|reference.h5ad|query.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]"
+datasets["MS"]="ms|reference.h5ad|query.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]"
 datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
-#datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
+datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 
 echo "Running annotation for ${mode}"
 
