@@ -14,12 +14,13 @@ def instantiate_args():
     parser.add_argument('--reference_adata', type=str, default='ms.h5ad')
     parser.add_argument('--query_adata', type=str, default='ms.h5ad')
     parser.add_argument('--pretrained_model_dir', type=str, default=f'{HOME_DIR}/pretrained_models/scGPT_human')
+    parser.add_argument("--init_weights_dir", type=str, default=f"{HOME_DIR}/init_weights/hp.pth")
     parser.add_argument("--finetune_model_dir", type=str)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--config_file', type=str, help='.yml file for the model', default='config.yml')
     parser.add_argument("--verbose", action='store_true', default=False)
     parser.add_argument("--dataset_name", type=str, default='ms')
-    parser.add_argument("--shared_res_file", type=str, default=f"{HOME_DIR}/output/annotation/shared_res.csv")
+    parser.add_argument("--param_tuning_res", type=str, default=f"{HOME_DIR}/output/annotation/param-tuning_res")
     return parser
 
 
