@@ -14,6 +14,7 @@ from FedscGPT.utils import SeqDataset, dump_results, plot, ResultsRecorder
 from FedscGPT.centralized.models import ScGPT
 from FedscGPT.utils import read_h5ad
 import copy
+from functools import partial
 
 class Base(ScGPT):
     def __init__(self, **kwargs):
@@ -179,7 +180,7 @@ class Training(Base):
 
 
 class Inference(Base):
-    def __init__(self, query_adata, dataset_name, shared_res_file, load_model=True, model_name="model.pt", param_tuning=False, **kwargs):
+    def __init__(self, query_adata, dataset_name, param_tuning_res, load_model=True, model_name="model.pt", param_tuning=False, **kwargs):
         super().__init__(**kwargs)
         self.celltypes_labels = None
         self.read_query(query_adata)
@@ -203,7 +204,7 @@ class Inference(Base):
             os.makedirs(self.plot_dir, exist_ok=True)
         self.test_loader = None
         self.param_tuning = param_tuning
-        self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=shared_res_file, logger=self.log)
+        self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=param_tuning_res, logger=self.log)
 
     def read_query(self, query_adata):
         self.adata_test_raw = read_h5ad(self.data_dir, query_adata)
@@ -221,7 +222,7 @@ class Inference(Base):
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
         macro_f1 = f1_score(self.celltypes_labels, predictions, average="macro")
-        self.update_records(accuracy=accuracy, precision=precision, recall=recall, macro_f1=macro_f1, round_number=round_num, n_epochs=n_epochs)
+        self.update_records(accuracy=accuracy, precision=precision, recall=recall, macro_f1=macro_f1, round_number=round_num, n_epochs=n_epochs, predictions=predictions)
         results = {
             "test/accuracy": accuracy,
             "test/precision": precision,
@@ -264,12 +265,13 @@ class Inference(Base):
 
     def save_results(self, labels, predictions, results):
         dump_results(predictions, labels, results, self.cell_id2type, self.output_dir)
+
     def save_records(self):
         if self.param_tuning:
-            self.result_recorder.save_dataframe()
+            self.result_recorder.save()
 
     def update_records(self, **kwargs):
-        self.result_recorder.update_dataframe(**kwargs)
+        self.result_recorder.update(labels=self.celltypes_labels, id_maps=self.cell_id2type, **kwargs)
 
 class CellTypeAnnotator(Training, Inference):
     def __init__(self, reference_adata, query_adata=None, **kwargs):
