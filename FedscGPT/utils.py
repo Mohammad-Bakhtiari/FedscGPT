@@ -463,16 +463,40 @@ def plot(adata, celltype: list, celltype_key: str, save_dir: str):
     plot_umap(adata, celltype_key, celltype, f"{save_dir}/umap_plots.png", legend='no_legend')
     plot_umap(adata, celltype_key, celltype, f"{save_dir}/legend.png", legend='legend_only')
 
-
-def dump_results(predictions, labels, results, id2type, save_dir):
+def dump_results(predictions, labels, results, id2type, save_dir, epoch=None, n_rounds=None):
     save_dict = {
         "predictions": predictions,
         "labels": labels,
         "results": results,
         "id_maps": id2type,
     }
-    with open(f"{save_dir}/results.pkl", "wb") as f:
-        pickle.dump(save_dict, f)
+    if epoch is None or n_rounds is None:
+        with open(f"{save_dir}/results.pkl", "wb") as f:
+            pickle.dump(save_dict, f)
+    else:
+        save_path = f"{save_dir}/results.pkl"
+        if os.path.exists(save_path):
+            with open(save_path, "rb") as f:
+                all_results = pickle.load(f)
+        else:
+            all_results = {}
+
+
+        # Ensure the dictionary structure exists
+        if epoch not in all_results:
+            all_results[epoch] = {}
+
+        if n_rounds not in all_results[epoch]:
+            all_results[epoch][n_rounds] = {}
+
+        # Store the current result dictionary under the epoch and round
+        all_results[epoch][n_rounds] = save_dict
+
+        # Save the updated results back to the file
+        with open(save_path, "wb") as f:
+            pickle.dump(all_results, f)
+
+        print(f"Results saved for epoch {epoch}, round {n_rounds} in {save_path}")
 
 
 def eval_annotation(celltypes: list, predictions, labels, id2type, save_dir):
@@ -697,14 +721,16 @@ def verify_tokenization_consistency(client_tokenized_data_list):
     return True, "Tokenization is consistent across all clients."
 
 
-
 class ResultsRecorder:
-    def __init__(self, dataset, file_name='round_results.csv', logger=None):
-        self.results_file = file_name
+    def __init__(self, dataset, file_name='param_tuning', logger=None, verbose=False):
+        self.results_file = file_name + '.csv'
+        self.pickle_file = file_name + '.pkl'
         self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs']
         self.dataset = dataset
         self.results_df = self.load_or_create_dataframe()
+        self.all_results = self.load_or_create_pickle()
         self.logger = logger if logger else print
+        self.verbose = verbose
 
     def load_or_create_dataframe(self):
         """Load the DataFrame from a CSV file or create a new one if the file doesn't exist."""
@@ -713,6 +739,13 @@ class ResultsRecorder:
         else:
             return pd.DataFrame(columns=self.columns)
 
+    def load_or_create_pickle(self):
+        """Load the results dictionary from a pickle file or create a new one if the file doesn't exist."""
+        if os.path.exists(self.pickle_file):
+            with open(self.pickle_file, 'rb') as f:
+                return pickle.load(f)
+        else:
+            return {}
 
     def update_dataframe(self, accuracy, precision, recall, macro_f1, round_number=None, n_epochs=None, dataset=None):
         """Update the DataFrame with new round results."""
@@ -724,7 +757,8 @@ class ResultsRecorder:
             'Recall': recall,
             'Macro_F1': macro_f1
         }
-        self.logger( f"Accuracy: {accuracy:.3f}, Precision: {precision:.3f}, Recall: {recall:.3f}, Macro F1: {macro_f1:.3f}")
+        self.logger(
+            f"Accuracy: {accuracy:.3f}, Precision: {precision:.3f}, Recall: {recall:.3f}, Macro F1: {macro_f1:.3f}")
         new_rows = pd.DataFrame([{
             'Round': round_number,
             'Metric': metric,
@@ -734,13 +768,61 @@ class ResultsRecorder:
         } for metric, value in metrics.items()])
         self.results_df = pd.concat([self.results_df, new_rows], ignore_index=True)
 
-
     def save_dataframe(self):
         """Save the DataFrame to the CSV file."""
         self.results_df.to_csv(self.results_file, index=False)
-        self.logger(f"Data successfully saved to {self.results_file}")
+        if self.verbose:
+            self.logger(f"Data successfully saved to {self.results_file}")
 
-    def record_results(self, round_number, round_metrics, n_epochs):
-        """Load, update, and save the DataFrame with new results."""
-        self.update_dataframe(round_number, round_metrics, n_epochs)
+    def update_pickle(self, predictions, labels, id_maps, epoch, round_number, dataset=None):
+        """Update the pickle file with detailed results for each epoch and round."""
+        if dataset is None:
+            dataset = self.dataset
+
+        if dataset not in self.all_results:
+            self.all_results[dataset] = {}
+
+
+        if 'id_maps' not in self.all_results[dataset]:
+            self.all_results[dataset]['id_maps'] = id_maps
+        else:
+            assert self.all_results[dataset]['id_maps'] == id_maps, f"ID Maps mismatch for dataset {dataset}"
+
+        # Initialize epoch if not present
+        if epoch not in self.all_results[dataset]:
+            self.all_results[dataset][epoch] = {}
+
+        # Ensure round_number is not overwritten
+        if round_number in self.all_results[dataset][epoch]:
+            self.logger(f"Warning: Round {round_number} already exists for epoch {epoch} in dataset {dataset}.")
+
+        self.all_results[dataset][epoch][round_number] = {'predictions': predictions, 'labels': labels}
+
+    def save_pickle(self):
+        """Save the detailed results dictionary to the pickle file."""
+        with open(self.pickle_file, 'wb') as f:
+            pickle.dump(self.all_results, f)
+        if self.verbose:
+            self.logger(f"Detailed results successfully saved to {self.pickle_file}")
+
+    def record_metrics(self, round_number, accuracy, precision, recall, macro_f1, n_epochs):
+        """Record and save metrics in the DataFrame."""
+        self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs)
         self.save_dataframe()
+
+    def record_detailed_results(self, epoch, round_number, predictions, labels, id_maps):
+        """Record and save detailed results in the pickle file."""
+        self.update_pickle(predictions, labels, id_maps, epoch, round_number)
+        self.save_pickle()
+
+    def update(self, accuracy, precision, recall, macro_f1, predictions, labels, id_maps, round_number, n_epochs,
+               dataset=None):
+        if dataset is None:
+            dataset = self.dataset
+        self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs, dataset)
+        self.update_pickle(predictions, labels, id_maps, n_epochs, round_number, dataset)
+        self.save()
+
+    def save(self):
+        self.save_dataframe()
+        self.save_pickle()
