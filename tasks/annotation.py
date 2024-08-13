@@ -1,106 +1,15 @@
 """"
-Preprocessing workflow for cell type annotation task.
-* Train vs test: fine-tuned the model on a reference set with ground truth labels and validated annotation performance on a held-out query set.
-* The common set of gene tokens between the pretrained foundation model and the reference set was retained.
-* Normalization: Gene expression values were normalized, log transformed and binned before model fine-tuning.
-* transfer learning: All pretrained model weights were used to initialize the fine-tuned model, except for the output cell type classifier, which was randomly initialized.
-* All gene tokens with both zero and non-zero expression values were used in training.
-* The cell type-classification fine-tuning objective was used to minimize the classification loss
 
 """
 import os
-import pickle
-
 import __init__
-# from FedscGPT.centralized.annotator import CellTypeAnnotator
 from FedscGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
 from FedscGPT.federated.annotator import FedAnnotator
 from FedscGPT.federated.aggregator import FedAvg
-from FedscGPT.utils import eval_annotation, validate_fed_code, split_data_by_batch, save_data_batches, ResultsRecorder
-
-from args import instantiate_args, add_annotation_args, split_test_batches, create_output_dir, add_federated_annotation_args
+from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches
+from args import instantiate_args, add_annotation_args, create_output_dir, add_federated_annotation_args
 import torch
-import anndata
-import copy
-import scanpy as sc
 from functools import partial
-
-
-
-def centralized_annotation(config,
-                           data_dir,
-                           reference_adata,
-                           query_adata,
-                           celltype_key,
-                           batch_key,
-                           pretrained_model_dir,
-                           output_dir,
-                           gpu):
-    """
-    We assume there is a test_set that should be combined with the training set for preprocessing and then split
-    after preprocessing.
-
-    Parameters
-    ----------
-    query_adata
-    reference_adata
-    config
-    data_dir
-    adata
-    test_adata
-    pretrained_model_dir
-    output_dir
-
-    Returns
-    -------
-
-    """
-    annotator = CellTypeAnnotator(task="annotation",
-                                  config=config,
-                                  data_dir=data_dir,
-                                  reference_adata=reference_adata,
-                                  query_adata=query_adata,
-                                  celltype_key=celltype_key,
-                                  batch_key=batch_key,
-                                  pretrained_model_dir=pretrained_model_dir,
-                                  output_dir=output_dir,
-                                  gpu=gpu)
-    # annotator.harmonize()
-    # if annotator.pretrained_model_dir is not None:
-    #     annotator.load_pretrained_config()
-    # # annotator.split_adata_by_obs()
-    # annotator.preprocess_data()
-    # annotator.tokenize()
-    # annotator.instantiate_transformer_model()
-    # annotator.load_pretrained_model()
-    # annotator.setup_training()
-    # annotator.train()
-    # predictions, celltypes_labels = annotator.inference()
-    # eval_annotation(annotator.unique_cell_types,
-    #                 predictions,
-    #                 celltypes_labels,
-    #                 annotator.cell_id2type,
-    #                 output_dir
-    #                 )
-    annotator.harmonize(annotator.adata, annotator.adata_test)
-    if annotator.pretrained_model_dir is not None:
-        annotator.load_pretrained_config()
-    annotator.adata, annotator.adata_test = annotator.filter(annotator.adata, annotator.adata_test)
-    annotator.instantiate_preprocessor()
-    annotator.preprocess_reference()
-    annotator.preprocess_query()
-    annotator.tokenize()
-    annotator.instantiate_transformer_model()
-    annotator.load_pretrained_model()
-    annotator.setup_losses()
-    annotator.train()
-    predictions, celltypes_labels = annotator.inference()
-    eval_annotation(annotator.unique_cell_types,
-                    predictions,
-                    celltypes_labels,
-                    annotator.cell_id2type,
-                    output_dir
-                    )
 
 
 def centralized_finetune(**kwargs):
@@ -148,23 +57,6 @@ def cent_prep(annotator=None, preprocess=True, **kwargs):
 
 def centralized_finetune_inference(**kwargs):
     """
-    We assume there is a test_set that should be combined with the training set for preprocessing and then split
-    after preprocessing.
-
-    Parameters
-    ----------
-    query_adata
-    reference_adata
-    config
-    data_dir
-    adata
-    test_adata
-    pretrained_model_dir
-    output_dir
-
-    Returns
-    -------
-
     """
     annotator = centralized_finetune(**kwargs)
     centralized_inference(logger=annotator.logger,
@@ -201,72 +93,6 @@ def centralized_inference(annotator=None,
                         )
     return annotator
 
-# def federated_finetuning_annotation(fed_config,
-#                                     config,
-#                                     data_dir,
-#                                     reference_adata,
-#                                     query_adata,
-#                                     celltype_key,
-#                                     batch_key,
-#                                     pretrained_model_dir,
-#                                     output_dir,
-#                                     gpu):
-#     """
-#     We assume there is no test data, and if it is needed according to ..., the dataset will be split according to the
-#     batch key.
-#     Parameters
-#     ----------
-#     config
-#     data_dir
-#     adata
-#     test_adata:
-#         Test adata is a global test set which is available centrally to the Aggregator/Server
-#     pretrained_model_dir
-#     output_dir
-#
-#     Returns
-#     -------
-#
-#     """
-#     # mode = "set_and_inference"
-#     mode = "aggregate_and_inference"
-#     annotator = FedAnnotator(task="annotation",
-#                              config_file=config,
-#                              fed_config_file=fed_config,
-#                              data_dir=data_dir,
-#                              reference_adata=reference_adata,
-#                              query_adata=query_adata,
-#                              celltype_key=celltype_key,
-#                              batch_key=batch_key,
-#                              pretrained_model_dir=pretrained_model_dir,
-#                              output_dir=output_dir,
-#                              gpu=gpu)
-#     if mode == "set_and_inference":
-#         finetune_model_path = "/".join(output_dir.split("/")[:-1]+["centralized", "model.pt"])
-#         annotator.celltype_annotator.model.load_state_dict(torch.load(finetune_model_path))
-#         annotator.celltype_annotator.model.to(annotator.celltype_annotator.device)
-#         annotator.celltype_annotator.best_model = annotator.celltype_annotator.model
-#         annotator.celltype_annotator.inference()
-#     elif mode == "aggregate_and_inference":
-#         annotator.aggregate_gene_sets()
-#         annotator.aggregate_celltype_sets()
-#         annotator.load_pretrained_config()
-#         annotator.preprocess_data()
-#         annotator.post_prep_setup()
-#         global_weights = []
-#         for round in range(1, annotator.fed_config.n_rounds + 1):
-#             annotator.logger.federated(f"Round {round}")
-#             local_weights = []
-#             for client in annotator.clients:
-#                 local_weights.append(client.local_update(global_weights, round))
-#             global_weights = annotator.aggregate(local_weights)
-#             annotator.celltype_annotator.model = annotator.clients[0].model.copy()
-#             annotator.inference(global_weights)
-
-
-
-    # adata_list = [client.adata for client in annotator.clients]
-    # return adata_list
 
 def aggregate(annotator, local_weights, n_local_samples, **kwargs):
     if annotator.fed_config.aggregation_type == "FedAvg":
@@ -375,8 +201,6 @@ if __name__ == '__main__':
         centralized_inference(task='annotation', **vars(args))
     elif args.mode == "centralized_finetune_inference": # checked! it works fine!
         centralized_finetune_inference(task='annotation', **vars(args))
-    # elif args.mode == "federated_prep":
-    #     federated_prep_cent_annotation(task='annotation', **vars(args))
     elif args.mode == "cent_prep_fed_finetune":
         centralized_prep_fed_annotation(task='annotation', **vars(args))
     elif args.mode == "centralized_clients": # checked! it works fine!
