@@ -1,3 +1,5 @@
+from FedscGPT import utils
+utils.set_seed()
 from torch.utils.data import DataLoader
 import torch
 from typing import Dict, List
@@ -12,7 +14,7 @@ from scipy.sparse import issparse
 from sklearn.model_selection import train_test_split
 from FedscGPT.utils import SeqDataset, dump_results, plot, ResultsRecorder
 from FedscGPT.centralized.models import ScGPT
-from FedscGPT.utils import read_h5ad
+from FedscGPT.utils import read_h5ad, seed_worker
 import copy
 from functools import partial
 
@@ -64,42 +66,9 @@ class Base(ScGPT):
             reference.obs[obs_key] = reference.obs[obs_key].cat.set_categories(query_unique_cell_obs)
             query.obs[obs_key] = query.obs[obs_key].cat.set_categories(reference_unique_obs)
 
-    def load_pretrained_config(self):
-        model_config_file = os.path.join(self.pretrained_model_dir, 'args.json')
-        model_file = os.path.join(self.pretrained_model_dir, 'best_model.pt')
-        vocab_file = os.path.join(self.pretrained_model_dir, 'vocab.json')
-        self.vocab = GeneVocab.from_file(vocab_file)
-        if self.pretrained_model_dir != self.output_dir:
-            output_dir = os.path.join(self.output_dir, 'model')
-            if not os.path.isdir(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-            shutil.copy(vocab_file, os.path.join(output_dir, 'vocab.json'))
-            shutil.copy(model_config_file, os.path.join(output_dir, "args.json"))
-        self.add_special_tokens()
-        with open(model_config_file, "r") as f:
-            model_configs = json.load(f)
-        self.log(
-            f"Resume model from {model_file}, the model args will override the "
-            f"config {model_config_file}."
-        )
-        self.config.pretrained_model = {**model_configs}
-        self.config.model.embsize = model_configs["embsize"]
-        self.config.model.nhead = model_configs["nheads"]
-        self.config.model.d_hid = model_configs["d_hid"]
-        self.config.model.nlayers = model_configs["nlayers"]
 
-    def filter_id_in_vocab(self, adata):
-        adata.var["id_in_vocab"] = [1 if gene in self.vocab else -1 for gene in adata.var["gene_name"]]
-        gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
-        self.log(
-            f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
-            f"in vocabulary of size {len(self.vocab)}."
-        )
-        filtered_adata = adata[:, adata.var["id_in_vocab"] >= 0].copy()
-        for column in adata.obs.select_dtypes(['category']).columns:
-            original_categories = adata.obs[column].cat.categories
-            filtered_adata.obs[column] = filtered_adata.obs[column].cat.set_categories(original_categories)
-        return filtered_adata
+
+
 
     def filter(self, adata, adata_test=None):
         self.log("Filtering genes in the reference dataset that are not in the vocabulary.")
@@ -109,11 +78,6 @@ class Base(ScGPT):
             adata_test = self.filter_id_in_vocab(adata_test)
             return adata, adata_test
         return adata
-
-    def add_special_tokens(self):
-        for s in self.special_tokens:
-            if s not in self.vocab:
-                self.vocab.append_token(s)
 
     def instantiate_preprocessor(self):
         self.preprocessor = Preprocessor(
@@ -153,9 +117,6 @@ class Training(Base):
     def __init__(self, reference_adata, **kwargs):
         super().__init__(**kwargs)
         self.read_reference(reference_adata)
-
-    def read_reference(self, reference_adata):
-        self.adata = read_h5ad(self.data_dir, reference_adata)
 
     def preprocess_reference(self):
         self.preprocessor(self.adata, batch_key=None)
@@ -252,6 +213,7 @@ class Inference(Base):
             drop_last=False,
             num_workers=min(len(os.sched_getaffinity(0)), self.config.train.eval_batch_size // 2),
             pin_memory=True,
+            worker_init_fn=seed_worker
         )
 
     def inference(self, plot_results=True, save=True, round_num=None, n_epochs=None):

@@ -1,3 +1,4 @@
+import json
 import warnings
 
 from torch.utils.data import DataLoader
@@ -16,9 +17,9 @@ from torchtext._torchtext import (
 from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
 
 from scgpt.model import TransformerModel
-
+import shutil
 from FedscGPT.base import BaseMixin
-from FedscGPT.utils import SeqDataset
+from FedscGPT.utils import SeqDataset, seed_worker, read_h5ad
 
 
 class ScGPT(BaseMixin):
@@ -54,6 +55,8 @@ class ScGPT(BaseMixin):
                             "do_sample": self.config.train.do_sample_in_train,
         }
 
+    def read_reference(self, reference_adata):
+        self.adata = read_h5ad(self.data_dir, reference_adata)
 
     def check_input_style(self):
         if self.config.preprocess.input_style == "category":
@@ -83,6 +86,40 @@ class ScGPT(BaseMixin):
             include_zero_gene=self.config.preprocess.include_zero_gene,
         )
 
+    def load_pretrained_config(self, set_pretrained_config=True):
+        model_config_file = os.path.join(self.pretrained_model_dir, 'args.json')
+        model_file = os.path.join(self.pretrained_model_dir, 'best_model.pt')
+        vocab_file = os.path.join(self.pretrained_model_dir, 'vocab.json')
+        self.vocab = GeneVocab.from_file(vocab_file)
+        if self.pretrained_model_dir != self.output_dir:
+            output_dir = os.path.join(self.output_dir, 'model')
+            if not os.path.isdir(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+            shutil.copy(vocab_file, os.path.join(output_dir, 'vocab.json'))
+            shutil.copy(model_config_file, os.path.join(output_dir, "args.json"))
+        self.add_special_tokens()
+        with open(model_config_file, "r") as f:
+            model_configs = json.load(f)
+        self.log(
+            f"Resume model from {model_file}, the model args will override the "
+            f"config {model_config_file}."
+        )
+        if set_pretrained_config:
+            self.config.pretrained_model = {**model_configs}
+            self.config.model.embsize = model_configs["embsize"]
+            self.config.model.nhead = model_configs["nheads"]
+            self.config.model.d_hid = model_configs["d_hid"]
+            self.config.model.nlayers = model_configs["nlayers"]
+            self.config.model.nlayers_cls = model_configs["n_layers_cls"]
+            self.config.model.dropout = model_configs["dropout"]
+            self.config.preprocess.pad_token = model_configs["pad_token"]
+            self.config.preprocess.pad_value = model_configs["pad_value"]
+
+    def add_special_tokens(self):
+        for s in self.special_tokens:
+            if s not in self.vocab:
+                self.vocab.append_token(s)
+
     def tokenize(self):
         self.gene_ids = np.array(self.vocab(self.adata.var["gene_name"].tolist()), dtype=int)
         self.tokenized_train = self.tokenize_and_pad_batch(self.train_data)
@@ -97,7 +134,12 @@ class ScGPT(BaseMixin):
         )
 
     def instantiate_transformer_model(self):
-        kwargs = self.config.model.__dict__
+        kwargs = copy.deepcopy(self.config.model.__dict__)
+        # print(kwargs)
+        # print(f"pad_token={self.config.preprocess.pad_token}",
+        #     f"pad_value={self.config.preprocess.pad_value}",)
+        # print(len(self.vocab))
+        # exit()
         self.model = TransformerModel(
             len(self.vocab),
             d_model=kwargs.pop("embsize"),
@@ -107,11 +149,24 @@ class ScGPT(BaseMixin):
             **kwargs,
         )
 
+    def filter_id_in_vocab(self, adata):
+        adata.var["id_in_vocab"] = [1 if gene in self.vocab else -1 for gene in adata.var["gene_name"]]
+        gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
+        self.log(
+            f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
+            f"in vocabulary of size {len(self.vocab)}."
+        )
+        filtered_adata = adata[:, adata.var["id_in_vocab"] >= 0].copy()
+        for column in adata.obs.select_dtypes(['category']).columns:
+            original_categories = adata.obs[column].cat.categories
+            filtered_adata.obs[column] = filtered_adata.obs[column].cat.set_categories(original_categories)
+        return filtered_adata
+
     def load_pretrained_model(self, model_name="best_model.pt"):
-        save_init_weights = False
+        save_init_weights = True
         if self.init_weights_dir:
             save_init_weights = self.load_init_weights()
-        if save_init_weights or self.pretrained_model_dir:
+        if save_init_weights and self.pretrained_model_dir:
             model_dir = os.path.join(self.pretrained_model_dir, model_name)
             try:
                 self.model.load_state_dict(torch.load(model_dir))
@@ -119,8 +174,8 @@ class ScGPT(BaseMixin):
             except:
                 # only load params that are in the model and match the size
                 self.load_matched_param(model_dir)
+            self.save_init_weights()
         self.freeze_params()
-        self.save_init_weights()
         self.model.to(self.device)
 
 
@@ -367,10 +422,12 @@ class ScGPT(BaseMixin):
                     batch_size,
                     intra_subset_shuffle=intra_domain_shuffle,
                     inter_subset_shuffle=shuffle,
-                    drop_last=drop_last,
+                    drop_last=True,
                 ),
+                drop_last=True,
                 num_workers=num_workers,
                 pin_memory=True,
+                worker_init_fn=seed_worker,
             )
             return data_loader
 
@@ -378,9 +435,10 @@ class ScGPT(BaseMixin):
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            drop_last=drop_last,
+            drop_last=True,
             num_workers=num_workers,
             pin_memory=True,
+            worker_init_fn=seed_worker,
         )
         return data_loader
 
