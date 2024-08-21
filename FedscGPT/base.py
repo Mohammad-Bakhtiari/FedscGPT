@@ -1,3 +1,5 @@
+from FedscGPT import utils
+utils.set_seed()
 import torch.nn as nn
 import torch
 import time
@@ -10,7 +12,6 @@ from scgpt.loss import (
 from scgpt.model import TransformerModel, AdversarialDiscriminator
 from FedscGPT.utils import load_config, load_fed_config, get_logger, weighted_average, average_weights, get_cuda_device, \
     split_data_by_batch, save_data_batches
-import pandas as pd
 
 class BaseMixin:
     """
@@ -361,7 +362,7 @@ class FedBase:
             dirs.append(client_dir)
         return dirs
 
-    def distribute_adata_by_batch(self, adata, batch_key):
+    def distribute_adata_by_batch(self, adata, batch_key, keep_vars=False):
         """
         Dynamic distribution of adata by batch id.
         Parameters
@@ -372,25 +373,19 @@ class FedBase:
         -------
 
         """
-        batches = split_data_by_batch(adata, batch_key)
-        # original_categories = {k: adata.obs[k].cat.categories for k in adata.obs.keys() if adata.obs[k].dtype == "category"}
-        # batch_ids = adata.obs[batch_key].tolist()
-        unique_batch_ids = list(set(batches.keys()))
-        self.n_clients = len(unique_batch_ids)
+        filename = "adata.h5ad"
+        self.n_clients = len(adata.obs[batch_key].unique())
         self.client_ids = list(range(self.n_clients)) if self.client_ids is None else self.client_ids
         self.logger = get_logger(self.output_dir, "FedscGPT", self.client_ids)
-        self.clients_data_dir = self.create_dirs(self.data_dir)
+        self.clients_data_dir = [f"{self.data_dir}/client_{client}" for client in range(self.n_clients)]
+        if not all([os.path.exists(f"{d}/{filename}") for d in self.clients_data_dir]):
+            batches = split_data_by_batch(adata, batch_key, keep_vars)
+            self.clients_data_dir = self.create_dirs(self.data_dir)
+            assert self.n_clients == len(self.clients_data_dir), \
+                f"Number of clients directories {len(self.clients_data_dir)} does not match the number of clients {self.n_clients}"
+            save_data_batches(batches, self.clients_data_dir, filename, keep_vars)
         self.clients_output_dir = self.create_dirs(self.output_dir)
-        assert self.n_clients == len(self.clients_data_dir), \
-            f"Number of clients directories {len(self.clients_data_dir)} does not match the number of clients {self.n_clients}"
-        
-        # for client, batch_id in enumerate(unique_batch_ids):
-        #     batch_adata = adata[adata.obs[batch_key] == batch_id].copy()
-        #     for k, v in original_categories.items():
-        #         batch_adata.obs[k] = pd.Categorical(batch_adata.obs[k], categories=v)
-            # assert os.path.exists(self.clients_data_dir[client]), f"{self.clients_data_dir[client]} does not exist!"
-            # batch_adata.write_h5ad(f"{self.clients_data_dir[client]}/adata.h5ad")
-        save_data_batches(batches, self.clients_data_dir, "adata.h5ad")
+
     
     def save_clients_fed_prep_data(self):
         for client in self.clients:
@@ -403,4 +398,4 @@ class FedBase:
 
 
     def init_global_weights(self):
-        self.global_weights = self.clients[0].get_weights()
+        self.global_weights = torch.load(self.clients[0].init_weights_dir)
