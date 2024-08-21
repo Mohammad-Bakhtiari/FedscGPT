@@ -1,6 +1,8 @@
+from FedscGPT import utils
+utils.set_seed()
 from abc import ABC, abstractmethod
-import numpy as np
 import torch
+
 
 class Aggregator(ABC):
     """
@@ -45,37 +47,6 @@ class Aggregator(ABC):
 
 
 class FedAvg(Aggregator):
-    # def aggregate(self, local_weights, **kwargs):
-    #     """Aggregate local weights by computing their simple average."""
-    #     global_weights = [np.zeros_like(w) for w in local_weights[0]]
-    #
-    #     # Sum all local weights
-    #     for weights in local_weights:
-    #         for i, weight in enumerate(weights):
-    #             global_weights[i] += weight
-    #
-    #     # Average the weights
-    #     for i in range(len(global_weights)):
-    #         global_weights[i] /= len(local_weights)
-    #
-    #     return global_weights
-
-    # def aggregate(self, local_weights, **kwargs):
-    #     """Aggregate local weights by computing their simple average."""
-    #     # Initialize the global weights dictionary with zeros
-    #     global_weights = {key: torch.zeros_like(val) for key, val in local_weights[0].items()}
-    #
-    #     # Sum all local weights
-    #     for weights in local_weights:
-    #         for key in weights.keys():
-    #             global_weights[key] += weights[key]
-    #
-    #     # Average the weights
-    #     for key in global_weights.keys():
-    #         global_weights[key] /= len(local_weights)
-    #
-    #     return global_weights
-
     def aggregate(self, local_weights, **kwargs):
         n_clients = len(local_weights)
         self.global_weights = {}
@@ -109,5 +80,3 @@ class FedAvg(Aggregator):
         """
         self.current_round += 1
         return self.current_round >= self.n_rounds
-
-
