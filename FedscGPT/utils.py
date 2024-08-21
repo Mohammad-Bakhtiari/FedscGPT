@@ -1,13 +1,29 @@
-import os
+import random
+import numpy as np
+import torch
+import tensorflow as tf
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
+SEED = 42
+def set_seed(seed=SEED):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+    tf.random.set_seed(seed)
+set_seed()
+
+import os
 import anndata
 from sklearn.metrics import confusion_matrix
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import scgpt as scg
 from torch.utils.data import Dataset, DataLoader
-import torch
 from typing import Dict, Tuple, List
 from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
 import dataclasses
@@ -17,20 +33,15 @@ import pickle
 import matplotlib.pyplot as plt
 import logging
 import sys
-import random
 
-SEED = 42
-def set_seed(seed=SEED):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-        # torch.backends.cudnn.deterministic = True
-        # torch.backends.cudnn.benchmark = False
-        # torch.use_deterministic_algorithms(True)
 
-set_seed()
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2 ** 32
+    np.random.seed(worker_seed + SEED)
+    random.seed(worker_seed + SEED)
+    torch.manual_seed(worker_seed + SEED)
 
 BASE_CLIENT_LEVEL_NUM = 35
 
@@ -237,9 +248,6 @@ def read_h5ad(data_dir, adata):
     else:
         print(f"Reading data from {data_dir}/{adata} ...")
         adata = anndata.read_h5ad(f"{data_dir}/{adata}")
-    # TODO: check this comment does not affect ms dataset
-    # adata.obs["celltype"] = adata.obs["Factor Value[inferred cell type - authors labels]"].astype("category")
-    # adata.var.set_index(adata.var["gene_name"], inplace=True)
     return adata
 
 
@@ -351,7 +359,7 @@ def per_epoch_data_prep(tokenized_train, tokenized_valid, train_celltype_labels,
     tensor_celltype_labels_train = torch.from_numpy(train_celltype_labels).long()
     tensor_celltype_labels_valid = torch.from_numpy(valid_celltype_labels).long()
 
-    if sort_seq_batch:  # TODO: update to random pick seq source in each traning batch
+    if sort_seq_batch:
         train_sort_ids = np.argsort(train_batch_labels)
         input_gene_ids_train = input_gene_ids_train[train_sort_ids]
         input_values_train = input_values_train[train_sort_ids]
@@ -421,7 +429,7 @@ def model_config_adj(config):
 def plot_umap(adata, cell_type_key, unique_celltypes, file_name, legend='no_legend'):
     # Create a palette for the cell types
     palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    palette_ = palette_ * 3  # Extend the palette if needed
+    palette_ = palette_ * 3
     palette_ = {c: palette_[i] for i, c in enumerate(unique_celltypes)}
 
     fig = plt.figure(figsize=(10, 4))
@@ -559,7 +567,7 @@ def validate_fed_code(centralized_adata, clients_adata):
     print("Maximum difference between centralized and federated results:", max_diff)
 
 
-def split_data_by_batch(adata, batch_key):
+def split_data_by_batch(adata, batch_key, keep_vars):
     original_categories = {k: adata.obs[k].cat.categories for k in adata.obs.keys() if adata.obs[k].dtype == "category"}
     batch_ids = adata.obs[batch_key].tolist()
     unique_batch_ids = list(set(batch_ids))
@@ -568,17 +576,19 @@ def split_data_by_batch(adata, batch_key):
         batch_adata = adata[adata.obs[batch_key] == batch_id].copy()
         for k, v in original_categories.items():
             batch_adata.obs[k] = pd.Categorical(batch_adata.obs[k], categories=v)
+        if keep_vars:
+            batch_adata.var = adata.var.copy()
         batches[batch_id] = batch_adata
     return batches
 
-def save_data_batches(batches: dict, data_dir: list or str, filename: str):
+def save_data_batches(batches: dict, data_dir: list or str, filename: str, keep_vars: bool = False):
     if type(data_dir) == str:
         data_dir = [f"{data_dir}/client_{i}"for i in batches.keys()]
     for client, batch_adata in enumerate(batches.values()):
         if not os.path.exists(data_dir[client]):
             print(f"{data_dir[client]} does not exist!")
             os.makedirs(data_dir[client], exist_ok=True)
-        if "gene_name" in batch_adata.var.keys():
+        if "gene_name" in batch_adata.var.keys() and not keep_vars:
             batch_adata.var.drop(columns=["gene_name"], inplace=True)
         batch_adata.write_h5ad(f"{data_dir[client]}/{filename}")
     return data_dir
@@ -826,3 +836,167 @@ class ResultsRecorder:
     def save(self):
         self.save_dataframe()
         self.save_pickle()
+
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, vocab, count_matrix, gene_ids, emb_style='<cls>', pad_value='<pad>', batch_ids=None):
+        self.vocab = vocab
+        self.count_matrix = count_matrix
+        self.gene_ids = gene_ids
+        self.batch_ids = batch_ids
+        self.emb_style = emb_style
+        self.pad_value = pad_value
+
+    def __len__(self):
+        return len(self.count_matrix)
+
+    def __getitem__(self, idx):
+        row = self.count_matrix[idx]
+        nonzero_idx = np.nonzero(row)[0]
+        values = row[nonzero_idx]
+        genes = self.gene_ids[nonzero_idx]
+        # append <cls> token at the beginning
+        genes = np.insert(genes, 0, self.vocab[self.emb_style])
+        values = np.insert(values, 0, self.pad_value)
+        genes = torch.from_numpy(genes).long()
+        values = torch.from_numpy(values).float()
+        output = {
+            "id": idx,
+            "genes": genes,
+            "expressions": values,
+        }
+        if self.batch_ids is not None:
+            output["batch_labels"] = self.batch_ids[idx]
+        return output
+
+
+def plot_embedding(adata, query, cell_type_key, output_dir):
+    def concat_reference_query(ref, query):
+        n_ref_samples, n_query_samples = len(ref), len(query)
+        adata_concat = query.concatenate(ref, batch_key="dataset")
+        # mark the reference vs. query dataset
+        adata_concat.obs["is_ref"] = ["Query"] * n_query_samples + ["Reference"] * n_ref_samples
+        adata_concat.obs["is_ref"] = adata_concat.obs["is_ref"].astype("category")
+        # mask the query dataset cell types
+        adata_concat.obs[cell_type_key] = adata_concat.obs[cell_type_key].astype("category")
+        adata_concat.obs[cell_type_key] = adata_concat.obs[cell_type_key].cat.add_categories(["To be predicted"])
+        adata_concat.obs[cell_type_key][: n_query_samples] = "To be predicted"
+        return adata_concat
+
+
+
+    concat_adata = concat_reference_query(adata, query)
+
+    # Compute neighbors and UMAP
+    sc.pp.neighbors(concat_adata, use_rep="X_scGPT")
+    sc.tl.umap(concat_adata)
+
+    def custom_plot_umap(adata, color_by, file_name, legend='no_legend'):
+        """
+        Custom function to plot UMAP embeddings with or without legends.
+
+        Args:
+            adata (AnnData): The AnnData object containing the UMAP coordinates.
+            color_by (list): List of column names in `adata.obs` to color the plots by.
+            file_name (str): Name of the file to save the plot.
+            legend (str): Either 'no_legend' or 'legend_only'.
+        """
+        # Create the UMAP plot
+        fig, axes = plt.subplots(1, len(color_by), figsize=(len(color_by) * 5, 5))
+
+        if len(color_by) == 1:
+            axes = [axes]
+
+        for ax, color in zip(axes, color_by):
+            sc.pl.umap(adata, color=color, ax=ax, show=False, frameon=False)
+            if legend == 'no_legend':
+                ax.get_legend().remove()  # Remove the legend
+            elif legend == 'legend_only':
+                # Clear the data but keep the legend
+                for coll in ax.collections:
+                    coll.remove()
+                ax.set_title('')
+                ax.set_xlabel('')
+                ax.set_ylabel('')
+            else:
+                raise ValueError(f"Invalid value for legend: {legend}")
+
+        if legend == 'no_legend':
+            plt.tight_layout()
+        elif legend == 'legend_only':
+            # Adjust the subplot parameters to include more space for the legend
+            plt.subplots_adjust(right=0.5)
+            for ax in axes:
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.5, box.height])  # resize the plot
+
+        plt.savefig(file_name, dpi=300)
+        plt.close()
+
+    sc.pp.neighbors(concat_adata, use_rep="X_scGPT")
+    sc.tl.umap(concat_adata)
+
+    # Plot UMAP with and without legends
+    custom_plot_umap(concat_adata, color_by=["is_ref", cell_type_key], file_name=f"{output_dir}/embedding_umap_plot.png",
+                     legend='no_legend')
+    custom_plot_umap(concat_adata, color_by=["is_ref", cell_type_key], file_name=f"{output_dir}/embedding_umap_legend.png",
+                     legend='legend_only')
+
+
+
+def l2_sim(a, b):
+    sims = -np.linalg.norm(a - b, axis=1)
+    return sims
+
+def get_similar_vectors(vector, ref, top_k=10):
+    # sims = cos_sim(vector, ref)
+    sims = l2_sim(vector, ref)
+
+    top_k_idx = np.argsort(sims)[::-1][:top_k]
+    return top_k_idx, sims[top_k_idx]
+
+
+def eval_reference_mapping(gt, preds, output_dir="output", logger=None):
+    if logger is None:
+        logger = print
+    # Calculate evaluation metrics
+    res_dict = {
+        "accuracy": accuracy_score(gt, preds),
+        "precision": precision_score(gt, preds, average="macro"),
+        "recall": recall_score(gt, preds, average="macro"),
+        "macro_f1": f1_score(gt, preds, average="macro"),
+    }
+
+    # Print the evaluation metrics
+    logger("Evaluation Metrics:")
+    for key, value in res_dict.items():
+        logger(f"{key.capitalize()}: {value:.4f}")
+
+    # Save the evaluation metrics to a CSV file
+    metrics_df = pd.DataFrame([res_dict])
+    metrics_df.to_csv(f"{output_dir}/evaluation_metrics.csv", index=False)
+
+    # Prepare confusion matrix
+    y_true = gt
+    y_pred = preds
+    cell_type_list = np.unique(y_true)
+    matrix = confusion_matrix(y_true, y_pred, labels=cell_type_list)
+    matrix = matrix.astype("float") / matrix.sum(axis=1)[:, np.newaxis]
+
+    # Create a DataFrame for the confusion matrix
+    df = pd.DataFrame(matrix, index=cell_type_list[:matrix.shape[0]], columns=cell_type_list[:matrix.shape[1]])
+
+    # Create and save the clustermap
+    ax = sns.clustermap(df,
+                        cmap='Purples',
+                        annot=True, fmt=".2f",
+                        annot_kws={'size': 8},
+                        vmin=0,
+                        vmax=1,
+                        row_cluster=False,
+                        col_cluster=False,
+                        figsize=(14, 14))
+
+    clustermap_path = f"{output_dir}/confusion_matrix_clustermap.png"
+    plt.savefig(clustermap_path)
+    plt.close()
