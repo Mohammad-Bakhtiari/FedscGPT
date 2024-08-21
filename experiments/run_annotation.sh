@@ -23,7 +23,7 @@ echo "Running annotation for ${mode}"
 
 # Loop through each dataset configuration
 for key in "${!datasets[@]}"; do
-    echo "Running data annotation for $key"
+    echo -e "\e[34mRunning data annotation for $key\e[0m"
 
     # Read dataset configuration into an array using the custom delimiter
     IFS='|' read -r -a args <<< "${datasets[$key]}"
@@ -35,9 +35,9 @@ for key in "${!datasets[@]}"; do
 
     # Check for errors in the execution of the script
     if [ $? -ne 0 ]; then
-        echo "Error processing dataset $key. Please check the configuration."
+        echo -e "\e[31Error processing dataset $key. Please check the configuration.\e[0m"
         continue
     fi
 done
 
-echo "Data annotation completed for all datasets."
+echo -e "\e[33Data annotation completed for all datasets.\e[0m"
