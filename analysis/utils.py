@@ -21,6 +21,7 @@ def set_seed(seed=SEED):
 
 set_seed(SEED)
 image_format = 'svg'
+ANNOTATION_PLOTS_DIR = 'plots/annotation'
 
 def load_metric(filepath, metric):
     with open(filepath, 'rb') as file:
@@ -84,7 +85,7 @@ class CentralizedMetricPlotter:
                             marker=dict(color='blue', symbol='circle'))
 
         # Save the plot
-        fig.write_image(f"{plot_name}.{img_format}")
+        fig.write_image(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.{img_format}")
 
         # Show the plot
         fig.show()
@@ -130,6 +131,17 @@ class CentralizedMetricPlotter:
         ]
         legend_labels = ['Centralized', 'Outlier', 'Federated', 'Clients']
 
+        class HandlerImage:
+            def __init__(self, image):
+                self.image = image
+
+            def legend_artist(self, legend, orig_handle, fontsize, handlebox):
+                x0, y0 = handlebox.xdescent, handlebox.ydescent
+                imagebox = OffsetImage(self.image, zoom=0.15)
+                ab = AnnotationBbox(imagebox, (x0 + .075, y0 + .08), frameon=False, xycoords='axes fraction')
+                handlebox.add_artist(ab)
+                return ab
+
         plt.legend(handles=legend_elements, labels=legend_labels, loc='lower left', fontsize=14, labelspacing=0.9,
                    borderpad=.3, handlelength=1.4,
                    handler_map={image_placeholder_instance: HandlerImage(boxplot_image)})
@@ -144,9 +156,9 @@ class CentralizedMetricPlotter:
 
         # Save the plot
         if img_format == "svg":
-            plt.savefig(f"{plot_name}.svg", format='svg')
+            plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.svg", format='svg')
         else:
-            plt.savefig(f"{plot_name}.png")
+            plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.png")
 
 def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     """
@@ -160,10 +172,6 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     # Load the results DataFrame
     df = pd.read_csv(file_path)
     df = df[~(df.Round == 0)]
-    # m = df[(df.Metric == 'Accuracy') & (df.Dataset == 'hp')].round(2).Value.idxmax()
-    # print(df.loc[m])
-    print(df[(df.Metric == 'Accuracy') & (df.Dataset == 'hp')])
-    exit()
     # Determine unique datasets and metrics
     dataset_keys = df['Dataset'].unique()
     metric_keys = df['Metric'].unique()
@@ -219,12 +227,13 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     cbar_ax = fig.add_axes([0.79, 0.28, 0.02, 0.5])
     cbar = plt.colorbar(mappable, cax=cbar_ax)
     cbar.ax.tick_params(labelsize=14)
-    plt.savefig(f"{plot_name}.{file_format}", dpi=300)
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.{file_format}", dpi=300)
 
 
 
 
-def analyze_communication_efficiency(results_file_path, centralized_file_path, percentages=[70, 80, 90, 95, 99], metric="Accuracy"):
+def analyze_communication_efficiency(results_file_path, centralized_file_path, percentages=[70, 80, 90, 92, 95, 99],
+                                     metric="Accuracy"):
     """
     Analyze the communication efficiency by calculating the number of communication rounds and epochs required
     to reach specified percentages of the centralized accuracy and display the results in a table.
@@ -233,6 +242,13 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
         results_file_path (str): Path to the CSV file containing the federated results.
         centralized_file_path (str): Path to the CSV file containing the centralized results.
         percentages (list): List of percentages of centralized accuracy to target.
+
+    Parameters
+    ----------
+    percentages
+    centralized_file_path
+    results_file_path
+    metric
     """
     # Load the results DataFrame and centralized results
     df = pd.read_csv(results_file_path)
@@ -248,7 +264,6 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
     for dataset in dataset_keys:
         row = [handle_ds_name(dataset)]
         for p in percentages:
-            metric = "Accuracy"
             # Get the centralized accuracy for the specific dataset and metric
             central_value = centralized_df[(centralized_df['Dataset'] == dataset) & (centralized_df['Type'] == 'Centralized')][metric].values[0]
 
@@ -270,15 +285,16 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
                 if rounds_data.loc[m]['Value'] >= target_value:
                     rounds_needed = r
                     epochs_needed = rounds_data.loc[m]['n_epochs']
+                    best_= rounds_data.loc[m]['Value']
                     break
 
             if rounds_needed is not None:
                 row.append(f"{rounds_needed}|{epochs_needed}")
+                print(f"For {dataset}, {p}% of centralized accuracy is reached in {rounds_needed} rounds and {epochs_needed} epochs with {best_}")
             else:
                 row.append("NR")
 
         table_data.append(row)
-
     # Calculate column widths based on the longest text in each column
     col_widths = []
     for col_idx in range(len(table_data[0])):
@@ -302,9 +318,9 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
             table[(row_idx, col_idx)].set_width(width + 0.5)
     for key, cell in table.get_celld().items():
         cell.set_height(0.2)
-    plt.savefig("communication.svg", dpi=300, format="svg")
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/communication.svg", dpi=300, format="svg")
 
-def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy'):
+def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy', img_format='svg'):
     df = pd.read_csv(file_path)
     df = df[df.Round < 11]
     df.Round = df.Round.astype(int)
@@ -359,14 +375,13 @@ def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_m
     fig.legend(handles, labels, loc='center', bbox_to_anchor=(0.5, 0.94), ncol=len(epochs_list), fontsize=12)
     plt.tight_layout()
     plt.subplots_adjust(top=0.8, wspace=0.051)  # Adjust top for the legend
-    plt.savefig(f"{target_metric}_changes_over_ER.svg", format='svg', dpi=300)
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{target_metric}_changes_over_ER.{img_format}", format=img_format, dpi=300)
 
 
 def find_best_fed(file_path, metric):
     df = pd.read_csv(file_path)
     df = df[df['Metric'] == metric.title()]
     dataset_keys = df['Dataset'].unique()
-    print(dataset_keys)
     best = {}
     for dataset in dataset_keys:
         data = df[df['Dataset'] == dataset]
@@ -396,43 +411,53 @@ def handle_ds_name(name):
         return "MS"
     if name.lower() == "myeloid":
         return "Myeloid"
+    if name.lower() == "covid":
+        return "Covid-19"
+    if name.lower() == "lung":
+        return "Lung-Kim"
 
 class ImagePlaceholder:
     pass
 
-class HandlerImage:
-    def __init__(self, image):
-        self.image = image
 
-    def legend_artist(self, legend, orig_handle, fontsize, handlebox):
-        x0, y0 = handlebox.xdescent, handlebox.ydescent
-        imagebox = OffsetImage(self.image, zoom=0.15)
-        ab = AnnotationBbox(imagebox, (x0 + .075, y0 + .08), frameon=False, xycoords='axes fraction')
-        handlebox.add_artist(ab)
-        return ab
-
-
-def load_results_pkl(root_dir):
-    datasets = [d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))]
+def load_results_pkl(root_dir, pkl_file, best_fed):
+    with open(pkl_file, 'rb') as f:
+        result = pickle.load(f)
     results = {}
-
-    for dataset in datasets:
-        results[dataset] = {}
-        for mode in ['centralized', 'federated']:
-            pkl_file = os.path.join(root_dir, dataset, mode, 'results.pkl')
-            results[dataset][mode] = {}
-
-            if os.path.exists(pkl_file):
-                with open(pkl_file, 'rb') as file:
-                    res = pickle.load(file)
-                    results[dataset][mode]['metrics'] = res['results']
-                    results[dataset][mode]['predictions'] = res['predictions']
-                    results[dataset][mode]['labels'] = res['labels']
-                    results[dataset][mode]['id_maps'] = res['id_maps']
-                    results[dataset][mode]['unique_celltypes'] = list(res['id_maps'].values())
-            else:
-                print(f"results.pkl not found in {dataset} {mode}")
+    for ds, res in best_fed.items():
+        epochs = res['n_epochs']
+        rounds = res['Round']
+        results[ds] = {"federated": result[ds][epochs][rounds]}
+        id_maps = result[ds]['id_maps']
+        results[ds]['federated']['id_maps'] = id_maps
+        results[ds]['federated']['unique_celltypes'] = list(id_maps.values())
+        cent_pkl_file = os.path.join(root_dir, "output", "annotation", ds, 'centralized', 'results.pkl')
+        if os.path.exists(cent_pkl_file):
+            with open(cent_pkl_file, 'rb') as file:
+                cent_res = pickle.load(file)
+        results[ds]['centralized'] = cent_res
+        results[ds]['centralized']['unique_celltypes'] = list(cent_res['id_maps'].values())
     return results
+    # datasets = [d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))]
+    # results = {}
+    #
+    # for dataset in datasets:
+    #     results[dataset] = {}
+    #     for mode in ['centralized', 'federated']:
+    #         pkl_file = os.path.join(root_dir, dataset, mode, 'results.pkl')
+    #         results[dataset][mode] = {}
+    #
+    #         if os.path.exists(pkl_file):
+    #             with open(pkl_file, 'rb') as file:
+    #                 res = pickle.load(file)
+    #                 results[dataset][mode]['metrics'] = res['results']
+    #                 results[dataset][mode]['predictions'] = res['predictions']
+    #                 results[dataset][mode]['labels'] = res['labels']
+    #                 results[dataset][mode]['id_maps'] = res['id_maps']
+    #                 results[dataset][mode]['unique_celltypes'] = list(res['id_maps'].values())
+    #         else:
+    #             print(f"results.pkl not found in {dataset} {mode}")
+    # return results
 
 def load_query_datasets(data_dir):
     datasets = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
@@ -506,12 +531,14 @@ def plot_confusion_matrices(dataset, results, color_mapping):
     cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])  # Adjust the position and size as needed
     plt.colorbar(axes[1].collections[0], cax=cbar_ax).ax.tick_params(labelsize=20)
     plt.tight_layout(rect=[0, 0, 0.9, 1])
-    plt.savefig(f"{dataset}_confusion_matrices.svg", dpi=300, format='svg')
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{dataset}_confusion_matrices.svg", dpi=300, format='svg')
     plt.close()
     return color_mapping
 
-def plot_umap_and_conf_matrix(root_dir, data_dir):
-    results = load_results_pkl(root_dir)
+def plot_umap_and_conf_matrix(root_dir, data_dir, res_pkl_file, res_df_file):
+    df = pd.read_csv(res_df_file)
+    best_fed = {ds: df.loc[df[(df.Dataset==ds) & (df.Metric == 'Accuracy')]["Value"].idxmax()] for ds in df.Dataset.unique()}
+    results = load_results_pkl(root_dir, res_pkl_file, best_fed)
     query_datasets = load_query_datasets(data_dir)
 
     for dataset in results.keys():
@@ -553,7 +580,7 @@ def plot_umaps(adata, predictions_centralized, predictions_federated, labels, un
             ax.set_title(title)
             ax.axis('off')
         plt.tight_layout()
-        plt.savefig(file_name, dpi=300)
+        plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{file_name}", dpi=300)
         plt.close(fig)
     else:
         fig = plt.figure(figsize=(15, 5))
@@ -566,31 +593,42 @@ def plot_umaps(adata, predictions_centralized, predictions_federated, labels, un
         fig_legend, ax_legend = plt.subplots(figsize=(3, 9))  # Separate figure for the legend
         ax_legend.legend(sorted_handles, sorted_labels, loc='center', fontsize='small', frameon=False, ncol=1)
         ax_legend.axis('off')
-        plt.savefig(legend_file_name, dpi=300)
+        plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{legend_file_name}", dpi=300)
         plt.close(fig_legend)
         plt.close()
 
 
-def create_and_save_metrics_dataframe(root_dir, output_csv):
-    results = load_results_pkl(root_dir)
-    all_data = []
+def create_metrics_dataframe(root_dir, res_df_file):
+    df = pd.read_csv(res_df_file)
+    results = {}
+    for ds in df.Dataset.unique():
+        results[ds] = {"federated": {}}
+        for metric in df.Metric.unique():
+            idmax = df[(df.Dataset == ds) & (df.Metric == metric)]["Value"].idxmax()
+            results[ds]["federated"][metric] = df.loc[idmax, "Value"]
+        results[ds]["centralized"] = {}
+        cent_pkl_file = os.path.join(root_dir, ds, 'centralized', 'results.pkl')
+        if os.path.exists(cent_pkl_file):
+            with open(cent_pkl_file, 'rb') as file:
+                cent_res = pickle.load(file)
+        results[ds]['centralized'] = cent_res['results']
+    rows = []
 
-    # Extract metrics for each dataset and mode
-    for dataset in results.keys():
-        for mode in results[dataset].keys():
-            for metric, value in results[dataset][mode]['metrics'].items():
-                all_data.append({
+    for dataset, modes in results.items():
+        for mode, metrics in modes.items():
+            for metric, value in metrics.items():
+                rows.append({
                     'Dataset': dataset,
                     'Mode': mode,
                     'Metric': metric,
                     'Value': value
                 })
 
-    # Create a DataFrame
-    df = pd.DataFrame(all_data)
-
-    # Save the DataFrame to a CSV file
-    df.to_csv(output_csv, index=False)
+    # Creating the DataFrame
+    df = pd.DataFrame(rows)
+    df.Metric = df.Metric.apply(lambda x: x[5:].title() if x.startswith('test/') else x)
+    df.Metric = df.Metric.apply(lambda x: x[:-2] + "F1" if x.endswith('f1') else x)
+    return df
 
 def handle_metrics(metric):
     metric = metric[5:]
@@ -598,13 +636,10 @@ def handle_metrics(metric):
         return 'Macro F1'
     return metric.title()
 
-def plot_best_metrics(root_dir=None, csv_file='best_metrics.csv', img_format='svg'):
+def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     handle_image_format(img_format)
-    if not os.path.exists(csv_file):
-        create_and_save_metrics_dataframe(root_dir,csv_file)
-    df = pd.read_csv(csv_file)
-    print(df[df['Metric'] == 'test/accuracy'].round(2))
-    exit()
+    df = create_metrics_dataframe(root_dir, param_tuning_df)
+    best_metrics_report(df)
 
     # Plot metrics with subplots for each metric and different modes as curves
     metrics = df['Metric'].unique()
@@ -615,7 +650,7 @@ def plot_best_metrics(root_dir=None, csv_file='best_metrics.csv', img_format='sv
     for i, metric in enumerate(metrics):
         ax = axes[i] if num_metrics > 1 else axes
         sns.barplot(data=df[df['Metric'] == metric], x='Dataset', y='Value', hue='Mode', ax=ax, width=0.4)
-        ax.set_ylabel(handle_metrics(metric), fontsize=16)
+        ax.set_ylabel(metric, fontsize=16)
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
@@ -629,6 +664,151 @@ def plot_best_metrics(root_dir=None, csv_file='best_metrics.csv', img_format='sv
         ax.get_legend().remove()
     legend_offset = 0.12
     plt.tight_layout(rect=[0, 0, 1 - legend_offset, 1 -legend_offset])  # Adjust rect to make space for the legend
-    plt.savefig(f"best_metrics.{img_format}", dpi=300, format=img_format)
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/best_metrics.{img_format}", dpi=300, format=img_format)
+    plt.close()
     handle_image_format(start=False)
 
+
+def best_metrics_report(df):
+    # Calculate the differences between federated and centralized
+    df_pivot = df.pivot_table(index=['Dataset', 'Metric'], columns='Mode', values='Value').reset_index()
+    df_pivot['Difference'] = df_pivot['federated'] - df_pivot['centralized']
+    # Calculate the percentage of centralized performance achieved by federated learning
+    df_pivot['Percentage Achieved'] = (df_pivot['federated'] / df_pivot['centralized']) * 100
+    # Print the difference and percentage for each metric
+    print("Differences and Percentage Achieved between Federated and Centralized for each metric:")
+    print(df_pivot[['Dataset', 'Metric', 'Difference', 'Percentage Achieved']])
+    # Identify and print the maximum difference
+    max_diff_row = df_pivot.loc[df_pivot['Difference'].abs().idxmax()]
+    print("\nMaximum Difference:")
+    print(
+        f"Dataset: {max_diff_row['Dataset']}, Metric: {max_diff_row['Metric']}, Difference: {max_diff_row['Difference']}")
+    # Identify and print the worst case (lowest percentage achieved)
+    worst_case_row = df_pivot.loc[df_pivot['Percentage Achieved'].idxmin()]
+    print("\nWorst Case (Lowest Percentage Achieved):")
+    print(
+        f"Dataset: {worst_case_row['Dataset']}, Metric: {worst_case_row['Metric']}, Percentage Achieved: {worst_case_row['Percentage Achieved']}%")
+
+
+def embedding_boxplot(data_dir, img_format='svg'):
+    dataset = ["covid", "lung"]
+    metrics = ['accuracy', 'precision', 'recall', 'macro_f1']
+
+    # Initialize an empty DataFrame to hold all results
+    df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
+
+    federated_file_path = {ds: os.path.join(data_dir, ds, "federated", "evaluation_metrics.csv") for ds in dataset}
+    centralized_file_path = {ds: os.path.join(data_dir, ds, "centralized", "evaluation_metrics.csv") for ds in dataset}
+
+    for ds in dataset:
+        # Load centralized and federated results
+        centralized_metrics = pd.read_csv(centralized_file_path[ds])
+        federated_metrics = pd.read_csv(federated_file_path[ds])
+        rows = []
+        # Append centralized and federated results to the DataFrame
+        for metric in metrics:
+            rows.append({
+                'Dataset': ds,
+                'Type': 'Centralized',
+                'Metric': metric,
+                'Value': centralized_metrics[metric].values[0]
+            })
+            rows.append({
+                'Dataset': ds,
+                'Type': 'Federated',
+                'Metric': metric,
+                'Value': federated_metrics[metric].values[0]
+            })
+        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+        # Collect and append client results
+        client_dir_path = os.path.join(data_dir, ds, "centralized")
+        rows = []
+        for client_dir in os.listdir(client_dir_path):
+            if client_dir.startswith("client"):
+                client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
+                for metric in metrics:
+                    rows.append({
+                        'Dataset': ds,
+                        'Type': 'Client',
+                        'Metric': metric,
+                        'Value': client_metrics[metric].values[0]
+                    })
+        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+    plot_embedding_boxplot(df, img_format)
+
+
+def plot_embedding_boxplot(df, img_format='svg'):
+    """
+    Plot data using Matplotlib from a pandas DataFrame.
+    """
+    if not os.path.exists('./plots/embedding'):
+        os.makedirs('./plots/embedding')
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(5, 5))
+
+        # Separate client data and centralized/federated data
+        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('Client'))]
+        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
+        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+
+        # Prepare data for boxplot
+        client_values = [client_data[client_data['Dataset'] == dataset]['Value'].values for dataset in datasets]
+
+        # Create boxplots
+        box = plt.boxplot(client_values, patch_artist=True, positions=range(1, len(datasets) + 1))
+
+        # Colors for boxplots
+        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
+        for patch, color in zip(box['boxes'], colors[:len(box['boxes'])]):
+            patch.set_facecolor(color)
+
+        # Overlay centralized and federated data points
+        for i, dataset in enumerate(datasets):
+            # Centralized as dashed lines
+            plt.axhline(y=centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0],
+                        color=box['boxes'][i].get_facecolor(), linestyle='--', linewidth=2, zorder=3)
+            # Federated as scatter points
+            plt.scatter(i + 1, federated_data[federated_data['Dataset'] == dataset]['Value'].values[0],
+                        color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker='D', s=100)
+
+        # Customize the plot
+        plt.xlabel('Datasets', fontsize=16)
+        plt.ylabel(metric.capitalize(), fontsize=16)
+        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=16)
+        plt.yticks(fontsize=16)
+
+
+        boxplot_image_path = 'boxplot.png'
+        boxplot_image_pil = Image.open(boxplot_image_path).convert("RGBA")  # Ensure it is RGBA
+        # Convert to an array suitable for Matplotlib
+        boxplot_image = np.array(boxplot_image_pil)
+        image_placeholder_instance = ImagePlaceholder()
+        legend_elements = [
+            Line2D([0], [0], color='black', lw=2, linestyle='--', label='Centralized'),
+            Line2D([0], [0], marker='*', color='w', markersize=10, label='Federated',
+                   markeredgecolor='black'),
+            image_placeholder_instance
+        ]
+        legend_labels = ['Centralized', 'Federated', 'Clients']
+
+        class HandlerImage:
+            def __init__(self, image):
+                self.image = image
+
+            def legend_artist(self, legend, orig_handle, fontsize, handlebox):
+                x0, y0 = handlebox.xdescent, handlebox.ydescent
+                imagebox = OffsetImage(self.image, zoom=0.15)
+                ab = AnnotationBbox(imagebox, (x0 + .61, y0 + .08), frameon=False, xycoords='axes fraction')
+                handlebox.add_artist(ab)
+                return ab
+
+        plt.legend(handles=legend_elements, labels=legend_labels, loc='lower right', fontsize=14, labelspacing=0.9,
+                   borderpad=.3, handlelength=1.4,
+                   handler_map={image_placeholder_instance: HandlerImage(boxplot_image)})
+
+        plt.tight_layout()
+        plt.savefig(f"./plots/embedding/{metric}_boxplot.{img_format}", format=img_format, dpi=300)
+        plt.close()
