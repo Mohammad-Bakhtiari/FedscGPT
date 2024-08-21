@@ -29,6 +29,11 @@ def add_annotation_args(parser):
     parser.add_argument('--batch_key', type=str, default='batch')
     parser.add_argument('--dataset', type=str, default='ms', choices=['ms', 'hp', 'myeloid'])
 
+def add_observation_args(parser):
+    parser.add_argument('--celltype_key', type=str, default='celltype')
+    parser.add_argument('--batch_key', type=str, default='batch')
+    parser.add_argument('--gene_col', type=str, default='gene_name')
+    parser.add_argument('--k', type=int, help="Number of nearest neighbors", default=10)
 
 
 def add_federated_annotation_args(parser):
@@ -41,6 +46,9 @@ def add_federated_annotation_args(parser):
     parser.add_argument("--mu", type=float, default=0.05, help="Mean parameter")
     parser.add_argument("--param_tuning", action='store_true', default=False)
 
+def add_federated_embedding_args(parser):
+    parser.add_argument('--fed_config_file', type=str, help='.yml file for the federated model',
+                        default='fed_config.yml')
 
 def split_test_batches(args):
     args.test_batches = [b for b in args.test_batches.split(',')]
