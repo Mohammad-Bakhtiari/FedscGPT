@@ -3,7 +3,6 @@ import os.path
 import torch
 from typing import Dict
 from FedscGPT.base import FedBase
-# from FedscGPT.centralized.annotator import CellTypeAnnotator
 from FedscGPT.centralized.annotator import Training, Inference
 from FedscGPT.utils import read_h5ad
 from FedscGPT.preprocessor.local import Preprocessor
@@ -12,7 +11,6 @@ from FedscGPT.preprocessor.aggregation import aggregate_gene_counts, aggregate_b
 from FedscGPT.federated.aggregator import FedAvg
 
 
-# class ClientAnnotator(CellTypeAnnotator):
 class ClientAnnotator(Training):
     """
     cell_id2type: Here is calculated locally. No global ID!
@@ -57,20 +55,11 @@ class ClientAnnotator(Training):
         cellytpe_dict = {v: k for k, v in global_cellytpe_dict.items()}
         self.adata.obs["celltype_id"] = [cellytpe_dict[i] for i in self.adata.obs[self.celltype_key]]
         self.config.model.n_cls = len(global_cellytpe_dict) if self.config.train.CLS else 1
-        # self.cell_id2type = dict(enumerate(self.adata.obs[self.celltype_key].astype("category").cat.categories))
         self.cell_id2type = global_cellytpe_dict
         self.adata.var["gene_name"] = self.adata.var.index.tolist()
-        # self.unique_cell_types = self.adata.obs[self.celltype_key].unique()
         self.unique_cell_types = list(global_cellytpe_dict.values())
         self.load_pretrained_config()
         self.filter(self.adata)
-        print(global_cellytpe_dict)
-        print(self.adata.obs[self.celltype_key])
-        print(self.adata.obs["celltype_id"])
-        print(self.cell_id2type)
-        print(self.unique_cell_types)
-
-
 
     def local_harmonize(self):
         super().harmonize(self.adata)
@@ -94,7 +83,6 @@ class ClientAnnotator(Training):
         return self.preprocessor.compute_local_hvg_stats(self.adata)
 
     def apply_hvg_stats(self, global_hvg_stats):
-        # TODO: set n_top_genes
         self.adata = self.preprocessor.subset_hvgs(self.adata, global_hvg_stats, n_top_genes=None)
 
     def get_local_bin_edges(self):
@@ -123,17 +111,6 @@ class ClientAnnotator(Training):
         self.model.load_state_dict(init_weights)
         return trained_weights
 
-
-
-    # def get_weights(self):
-    #     weights = []
-    #     for w in self.model.parameters():
-    #         weights.append(w.data.cpu().numpy())
-    #     return weights
-    #
-    # def set_weights(self, weights):
-    #     for w, w_new in zip(self.model.parameters(), weights):
-    #         w.data = torch.tensor(w_new, device=self.device)
 
     def get_weights(self):
         """ Get the weights of the model
@@ -234,9 +211,3 @@ class FedAnnotator(FedBase, FedAvg):
             client.instantiate_transformer_model()
             client.load_pretrained_model()
             client.setup_losses()
-
-    def inference(self, global_weights):
-        # self.celltype_annotator.model.load_state_dict(global_weights)
-        # self.celltype_annotator.best_model = self.celltype_annotator.model
-        self.celltype_annotator.best_model.load_state_dict(global_weights)
-        self.celltype_annotator.inference(plot_results=False, save=False)
