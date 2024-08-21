@@ -1,12 +1,14 @@
 """"
 
 """
-import os
 import __init__
+from FedscGPT import utils
+utils.set_seed()
+from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches
 from FedscGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
 from FedscGPT.federated.annotator import FedAnnotator
 from FedscGPT.federated.aggregator import FedAvg
-from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches
+import os
 from args import instantiate_args, add_annotation_args, create_output_dir, add_federated_annotation_args
 import torch
 from functools import partial
