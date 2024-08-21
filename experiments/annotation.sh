@@ -29,6 +29,7 @@ query="${data_dir}/${query_file}"
 output="${root_dir}/output/annotation/${dataset}/${general_mode}"
 INTI_WEIGHTS_DIR="${root_dir}/init_weights"
 
+export CUBLAS_WORKSPACE_CONFIG=:4096:8
 cmd="python ${root_dir}/tasks/annotation.py \
  --dataset_name $dataset \
  --data-dir $data_dir \
