@@ -28,6 +28,7 @@ for key in "${!datasets[@]}"; do
         query="${data_dir}/${args[2]}"
         output="${root_dir}/output/annotation/${args[0]}/param_tuning"
 
+        export CUBLAS_WORKSPACE_CONFIG=:4096:8
         # Run the Python script with the specified arguments
         python "${root_dir}/tasks/annotation.py" \
          --dataset_name "${args[0]}" \
