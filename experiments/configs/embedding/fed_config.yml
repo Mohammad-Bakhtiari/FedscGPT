@@ -1,0 +1,11 @@
+embedding:
+  n_rounds: 5
+  aggregation_type: "WeightedFedAvg"
+  condition_key: "condition"
+  preprocess:
+    filter_gene_by_counts: false
+    filter_cell_by_counts: false
+    normalize_total: true
+    log1p: false
+    subset_hvg: false
+    binning: true
