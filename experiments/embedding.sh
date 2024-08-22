@@ -42,5 +42,4 @@ python ${root_dir}/tasks/embedding.py \
  --gpu $gpu \
  --pretrained_model_dir "${root_dir}/pretrained_models/scGPT_human" \
  --config_file "${root_dir}/experiments/configs/embedding/config.yml" \
- --fed_config_file "${root_dir}/experiments/configs/embedding/fed_config.yml" \
- --verbose
+ --fed_config_file "${root_dir}/experiments/configs/embedding/fed_config.yml"
