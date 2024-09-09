@@ -29,6 +29,21 @@ def add_annotation_args(parser):
     parser.add_argument('--batch_key', type=str, default='batch')
     parser.add_argument('--dataset', type=str, default='ms', choices=['ms', 'hp', 'myeloid'])
 
+def add_perturbation_args(parser):
+    parser.add_argument('--celltype_key', type=str, default='celltype')
+    parser.add_argument('--batch_key', type=str, default='batch')
+    parser.add_argument('--dataset', type=str, default='adamson', choices=['norman', 'adamson'])
+    parser.add_argument('--pyg_path', type=str)
+    parser.add_argument('--split_path', type=str)
+    parser.add_argument('--perts_to_plot', type=list, default=["KCTD16+ctrl"])
+
+def add_federated_perturbation_args(parser):
+    parser.add_argument('--n_rounds', type=int, default=10)
+    parser.add_argument('--n_epochs', type=int, default=10)
+    parser.add_argument('--n_clients', type=int, default=10)
+    parser.add_argument('--clients_data_dir', type=str)
+
+
 def add_observation_args(parser):
     parser.add_argument('--celltype_key', type=str, default='celltype')
     parser.add_argument('--batch_key', type=str, default='batch')
