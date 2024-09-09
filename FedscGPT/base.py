@@ -1,5 +1,6 @@
 from FedscGPT import utils
 utils.set_seed()
+from copy import deepcopy
 import torch.nn as nn
 import torch
 import time
@@ -280,12 +281,13 @@ class LossMeter:
         for k in self.loss_dict:
             self.loss_dict[k] = 0.0
 
-    def log(self, log_interval):
+    def log(self, log_interval, log_error=True):
         ms_per_batch = (time.time() - self.start_time) * 1000 / log_interval
         log_txt = f"ms/batch {ms_per_batch:5.2f} | loss {(self.loss.item() / log_interval):5.2f} | "
         for loss_name in self.loss_dict:
             log_txt += f"{loss_name} {(self.loss_dict[loss_name].item() / log_interval):5.2f} |"
-        log_txt += f"Error {(self.error / log_interval):5.2f}"
+        if log_error:
+            log_txt += f"Error {(self.error / log_interval):5.2f}"
         return log_txt
 
 
@@ -399,3 +401,48 @@ class FedBase:
 
     def init_global_weights(self):
         self.global_weights = torch.load(self.clients[0].init_weights_dir)
+
+
+
+class BaseClientMixin:
+    def local_update(self, global_weights, round_num):
+        if self.use_fedprox:
+            self.global_model = deepcopy(global_weights)
+        if round_num > 1:
+            self.set_weights(global_weights)
+        else:
+            self.model.load_state_dict(global_weights)
+        self.train_and_validate()
+        return self.get_weights()
+
+    def centralized_training(self, init_weights=None):
+        if init_weights is None:
+            init_weights = self.model.state_dict()
+        else:
+            self.model.load_state_dict(init_weights)
+        self.train_and_validate()
+        trained_weights = self.model.state_dict()
+        self.model.load_state_dict(init_weights)
+        return trained_weights
+
+
+    def get_weights(self):
+        """ Get the weights of the model
+        Returns
+        -------
+        dict
+            The weights of the model
+        """
+        return self.model.state_dict()
+
+    def set_weights(self, state_dict):
+        """ Set the weights of the model
+        Parameters
+        ----------
+        state_dict: dict
+            The weights of the model
+        """
+        with torch.no_grad():
+            for name, param in self.model.named_parameters():
+                if name in state_dict:
+                    param.data.copy_(state_dict[name].to(param.device))
