@@ -1,5 +1,6 @@
 import json
 import warnings
+from sys import prefix
 
 from torch.utils.data import DataLoader
 import time
@@ -16,7 +17,7 @@ from torchtext._torchtext import (
 )
 from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
 
-from scgpt.model import TransformerModel
+from scgpt.model import TransformerModel, TransformerGenerator
 import shutil
 from FedscGPT.base import BaseMixin
 from FedscGPT.utils import SeqDataset, seed_worker, read_h5ad
@@ -133,21 +134,35 @@ class ScGPT(BaseMixin):
             f"\n\t feature length: {self.tokenized_valid['genes'].shape[1]}"
         )
 
-    def instantiate_transformer_model(self):
+    def instantiate_transformer_model(self, foundation_type: str = "transformer"):
         kwargs = copy.deepcopy(self.config.model.__dict__)
-        # print(kwargs)
-        # print(f"pad_token={self.config.preprocess.pad_token}",
-        #     f"pad_value={self.config.preprocess.pad_value}",)
-        # print(len(self.vocab))
-        # exit()
-        self.model = TransformerModel(
-            len(self.vocab),
-            d_model=kwargs.pop("embsize"),
-            vocab=self.vocab,
-            pad_token=self.config.preprocess.pad_token,
-            pad_value=self.config.preprocess.pad_value,
-            **kwargs,
-        )
+        if foundation_type == "transformer":
+            self.model = TransformerModel(
+                len(self.vocab),
+                d_model=kwargs.pop("embsize"),
+                vocab=self.vocab,
+                pad_token=self.config.preprocess.pad_token,
+                pad_value=self.config.preprocess.pad_value,
+                **kwargs,
+            )
+        elif foundation_type == "generator":
+            self.model = TransformerGenerator(
+                len(self.vocab),
+                d_model=kwargs.pop("embsize"),
+                nhead=kwargs.pop("nhead"),
+                d_hid=kwargs.pop("d_hid"),
+                nlayers=kwargs.pop("nlayers"),
+                nlayers_cls=kwargs.pop("nlayers_cls"),
+                n_cls=kwargs.pop("n_cls"),
+                vocab=self.vocab,
+                pad_token=self.config.preprocess.pad_token,
+                pad_value=self.config.preprocess.pad_value,
+                pert_pad_id= self.config.preprocess.pert_pad_id,
+                dropout=kwargs.pop("dropout"),
+                use_fast_transformer=kwargs.pop("use_fast_transformer"),
+            )
+        else:
+            raise ValueError(f"Unknown transformer type: {foundation_type}")
 
     def filter_id_in_vocab(self, adata):
         adata.var["id_in_vocab"] = [1 if gene in self.vocab else -1 for gene in adata.var["gene_name"]]
@@ -168,16 +183,32 @@ class ScGPT(BaseMixin):
             save_init_weights = self.load_init_weights()
         if save_init_weights and self.pretrained_model_dir:
             model_dir = os.path.join(self.pretrained_model_dir, model_name)
-            try:
-                self.model.load_state_dict(torch.load(model_dir))
-                self.log(f"Loading all model params from {self.pretrained_model_dir}")
-            except:
-                # only load params that are in the model and match the size
-                self.load_matched_param(model_dir)
+            self.log(f"Loading all model params from {self.pretrained_model_dir}")
+            if self.config.train.load_param_prefixs:
+                self.load_param_prefix(model_dir)
+            else:
+                try:
+                    self.model.load_state_dict(torch.load(model_dir))
+                except:
+                    self.load_matched_param(model_dir)
             self.save_init_weights()
-        self.freeze_params()
+        if self.config.train.freeze:
+            self.freeze_params()
         self.model.to(self.device)
 
+    def load_param_prefix(self, model_dir):
+        self.log([prefix for prefix in self.config.train.load_param_prefixs])
+        model_dict = self.model.state_dict()
+        pretrained_dict = torch.load(model_dir)
+        pretrained_dict = {
+            k: v
+            for k, v in pretrained_dict.items()
+            if any([k.startswith(prefix) for prefix in self.config.train.load_param_prefixs])
+        }
+        for k, v in pretrained_dict.items():
+            self.log(f"Loading params {k} with shape {v.shape}")
+        model_dict.update(pretrained_dict)
+        self.model.load_state_dict(model_dict)
 
     def train_for_epoch(self, loader, epoch) -> None:
         """
@@ -186,17 +217,22 @@ class ScGPT(BaseMixin):
         self.model.train()
         self.loss_meter.reset()
         num_batches = len(loader)
+        self.adjust_log_interval(num_batches)
+        for batch, batch_data in enumerate(loader, 1):
+            self.train_on_batch(batch_data)
+            self.log_training_progress(batch, epoch, num_batches)
+
+    def adjust_log_interval(self, num_batches):
         if self.config.log.log_interval > num_batches:
             self.config.log.log_interval = num_batches
             self.log(f"Setting log_interval to {num_batches}")
-        for batch, batch_data in enumerate(loader, 1):
-            self.train_on_batch(batch_data)
-            if batch % self.config.log.log_interval == 0 and batch > 0:
-                lr = self.lr_schedulers['main'].get_last_lr()[0]
-                log_txt = self.loss_meter.log(self.config.log.log_interval)
-                log_txt = f"| epoch {epoch:3d} | {batch:3d}/{num_batches:3d} batches | lr {lr:05.4f} | " + log_txt
-                self.log(log_txt)
-                self.loss_meter.reset()
+
+    def log_training_progress(self, batch, epoch, num_batches):
+        if batch % self.config.log.log_interval == 0 and batch > 0:
+            lr = self.lr_schedulers['main'].get_last_lr()[0]
+            log_txt = self.loss_meter.log(self.config.log.log_interval, self.config.log.log_error)
+            self.log(f"| epoch {epoch:3d} | {batch:3d}/{num_batches:3d} batches | lr {lr:05.4f} | {log_txt}")
+            self.loss_meter.reset()
 
     def train_on_batch(self, batch_data):
         batch_labels, celltype_labels, input_gene_ids, input_values, target_values = self.unwrap_batch_data(batch_data)
@@ -219,9 +255,20 @@ class ScGPT(BaseMixin):
             self.apply_loss(**args_dict)
             self.fedprox()
 
+        self.apply_gradients_and_optimize()
+        if self.config.train.ADV:
+            self.adversarial_training(batch_labels, input_gene_ids, input_values, src_key_padding_mask)
+        self.loss_meter.reset_batch_loss()
+
+    def apply_gradients_and_optimize(self):
         self.model.zero_grad()
         self.scaler.scale(self.loss_meter.batch_loss).backward()
         self.scaler.unscale_(self.optimizers["main"])
+        self.clip_and_warn()
+        self.scaler.step(self.optimizers["main"])
+        self.scaler.update()
+
+    def clip_and_warn(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.filterwarnings("always")
             torch.nn.utils.clip_grad_norm_(
@@ -235,11 +282,6 @@ class ScGPT(BaseMixin):
                     f"scaler. The current scale is {self.scaler.get_scale()}. This warning "
                     "can be ignored if no longer occurs after autoscaling of the scaler."
                 )
-        self.scaler.step(self.optimizers["main"])
-        self.scaler.update()
-        if self.config.train.ADV:
-            self.adversarial_training(batch_labels, input_gene_ids, input_values, src_key_padding_mask)
-        self.loss_meter.reset_batch_loss()
 
     def fedprox(self):
         if self.use_fedprox and self.global_model:
@@ -443,34 +485,42 @@ class ScGPT(BaseMixin):
         return data_loader
 
     def train(self):
-        best_val_loss = float("inf")
         for epoch in range(1, self.config.train.epochs + 1):
-            epoch_start_time = time.time()
-            train_data_pt, valid_data_pt = self.per_epoch_data_prep(epoch)
-            train_loader = self.per_epoch_dataloader(train_data_pt,
-                                                     batch_size=self.config.train.batch_size,
-                                                     shuffle=False,
-                                                     intra_domain_shuffle=True,
-                                                     drop_last=False)
-
-            valid_loader = self.per_epoch_dataloader(valid_data_pt,
-                                                     batch_size=self.config.train.eval_batch_size,
-                                                     shuffle=False,
-                                                     intra_domain_shuffle=False,
-                                                     drop_last=False)
-
+            train_loader, valid_loader = self.get_train_valid_loaders(epoch=epoch)
             self.train_for_epoch(train_loader, epoch)
-            val_loss, val_err = self.evaluate(self.model, valid_loader)
+            res = self.evaluate(self.model, valid_loader)
+            yield res
+
+
+    def train_and_validate(self):
+        best_val_loss = float("inf")
+        epoch_start_time = time.time()
+        for epoch, (val_loss, val_err) in enumerate(self.train()):
             elapsed = time.time() - epoch_start_time
             self.log("-" * 89)
-            self.log(
-                f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
-                f"valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
+            self.log(f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
             )
             self.log("-" * 89)
             if val_loss < best_val_loss:
                 self.update_best_model(val_loss, epoch)
+                # TODO: forgot to save the best_val_loss, repeat the annotation experiments
+                best_val_loss = val_loss
             self.lr_schedulers_step()
+            epoch_start_time = time.time()
+
+    def get_train_valid_loaders(self, **kwargs):
+        train_data_pt, valid_data_pt = self.per_epoch_data_prep(kwargs['epoch'])
+        train_loader = self.per_epoch_dataloader(train_data_pt,
+                                                 batch_size=self.config.train.batch_size,
+                                                 shuffle=False,
+                                                 intra_domain_shuffle=True,
+                                                 drop_last=False)
+        valid_loader = self.per_epoch_dataloader(valid_data_pt,
+                                                 batch_size=self.config.train.eval_batch_size,
+                                                 shuffle=False,
+                                                 intra_domain_shuffle=False,
+                                                 drop_last=False)
+        return train_loader, valid_loader
 
     def update_best_model(self, val_loss, epoch):
         if self.config.log.retain_best_model:
