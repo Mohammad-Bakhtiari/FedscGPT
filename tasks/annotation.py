@@ -4,7 +4,7 @@
 import __init__
 from FedscGPT import utils
 utils.set_seed()
-from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches
+from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches, aggregate
 from FedscGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
 from FedscGPT.federated.annotator import FedAnnotator
 from FedscGPT.federated.aggregator import FedAvg
@@ -40,7 +40,7 @@ def centralized_finetune(**kwargs):
     annotator.instantiate_transformer_model()
     annotator.load_pretrained_model()
     annotator.setup_losses()
-    annotator.train()
+    annotator.train_and_validate()
     annotator.save_best_model(annotator.model)
     return annotator
 
@@ -94,15 +94,6 @@ def centralized_inference(annotator=None,
 
                         )
     return annotator
-
-
-def aggregate(annotator, local_weights, n_local_samples, **kwargs):
-    if annotator.fed_config.aggregation_type == "FedAvg":
-        annotator.aggregate(local_weights)
-    elif annotator.fed_config.aggregation_type == "WeightedFedAvg":
-        annotator.weighted_aggregate(local_weights, n_local_samples)
-    else:
-        raise NotImplementedError(f"Aggregation type {annotator.fed_config.aggregation_type} not implemented")
 
 
 def federated_finetune(**kwargs):
