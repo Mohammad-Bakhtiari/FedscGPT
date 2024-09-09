@@ -35,9 +35,9 @@ for key in "${!datasets[@]}"; do
 
     # Check for errors in the execution of the script
     if [ $? -ne 0 ]; then
-        echo -e "\e[31Error processing dataset $key. Please check the configuration.\e[0m"
+        echo -e "\e[31mError processing dataset $key. Please check the configuration.\e[0m"
         continue
     fi
 done
 
-echo -e "\e[33Data annotation completed for all datasets.\e[0m"
+echo -e "\e[33mData annotation completed for all datasets.\e[0m"
