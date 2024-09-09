@@ -85,4 +85,5 @@ annotation:
     log_interval: 100  # iterations
     save_eval_interval: 5  # epochs
     do_eval_scib_metrics: true2
-    retain_best_model: True  # whether to retain the best model during training
+    retain_best_model: True
+    log_error: True
