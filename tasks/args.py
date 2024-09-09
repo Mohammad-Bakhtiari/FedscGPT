@@ -30,8 +30,6 @@ def add_annotation_args(parser):
     parser.add_argument('--dataset', type=str, default='ms', choices=['ms', 'hp', 'myeloid'])
 
 def add_perturbation_args(parser):
-    parser.add_argument('--celltype_key', type=str, default='celltype')
-    parser.add_argument('--batch_key', type=str, default='batch')
     parser.add_argument('--dataset', type=str, default='adamson', choices=['norman', 'adamson'])
     parser.add_argument('--pyg_path', type=str)
     parser.add_argument('--split_path', type=str)

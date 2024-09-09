@@ -19,7 +19,7 @@ class BaseMixin:
     Base class for scGPT tasks.
 
     """
-    def __init__(self, task, config_file, celltype_key, batch_key, output_dir, logger=None,
+    def __init__(self, task, config_file, output_dir, celltype_key=None, batch_key=None, logger=None,
                  log_id: [str or None] = None, gpu: int = 0, verbose: bool = False, n_epochs=None, mu=None, use_fedprox=False, init_weights_dir=None, **kwargs):
         self.log_id = log_id
         self.log_level = "info" if log_id is None else log_id
