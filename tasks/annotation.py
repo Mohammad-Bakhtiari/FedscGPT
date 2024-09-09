@@ -147,7 +147,7 @@ def clients_centralized_training(federated_prep, **kwargs):
     else:
         client_ref_adata = "cent_prep_adata.h5ad"
         cent_annotator = cent_prep(**kwargs)
-        batches = split_data_by_batch(cent_annotator.adata, kwargs['batch_key'])
+        batches = split_data_by_batch(cent_annotator.adata, kwargs['batch_key'], keep_vars=False)
         clients_data_dir = save_data_batches(batches, kwargs['data_dir'], filename=client_ref_adata)
         client_output_dir = [f"{kwargs['output_dir']}/{d.split('/')[-1]}" for d in clients_data_dir]
     for data_dir, output_dir in zip(clients_data_dir, client_output_dir):
