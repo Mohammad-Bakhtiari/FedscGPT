@@ -2,7 +2,7 @@ import copy
 import os.path
 import torch
 from typing import Dict
-from FedscGPT.base import FedBase
+from FedscGPT.base import FedBase, BaseClientMixin
 from FedscGPT.centralized.annotator import Training, Inference
 from FedscGPT.utils import read_h5ad
 from FedscGPT.preprocessor.local import Preprocessor
@@ -11,13 +11,13 @@ from FedscGPT.preprocessor.aggregation import aggregate_gene_counts, aggregate_b
 from FedscGPT.federated.aggregator import FedAvg
 
 
-class ClientAnnotator(Training):
+class ClientAnnotator(BaseClientMixin, Training):
     """
     cell_id2type: Here is calculated locally. No global ID!
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        Training.__init__(self, **kwargs)
         self.n_samples = len(self.adata)
         self.preprocessor = Preprocessor(
             log=self.log,
@@ -91,47 +91,7 @@ class ClientAnnotator(Training):
     def binning(self, global_bin_edges):
         self.adata = self.preprocessor.apply_binning(self.adata, global_bin_edges)
 
-    def local_update(self, global_weights, round_num):
-        if self.use_fedprox:
-            self.global_model = copy.deepcopy(global_weights)
-        if round_num > 1:
-            self.set_weights(global_weights)
-        else:
-            self.model.load_state_dict(global_weights)
-        self.train()
-        return self.get_weights()
 
-    def centralized_training(self, init_weights=None):
-        if init_weights is None:
-            init_weights = self.model.state_dict()
-        else:
-            self.model.load_state_dict(init_weights)
-        self.train()
-        trained_weights = self.model.state_dict()
-        self.model.load_state_dict(init_weights)
-        return trained_weights
-
-
-    def get_weights(self):
-        """ Get the weights of the model
-        Returns
-        -------
-        dict
-            The weights of the model
-        """
-        return self.model.state_dict()
-
-    def set_weights(self, state_dict):
-        """ Set the weights of the model
-        Parameters
-        ----------
-        state_dict: dict
-            The weights of the model
-        """
-        with torch.no_grad():
-            for name, param in self.model.named_parameters():
-                if name in state_dict:
-                    param.data.copy_(state_dict[name].to(param.device))
 
 
 class FedAnnotator(FedBase, FedAvg):
@@ -148,7 +108,6 @@ class FedAnnotator(FedBase, FedAvg):
                                      logger=self.logger, **kwargs)
             self.clients.append(client)
         self.retain_best_model_retain(False)
-        # TODO: Support post-finetune federated zeroshot
 
     def aggregate_gene_sets(self):
         local_gene_sets = [client.get_local_gene_set() for client in self.clients]
