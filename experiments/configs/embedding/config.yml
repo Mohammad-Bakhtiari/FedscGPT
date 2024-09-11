@@ -68,14 +68,14 @@ embedding:
     nlayers_cls: 3  # number of layers specifically for classification if applicable
     n_cls: 1  # number of classes for classification, dynamically set if CLS is true
     dropout: 0.2  # dropout probability
-    do_mvc: True  # Masked value prediction for cell embedding
-    do_dab: False  # Domain adaptation by reverse backpropagation
-    use_batch_labels: False  # whether to use batch labels for training
-    domain_spec_batchnorm: False  # Domain-specific batch normalization
-    explicit_zero_prob: False  # explicitly manage zero probability, tied to MLM
-    use_fast_transformer: True  # whether to use a fast transformer implementation
+    do_mvc: true  # Masked value prediction for cell embedding
+    do_dab: false  # Domain adaptation by reverse backpropagation
+    use_batch_labels: false  # whether to use batch labels for training
+    domain_spec_batchnorm: false  # Domain-specific batch normalization
+    explicit_zero_prob: false  # explicitly manage zero probability, tied to MLM
+    use_fast_transformer: false  # whether to use a fast transformer implementation
     fast_transformer_backend: "flash"  # backend for fast transformer
-    pre_norm: False  # whether to use pre-normalization in transformer layers
+    pre_norm: false  # whether to use pre-normalization in transformer layers
 
     # Extra
     input_emb_style: "continuous"  # style of embedding for input
@@ -88,5 +88,5 @@ embedding:
   log:
     log_interval: 100  # iterations
     save_eval_interval: 5  # epochs
-    do_eval_scib_metrics: true2
-    retain_best_model: True  # whether to retain the best model during training
+    do_eval_scib_metrics: true
+    retain_best_model: true  # whether to retain the best model during training
