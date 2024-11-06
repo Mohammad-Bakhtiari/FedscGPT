@@ -45,6 +45,7 @@ class BaseMixin:
         self.use_fedprox = use_fedprox
         self.global_model = None
         self.init_weights_dir = init_weights_dir
+        self.model_on_gpu = True
 
     def log(self, msg, log_level=None):
         if log_level is None:
@@ -77,7 +78,7 @@ class BaseMixin:
             self.optimizers['dab'], self.config.train.schedule_interval, gamma=self.config.train.schedule_ratio
         )
 
-    def set_defualt(self):
+    def set_default(self):
         self.optimizers['main'] = torch.optim.Adam(
             self.model.parameters(), lr=self.config.train.lr, eps=1e-4 if self.config.train.amp else 1e-8
         )
@@ -132,7 +133,7 @@ class BaseMixin:
         ).to(self.device)
 
     def setup_losses(self):
-        self.set_defualt()
+        self.set_default()
         if self.config.train.MLM:
             self.set_mse()
         if self.config.train.CLS:
@@ -219,6 +220,36 @@ class BaseMixin:
 
     def save_init_weights(self):
         torch.save(self.model.state_dict(), self.init_weights_dir)
+
+    def move_model_to_gpu(self):
+        """
+        Move the model to the GPU.
+        """
+        self.model.to(self.device)
+        self.model_on_gpu = True
+        if self.verbose:
+            self.log(f"Moved model to GPU: {self.device}")
+
+    def move_model_to_cpu(self):
+        """
+        Move the model to the CPU.
+        """
+        self.model.to('cpu')
+        torch.cuda.empty_cache()
+        self.model_on_gpu = False
+        if self.verbose:
+            self.log("Moved model to CPU")
+
+    def delete_models(self):
+        del self.model
+        if self.discriminator:
+            del self.discriminator
+        if hasattr(self, 'best_model'):
+            if self.best_model:
+                del self.best_model
+        torch.cuda.empty_cache()
+        if self.verbose:
+            self.log("Deleted models")
 
 class LossMeter:
     def __init__(self, MLM, CLS, CCE=False, MVC=False, ECS=False, DAB=False, ADV=False, explicit_zero_prob=False,
@@ -402,10 +433,28 @@ class FedBase:
     def init_global_weights(self):
         self.global_weights = torch.load(self.clients[0].init_weights_dir)
 
+    def save_global_weights(self):
+        if self.global_weights:
+            if not os.path.exists(f"{self.output_dir}/model"):
+                os.makedirs(f"{self.output_dir}/model")
+            if os.path.exists(f"{self.output_dir}/model/global_weights.pt"):
+                self.logger.federated("Overwriting global weights!")
+                torch.save(self.global_weights, f"{self.output_dir}/model/global_weights.pt")
+        else:
+            raise ValueError("Global weights are not initialized")
 
+    def put_clients_model_on_cpu(self):
+        for client in self.clients:
+            client.move_model_to_cpu()
+
+    def delete_clients_models(self):
+        for client in self.clients:
+            client.delete_models()
 
 class BaseClientMixin:
     def local_update(self, global_weights, round_num):
+        if not self.model_on_gpu:
+            self.move_model_to_gpu()
         if self.use_fedprox:
             self.global_model = deepcopy(global_weights)
         if round_num > 1:
@@ -413,6 +462,7 @@ class BaseClientMixin:
         else:
             self.model.load_state_dict(global_weights)
         self.train_and_validate()
+        self.move_model_to_cpu()
         return self.get_weights()
 
     def centralized_training(self, init_weights=None):
