@@ -1,10 +1,15 @@
 import os
 import pickle
+from gc import get_referents
+
+from ipykernel.pickleutil import cell_type
+from matplotlib.colors import to_hex
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib import cm, colors
 from matplotlib.lines import Line2D
+from matplotlib.patches import Circle
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from sklearn.metrics import confusion_matrix
 import plotly.express as px
@@ -13,6 +18,9 @@ import numpy as np
 import anndata
 import scanpy as sc
 import random
+from collections import Counter
+from statsmodels.tsa.vector_ar.tests.test_vecm import datasets
+import csv
 
 SEED = 42
 def set_seed(seed=SEED):
@@ -28,13 +36,24 @@ def load_metric(filepath, metric):
         data = pickle.load(file)
     return data['results'][f'test/{metric}']
 
-def collect_metrics(base_path, metric):
+def collect_metrics(base_path, data_dir, metric):
     accuracies = {}
     for root, dirs, files in os.walk(base_path):
         if 'results.pkl' in files:
             client_name = os.path.basename(root)
             accuracy = load_metric(os.path.join(root, 'results.pkl'), metric)
-            accuracies[client_name] = accuracy
+            if client_name.startswith('client'):
+                ds = root.split('/')[-3]
+                h5ad_file_dir = os.path.join(data_dir, ds,client_name, 'adata.h5ad')
+                if os.path.exists(h5ad_file_dir):
+                    batch = get_clients_batch_value(h5ad_file_dir, ds)
+                elif ds == "ms":
+                    batch = client_name
+                else:
+                    raise ValueError(f'Dataset {ds} does not exist')
+            else:
+                batch = "centralized"
+            accuracies[batch] = accuracy
     return accuracies
 
 
@@ -47,13 +66,13 @@ class CentralizedMetricPlotter:
         """
         data = []
         for dataset, values in metrics.items():
-            client_acc = [acc for key, acc in values.items() if key not in ['centralized', 'federated']]
+            client_acc = {key: acc for key, acc in values.items() if key not in ['centralized', 'federated']}
             centralized_acc = values['centralized']
             federated_acc = values['federated']
 
             # Append each client's data
-            for acc in client_acc:
-                data.append({'Dataset': dataset, 'Type': 'Client', 'Accuracy': acc})
+            for batch, acc in client_acc.items():
+                data.append({'Dataset': dataset, 'Type': 'client', "Batch":batch,  'Accuracy': acc})
 
             # Append centralized accuracy
             data.append({'Dataset': dataset, 'Type': 'Centralized', 'Accuracy': centralized_acc})
@@ -415,6 +434,10 @@ def handle_ds_name(name):
         return "Covid-19"
     if name.lower() == "lung":
         return "Lung-Kim"
+    if name.lower() == "adamson":
+        return "Adamson et. al"
+    if name.lower() == "norman":
+        return "Norman et al."
 
 class ImagePlaceholder:
     pass
@@ -459,8 +482,9 @@ def load_results_pkl(root_dir, pkl_file, best_fed):
     #             print(f"results.pkl not found in {dataset} {mode}")
     # return results
 
-def load_query_datasets(data_dir):
-    datasets = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+def load_query_datasets(data_dir, datasets=None):
+    if datasets is None:
+        datasets = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
     query_datasets = {}
     for dataset in datasets:
         candidates = [q for q in os.listdir(os.path.join(data_dir, dataset)) if q.startswith('query')]
@@ -539,7 +563,7 @@ def plot_umap_and_conf_matrix(root_dir, data_dir, res_pkl_file, res_df_file):
     df = pd.read_csv(res_df_file)
     best_fed = {ds: df.loc[df[(df.Dataset==ds) & (df.Metric == 'Accuracy')]["Value"].idxmax()] for ds in df.Dataset.unique()}
     results = load_results_pkl(root_dir, res_pkl_file, best_fed)
-    query_datasets = load_query_datasets(data_dir)
+    query_datasets = load_query_datasets(data_dir, datasets=['hp', 'ms', 'myeloid'])
 
     for dataset in results.keys():
         # plot_confusion_matrices(dataset, results)
@@ -690,15 +714,15 @@ def best_metrics_report(df):
         f"Dataset: {worst_case_row['Dataset']}, Metric: {worst_case_row['Metric']}, Percentage Achieved: {worst_case_row['Percentage Achieved']}%")
 
 
-def embedding_boxplot(data_dir, img_format='svg'):
+def embedding_boxplot(res_dir, data_dir, img_format='svg'):
     dataset = ["covid", "lung"]
     metrics = ['accuracy', 'precision', 'recall', 'macro_f1']
 
     # Initialize an empty DataFrame to hold all results
     df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
 
-    federated_file_path = {ds: os.path.join(data_dir, ds, "federated", "evaluation_metrics.csv") for ds in dataset}
-    centralized_file_path = {ds: os.path.join(data_dir, ds, "centralized", "evaluation_metrics.csv") for ds in dataset}
+    federated_file_path = {ds: os.path.join(res_dir, ds, "federated", "evaluation_metrics.csv") for ds in dataset}
+    centralized_file_path = {ds: os.path.join(res_dir, ds, "centralized", "evaluation_metrics.csv") for ds in dataset}
 
     for ds in dataset:
         # Load centralized and federated results
@@ -711,38 +735,185 @@ def embedding_boxplot(data_dir, img_format='svg'):
                 'Dataset': ds,
                 'Type': 'Centralized',
                 'Metric': metric,
-                'Value': centralized_metrics[metric].values[0]
+                'Value': centralized_metrics[metric].values[0],
+                'Batch': None
             })
             rows.append({
                 'Dataset': ds,
                 'Type': 'Federated',
                 'Metric': metric,
-                'Value': federated_metrics[metric].values[0]
+                'Value': federated_metrics[metric].values[0],
+                'Batch': None
             })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
         # Collect and append client results
-        client_dir_path = os.path.join(data_dir, ds, "centralized")
+        client_dir_path = os.path.join(res_dir, ds, "centralized")
         rows = []
         for client_dir in os.listdir(client_dir_path):
             if client_dir.startswith("client"):
                 client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
+                client_batch = get_clients_batch_value(os.path.join(data_dir, ds, client_dir, "adata.h5ad"), ds)
                 for metric in metrics:
                     rows.append({
                         'Dataset': ds,
-                        'Type': 'Client',
+                        'Type': client_dir,
                         'Metric': metric,
-                        'Value': client_metrics[metric].values[0]
+                        'Value': client_metrics[metric].values[0],
+                        'Batch': client_batch
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-    plot_embedding_boxplot(df, img_format)
+    display_federated_performance_report(df)
+    per_metric_annotated_scatterplot(df, "./plots/embedding", img_format)
+
+def find_federated_performance_comparison(df):
+    """
+    Function to identify the worst performance of the federated model compared to the corresponding centralized model,
+    and list where the performance is equal, higher, or lower. Additionally, it calculates the minimum percentage
+    performance of the federated model compared to the centralized model (N%).
+    """
+    # Calculate the difference between federated and centralized performance for each metric and dataset
+    performance_diff = (
+        df[df['Type'].isin(['Centralized', 'Federated'])]
+        .pivot_table(index=['Dataset', 'Metric'], columns='Type', values='Value')
+        .reset_index()
+    )
+
+    # Round the performance values to 3 decimal places
+    performance_diff['Centralized'] = performance_diff['Centralized'].round(3)
+    performance_diff['Federated'] = performance_diff['Federated'].round(3)
+    performance_diff['Difference'] = (performance_diff['Federated'] - performance_diff['Centralized']).round(3)
+
+    # Calculate percentage performance (FedscGPT as a percentage of scGPT)
+    performance_diff['Percentage'] = (performance_diff['Federated'] / performance_diff['Centralized']) * 100
+
+    # Calculate the minimum percentage performance across all metrics and datasets
+    N = performance_diff['Percentage'].min().round(2)
+
+    # Identify the worst (most negative) performance difference
+    worst_performance = performance_diff.loc[performance_diff['Difference'].idxmin()]
+
+    # Report the worst performance
+    worst_report = (f"Worst federated performance is on the '{worst_performance['Dataset']}' dataset "
+                    f"for the '{worst_performance['Metric']}' metric, with a difference of {worst_performance['Difference']:.3f} "
+                    f"compared to the centralized model (Federated: {worst_performance['Federated']:.3f}, "
+                    f"Centralized: {worst_performance['Centralized']:.3f}).")
+
+    # Separate performance into categories
+    higher = performance_diff[performance_diff['Difference'] > 0]
+    equal = performance_diff[performance_diff['Difference'] == 0]
+    lower = performance_diff[performance_diff['Difference'] < 0]
+
+    # Convert results into lists for easier reporting
+    higher_list = higher[['Dataset', 'Metric', 'Federated', 'Centralized']].values.tolist()
+    equal_list = equal[['Dataset', 'Metric', 'Federated', 'Centralized']].values.tolist()
+    lower_list = lower[['Dataset', 'Metric', 'Federated', 'Centralized']].values.tolist()
+
+    return worst_report, higher_list, equal_list, lower_list, N
 
 
-def plot_embedding_boxplot(df, img_format='svg'):
+def display_federated_performance_report(df):
+    # Call the function and print the results
+    worst_report, higher_list, equal_list, lower_list, N = find_federated_performance_comparison(df)
+
+    print(worst_report)
+
+    print(f"\nFedscGPT, in a privacy-aware federated manner, consistently reached at least {N}% of scGPT's performance across all metrics on both datasets (Fig. 3).")
+
+    print("\nFederated model performed **better** in the following cases:")
+    for entry in higher_list:
+        print(f"Dataset: {entry[0]}, Metric: {entry[1]} | Federated: {entry[2]:.3f}, Centralized: {entry[3]:.3f}")
+
+    print("\nFederated model performed **equally** in the following cases:")
+    for entry in equal_list:
+        print(f"Dataset: {entry[0]}, Metric: {entry[1]} | Federated: {entry[2]:.3f}, Centralized: {entry[3]:.3f}")
+
+    print("\nFederated model performed **worse** in the following cases:")
+    for entry in lower_list:
+        print(f"Dataset: {entry[0]}, Metric: {entry[1]} | Federated: {entry[2]:.3f}, Centralized: {entry[3]:.3f}")
+
+
+
+
+
+def get_clients_batch_value(h5ad_file_dir, ds_name):
+    client_batch = anndata.read_h5ad(h5ad_file_dir).obs[
+        get_batch_key(ds_name)].unique()
+    client_batch = client_batch[0] if len(client_batch) == 1 else client_batch
+    return client_batch
+
+
+def get_batch_key(ds_name):
+    if ds_name == "covid":
+        return "str_batch"
+    if ds_name == "lung":
+        return "sample"
+    if ds_name == "hp":
+        return "batch"
+    if ds_name == "ms":
+        return "Factor Value[sampling site]"
+    if ds_name == "myeloid":
+        return "top4+rest"
+    raise ValueError(f"Invalid dataset name: {ds_name}")
+
+def get_cell_key(ds_name):
+    if ds_name == "ms":
+        return "Factor Value[inferred cell type - authors labels]"
+    if ds_name == "myeloid":
+        return "combined_celltypes"
+    if ds_name == "hp":
+        return "Celltype"
+    if ds_name == "covid":
+        return "celltype"
+    if ds_name == "lung":
+        return "cell_type"
+    raise ValueError(f"Invalid dataset name: {ds_name}")
+
+
+def get_reference_name(ds_name):
+    if ds_name == "hp":
+        return "reference_refined.h5ad"
+    if ds_name == "myeloid":
+        return "reference_adata.h5ad"
+    return "reference.h5ad"
+
+def shorten_batch_value(batch_value):
+    replace = {
+        'COVID-19 (query)': 'COVID-19',
+        'Sun_sample4_TC': 'TC',
+        'Sun_sample3_TB': 'TB',
+        'HCL': 'HCL',
+        '10X': '10X',
+        'Oetjen_A': 'Oetjen',
+        'Sanger_Meyer_2019Madissoon': 'Sanger',
+        'Krasnow_distal 1a': 'Kras1a',
+        'Krasnow_distal 2': 'Kras2',
+        'Sun_sample1_CS': 'CS',
+        'Sun_sample2_KC': 'KC',
+        'Krasnow_distal 3': 'Kras3',
+        'P0034': 'P34',
+        'P0028': 'P28',
+        'P0025': 'P25',
+        'P1028': 'P1028',
+        'P0006': 'P6',
+        'P0020': 'P20',
+        'P0008': 'P8',
+        'P0018': 'P18',
+        'P0030': 'P30',
+        'P1058': 'P1058',
+        'client_cerebral cortex': "Cerebral",
+        'client_prefrontal cortex': 'Prefrontal',
+        'client_premotor cortex': 'Premotor'
+    }
+    return replace.get(batch_value, batch_value)
+
+def per_metric_boxplot(df, plots_dir, img_format='svg'):
     """
     Plot data using Matplotlib from a pandas DataFrame.
     """
-    if not os.path.exists('./plots/embedding'):
-        os.makedirs('./plots/embedding')
+    # if not os.path.exists('./plots/embedding'):
+    #     os.makedirs('./plots/embedding')
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
     metrics = df['Metric'].unique()
     datasets = df['Dataset'].unique()
 
@@ -810,5 +981,508 @@ def plot_embedding_boxplot(df, img_format='svg'):
                    handler_map={image_placeholder_instance: HandlerImage(boxplot_image)})
 
         plt.tight_layout()
-        plt.savefig(f"./plots/embedding/{metric}_boxplot.{img_format}", format=img_format, dpi=300)
+        plt.savefig(f"{plots_dir}/{metric}_boxplot.{img_format}", format=img_format, dpi=300)
         plt.close()
+
+def per_metric_scatterplot(df, plots_dir, img_format='svg'):
+    """
+    Plot data using Matplotlib from a pandas DataFrame.
+    """
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(5, 5))
+
+        # Separate client data and centralized/federated data
+        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('Client'))]
+        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
+        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+
+        # Scatter plot for client data
+        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
+        for i, dataset in enumerate(datasets):
+            dataset_clients = client_data[client_data['Dataset'] == dataset]['Value'].values
+            # Scatter each client point with a slight horizontal offset to avoid overlap
+            jitter = 0.05  # Add some horizontal jitter to avoid overlap
+            x_jitter = np.random.uniform(-jitter, jitter, size=dataset_clients.shape)
+            plt.scatter([i + 1 + x for x in x_jitter], dataset_clients,
+                        color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7)
+
+        # Overlay centralized and federated data points
+        for i, dataset in enumerate(datasets):
+            # Centralized as horizontal lines only within the dataset range
+            centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
+            plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
+                       color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3)
+            # Federated as scatter points
+            plt.scatter(i + 1, federated_data[federated_data['Dataset'] == dataset]['Value'].values[0],
+                        color=colors[i % len(colors)], edgecolor='black', zorder=5, marker='D', s=100)
+
+        # Customize the plot
+        plt.xlabel('Datasets', fontsize=16)
+        plt.ylabel(metric.capitalize(), fontsize=16)
+        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=16)
+        plt.yticks(fontsize=16)
+
+        plt.tight_layout()
+        plt.savefig(f"{plots_dir}/{metric}_scatterplot.{img_format}", format=img_format, dpi=300, bbox_inches='tight')
+        plt.close()
+        plot_legend(plots_dir, img_format)
+
+
+def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
+    """
+    Plot data using Matplotlib from a pandas DataFrame, with each scatter point annotated by its corresponding 'Batch' value.
+    Adjusts the text to the left or right dynamically to avoid overlap for points with close y-values.
+
+    Parameters:
+    - df: DataFrame containing the data to plot.
+    - plots_dir: Directory to save the plots.
+    - img_format: Format to save the images (e.g., 'svg').
+    - proximity_threshold: Defines the closeness of y-values to consider them overlapping (default = 0.1).
+    """
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(5, 5))
+
+        # Separate client data and centralized/federated data
+        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('client'))]
+        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
+        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+
+        # Scatter plot for client data
+        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
+        for i, dataset in enumerate(datasets):
+            dataset_clients = client_data[client_data['Dataset'] == dataset]
+            client_values = dataset_clients['Value'].values
+            client_batches = dataset_clients['Batch'].values
+            # Scatter each client point with a slight horizontal offset to avoid overlap
+            jitter = 0.05  # Add some horizontal jitter to avoid overlap
+            x_jitter = np.random.uniform(-jitter, jitter, size=client_values.shape)
+            scatter = plt.scatter([i + 1 + x for x in x_jitter], client_values,
+                                  color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7)
+
+            # Determine proximity of y-values to decide label positions
+            for j, (x, y, batch) in enumerate(zip([i + 1 + x for x in x_jitter], client_values, client_batches)):
+                batch_label = shorten_batch_value(batch)
+
+                # Check if other points are "close enough" in y-value using the proximity threshold
+                annot_fontsize = 12
+                close_points = np.sum(np.abs(client_values - y) < proximity_threshold)
+                if close_points > 1:  # If there are other points within the threshold range
+                    # Alternate placement of labels for overlapping points
+                    if j % 2 == 0:
+                        plt.text(x + 0.05, y, batch_label, fontsize=annot_fontsize, ha='left', va='center')  # Place to the right
+                    else:
+                        plt.text(x - 0.05, y, batch_label, fontsize=annot_fontsize, ha='right', va='center')  # Place to the left
+                else:
+                    plt.text(x + 0.05, y, batch_label, fontsize=annot_fontsize, ha='left',
+                             va='center')  # Place to the right by default
+
+        # Overlay centralized and federated data points
+        for i, dataset in enumerate(datasets):
+            # Centralized as horizontal lines only within the dataset range
+            if not centralized_data[centralized_data['Dataset'] == dataset].empty:
+                centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
+                plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
+                           color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3)
+
+            # Federated as scatter points
+            if not federated_data[federated_data['Dataset'] == dataset].empty:
+                federated_value = federated_data[federated_data['Dataset'] == dataset]['Value'].values[0]
+                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+                            zorder=5, marker='D', s=100)
+
+        # Customize the plot
+        plt.xlabel('', fontsize=1)
+        plt.ylabel(metric.capitalize(), fontsize=20)
+        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
+        plt.yticks(fontsize=18)
+
+        plt.tight_layout()
+        plt.savefig(f"{plots_dir}/{metric}_scatterplot_annotated.{img_format}", format=img_format, dpi=300,
+                    bbox_inches='tight')
+        plt.close()
+        plot_legend(plots_dir, img_format)
+
+def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.2):
+    """
+    Plot data using Matplotlib from a pandas DataFrame, with each scatter point annotated by its corresponding 'Batch' value.
+    Adjusts the text to the left or right dynamically to avoid overlap for points with close y-values.
+
+    Parameters:
+    - df: DataFrame containing the data to plot.
+    - plots_dir: Directory to save the plots.
+    - img_format: Format to save the images (e.g., 'svg').
+    - proximity_threshold: Defines the closeness of y-values to consider them overlapping (default = 0.1).
+    - legend_inside: Boolean flag indicating whether to place the legend inside the figure (default = False).
+    """
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(5, 5))
+
+        # Separate client data and centralized/federated data
+        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('client'))]
+        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
+        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+
+        # Scatter plot for client data
+        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
+        scatter_plots = []
+        for i, dataset in enumerate(datasets):
+            dataset_clients = client_data[client_data['Dataset'] == dataset]
+            client_values = dataset_clients['Value'].values
+            client_batches = dataset_clients['Batch'].values
+            # Scatter each client point with a slight horizontal offset to avoid overlap
+            jitter = 0.05  # Add some horizontal jitter to avoid overlap
+            x_jitter = np.random.uniform(-jitter, jitter, size=client_values.shape)
+            scatter = plt.scatter([i + 1 + x for x in x_jitter], client_values,
+                                  color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7,
+                                  label=f"Client Data - {dataset}")
+            scatter_plots.append(scatter)
+
+            # Determine proximity of y-values to decide label positions
+            for j, (x, y, batch) in enumerate(zip([i + 1 + x for x in x_jitter], client_values, client_batches)):
+                batch_label = shorten_batch_value(batch)
+
+                # Check if other points are "close enough" in y-value using the proximity threshold
+                close_points = np.sum(np.abs(client_values - y) < proximity_threshold)
+                annotation_font_size = 12
+                if close_points > 1:  # If there are other points within the threshold range
+                    # Alternate placement of labels for overlapping points
+                    if j % 2 == 0:
+                        plt.text(x + 0.1, y, batch_label, fontsize=annotation_font_size, ha='left', va='center')
+                    else:
+                        plt.text(x - 0.1, y, batch_label, fontsize=annotation_font_size, ha='right', va='center')
+                else:
+                    plt.text(x + 0.1, y, batch_label, fontsize=annotation_font_size, ha='left', va='center')
+
+        # Overlay centralized and federated data points
+        for i, dataset in enumerate(datasets):
+            # Centralized as horizontal lines only within the dataset range
+            if not centralized_data[centralized_data['Dataset'] == dataset].empty:
+                centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
+                plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
+                           color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3,
+                           label=f"Centralized - {dataset}")
+
+            # Federated as scatter points
+            if not federated_data[federated_data['Dataset'] == dataset].empty:
+                federated_value = federated_data[federated_data['Dataset'] == dataset]['Value'].values[0]
+                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+                            zorder=5, marker='D', s=100, label=f"Federated - {dataset}")
+
+        # Customize the plot
+        plt.xlabel('', fontsize=1)
+        plt.ylabel(metric.capitalize(), fontsize=20)
+        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
+        plt.yticks(fontsize=18)
+
+        # Legend placement based on the flag
+        custom_handles = [
+            plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white', markersize=8, linestyle='None',
+                        label='Clients'),
+            plt.Line2D([0], [0], marker='D', color='black', markerfacecolor='white', markersize=10, linestyle='None',
+                        label='Federated'),
+            plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='Centralized')
+        ]
+        legend = plt.legend(handles=custom_handles, loc='lower left', fontsize=14, frameon=True)
+        legend.get_frame().set_edgecolor('black')
+        legend.get_frame().set_facecolor('white')
+
+        plt.tight_layout()
+        plt.savefig(f"{plots_dir}/{metric}_scatterplot_annotated.{img_format}", format=img_format, dpi=300,
+                    bbox_inches='tight')
+        plt.close()
+
+
+def per_metric_boxplot_with_circles(df, plots_dir, img_format='svg'):
+    """
+    Plot a boxplot with scatter circles overlaid using Matplotlib from a pandas DataFrame.
+    """
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(5, 5))
+
+        # Filter data for the given metric
+        metric_data = df[df['Metric'] == metric]
+
+        # Define color options for consistency
+        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Color options
+
+        # Create a custom palette for boxplots matching the colors
+        palette = {dataset: colors[i % len(colors)] for i, dataset in enumerate(datasets)}
+
+        # Create narrower boxplot for each dataset
+        boxplot = sns.boxplot(x='Dataset', y='Value', data=metric_data, order=datasets, palette=palette, showfliers=False, width=0.2)
+
+        # Overlay circles for client data
+        client_data = metric_data[metric_data['Type'].str.contains('Client')]
+
+        # Add scatter circles for each client data point
+        for i, dataset in enumerate(datasets):
+            dataset_clients = client_data[client_data['Dataset'] == dataset]['Value'].values
+            # Scatter each client point with slight horizontal jitter to avoid overlap
+            jitter = 0.08  # Add some horizontal jitter to avoid overlap
+            x_jitter = np.random.uniform(-jitter, jitter, size=dataset_clients.shape)
+            plt.scatter([i + x for x in x_jitter], dataset_clients, color=colors[i % len(colors)],
+                        edgecolor='black', s=60, alpha=0.6, zorder=3)
+
+        # Overlay centralized and federated data points
+        centralized_data = metric_data[metric_data['Type'] == 'Centralized']
+        federated_data = metric_data[metric_data['Type'] == 'Federated']
+
+        for i, dataset in enumerate(datasets):
+            # Centralized as distinct horizontal lines within each dataset range
+            if not centralized_data[centralized_data['Dataset'] == dataset].empty:
+                centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
+                plt.hlines(y=centralized_value, xmin=i - 0.2, xmax=i + 0.2, color=colors[i % len(colors)],
+                           linestyle='--', linewidth=2.5, zorder=4)
+
+            # Federated as diamond-shaped scatter points
+            if not federated_data[federated_data['Dataset'] == dataset].empty:
+                federated_value = federated_data[federated_data['Dataset'] == dataset]['Value'].values[0]
+                plt.scatter(i, federated_value, color=colors[i % len(colors)], edgecolor='black', zorder=5,
+                            marker='D', s=100)
+
+        # Customize the plot
+        plt.xlabel('', fontsize=1)
+        plt.ylabel(metric.capitalize(), fontsize=20)
+        plt.xticks(range(len(datasets)), [handle_ds_name(d) for d in datasets], fontsize=20)
+        plt.yticks(fontsize=16)
+
+        plt.tight_layout()
+        plt.savefig(f"{plots_dir}/{metric}_boxplot_with_circles.{img_format}", format=img_format, dpi=300, bbox_inches='tight')
+        plt.close()
+
+
+def plot_legend(plots_dir, img_format='svg'):
+    """
+    Plot a separate figure containing only the legend.
+    """
+    plt.figure(figsize=(5, 1))
+
+    # Create legend elements
+    legend_elements = [
+        Line2D([0], [0], color='black', lw=2, linestyle='--', label='Centralized'),
+        Line2D([0], [0], marker='D', color='w', markersize=10, label='Federated', markeredgecolor='black'),
+        Line2D([0], [0], marker='o', color='w', markersize=10, label='Clients', markeredgecolor='black')
+    ]
+
+    # Create a blank plot and add the legend
+    plt.legend(handles=legend_elements, loc='center', fontsize=14, labelspacing=1.0, ncol=3, frameon=False)
+    plt.axis('off')  # Hide the axis
+
+    plt.savefig(f"{plots_dir}/legend.{img_format}", format=img_format, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+
+
+def perturbation_cent_box_plt(data_dir, img_format='svg'):
+    dataset = ["adamson", "norman"]
+    metrics = ['pearson', 'pearson_de', 'pearson_delta', 'pearson_de_delta']
+
+    # Initialize an empty DataFrame to hold all results
+    df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
+    test_metrics_filename = "deeper_analysis.pkl"
+    federated_file_path = {ds: os.path.join(data_dir, ds, "federated", 'records.csv') for ds in dataset}
+    centralized_file_path = {ds: os.path.join(data_dir, ds, "centralized", test_metrics_filename ) for ds in dataset}
+
+    for ds in dataset:
+        # Load centralized and federated results
+        with open(centralized_file_path[ds], 'rb') as f:
+            centralized_metrics = pickle.load(f)['test_metrics']
+        # with open(federated_file_path[ds], 'rb') as f:
+        #     federated_metrics = pickle.load(f)['test_metrics']
+        federated_metrics = pd.read_csv(federated_file_path[ds])
+        federated_metrics = federated_metrics[federated_metrics['category']=='test_metrics']
+        rows = []
+        for metric in metrics:
+            rows.append({
+                'Dataset': ds,
+                'Type': 'Centralized',
+                'Metric': metric,
+                'Value': centralized_metrics[metric]
+            })
+            rows.append({
+                'Dataset': ds,
+                'Type': 'Federated',
+                'Metric': metric,
+                'Value': federated_metrics[federated_metrics['metric'] == metric]['value'].values[0]
+            })
+        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+
+        # Collect and append client results
+        client_dir_path = os.path.join(data_dir, ds, "centralized")
+        client_dir_path = os.path.join(data_dir, 'adamson', "centralized")
+        rows = []
+        for client_dir in os.listdir(client_dir_path):
+            if client_dir.startswith("client"):
+                with open(os.path.join(client_dir_path, client_dir, test_metrics_filename), 'rb') as f:
+                    client_metrics = pickle.load(f)['test_metrics']
+                for metric in metrics:
+                    rows.append({
+                        'Dataset': ds,
+                        'Type': 'Client',
+                        'Metric': metric,
+                        'Value': client_metrics[metric]
+                    })
+        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+    print(df)
+    per_metric_scatterplot(df, "./plots/perturbation", img_format)
+
+
+def batch_umap(data_dir, img_format='svg'):
+    datasets = ["hp", "ms", "myeloid", "lung", "covid"]
+    pie_fontsize = dict(zip(datasets, [24, 22, 20, 14, 14]))
+    print(pie_fontsize)
+    palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] * 3  # Extend palette if necessary
+
+    for ds in datasets:
+        adata = anndata.read_h5ad(os.path.join(data_dir, ds, get_reference_name(ds)))
+        batch_key = get_batch_key(ds)
+        cell_key = get_cell_key(ds)
+
+        # Apply shorten_batch_value and remove unused categories in cell type
+        adata.obs[batch_key] = adata.obs[batch_key].apply(shorten_batch_value)
+        if adata.obs[cell_key].dtype.name == 'category':
+            adata.obs[cell_key] = adata.obs[cell_key].cat.remove_unused_categories()
+
+        # Get unique cell types and batches, ensuring they're sorted
+        unique_celltypes = sorted(adata.obs[cell_key].astype(str).unique())
+        unique_batches = sorted(adata.obs[batch_key].unique())
+
+        # Extend palette if needed and map colors
+        if len(unique_celltypes) > len(palette_):
+            palette_ = palette_ * (len(unique_celltypes) // len(palette_) + 1)
+        cell_color_mapping = {c: to_hex(palette_[i]) for i, c in enumerate(unique_celltypes)}
+        batch_color_mapping = {c: to_hex(palette_[i]) for i, c in enumerate(unique_batches)}
+
+        # Compute UMAP if not already available
+        if 'X_umap' not in adata.obsm.keys():
+            sc.pp.neighbors(adata, n_neighbors=30, use_rep='X')
+            sc.tl.umap(adata)
+        # Plot UMAPs for batches and cell types
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+        sc.pl.umap(adata, color=batch_key, palette=batch_color_mapping, ax=axes[0], show=False, legend_loc=None)
+        axes[0].axis('off')
+        sc.pl.umap(adata, color=cell_key, palette=cell_color_mapping, ax=axes[1], show=False, legend_loc=None)
+        axes[1].axis('off')
+
+        # Save UMAP plots
+        file_path = f"./plots/batch_dist/{ds}.{img_format}"
+        plt.savefig(file_path, format=img_format, dpi=300)
+        plt.close(fig)
+
+        def plot_legend(color_key, leg_type="cell"):
+            if leg_type == "cell":
+                unique_values = unique_celltypes
+                color_mapping = cell_color_mapping
+            else:
+                unique_values = unique_batches
+                color_mapping = batch_color_mapping
+
+            # Plot and retrieve legend handles and labels
+            plt.subplots(figsize=(3, 9))
+            sc.pl.umap(adata, color=color_key, palette=color_mapping, show=False)
+            handles, labels = plt.gca().get_legend_handles_labels()
+
+            # Sort legend entries based on the unique values order
+            sorted_handles_labels = sorted(zip(handles, labels), key=lambda x: unique_values.index(x[1]))
+            sorted_handles, sorted_labels = zip(*sorted_handles_labels)
+            plt.close()
+
+            # Create and save the legend figure
+            fig_legend, ax_legend = plt.subplots(figsize=(5, 15))
+            ax_legend.legend(sorted_handles, sorted_labels, loc='center', fontsize='large', frameon=False, ncol=1)
+            ax_legend.axis('off')
+            legend_file_path = f"./plots/batch_dist/{ds}_{leg_type}_legend.{img_format}"
+            plt.savefig(legend_file_path, format=img_format, dpi=300)
+            plt.close(fig_legend)
+            batch_counts = Counter(adata.obs[color_key])
+            batch_names = list(batch_counts.keys())
+            batch_sizes = list(batch_counts.values())
+            csv_file_path = f"./plots/batch_dist/{ds}_{leg_type}_legend.csv"
+            with open(csv_file_path, mode='w', newline='') as csv_file:
+                csv_writer = csv.writer(csv_file)
+
+                # Writing headers
+                csv_writer.writerow(["Batch Name", "Batch Size"])
+
+                # Writing batch names and sizes
+                for name, size in zip(batch_names, batch_sizes):
+                    csv_writer.writerow([name, size])
+
+
+        # Plot and save legends for cell types and batches
+        plot_legend(cell_key, "cell")
+        plot_legend(batch_key, "batch")
+        batch_counts = Counter(adata.obs[batch_key])
+        batch_names = list(batch_counts.keys())
+        batch_sizes = list(batch_counts.values())
+        batch_colors = [batch_color_mapping[batch] for batch in batch_names]
+
+        fig, ax = plt.subplots(figsize=(6, 6))
+        wedges, texts, autotexts = ax.pie(batch_sizes, labels=batch_names, colors=batch_colors,
+                                          autopct='%1.1f%%', startangle=140, textprops=dict(color="w"))
+
+        # Add counts inside pie chart slices
+        for i, autotext in enumerate(autotexts):
+            autotext.set_text(f"{batch_sizes[i]}")  # Set sample count as text inside
+
+        # Add total number of samples above pie chart
+        total_samples = sum(batch_sizes)
+        print(pie_fontsize[ds])
+        plt.text(0, 1.2, total_samples, ha='center', fontsize=pie_fontsize[ds], weight='bold')
+
+        # Save the pie chart
+        plt.savefig(f"./plots/batch_dist/{ds}_batch_pie.{img_format}", format=img_format, dpi=300)
+        plt.close(fig)
+
+
+def plot_dummy_pie_chart(fontsize=10, num_sections=5):
+    # Generate random data for the specified number of sections
+    data = np.random.randint(1, 100, num_sections)
+
+    # Generate random colors using Seaborn's color palette
+    colors = sns.color_palette("hsv", num_sections)
+
+    # Define labels for each section
+    labels = [f"Section {i + 1}" for i in range(num_sections)]
+
+    # Create the pie chart
+    fig, ax = plt.subplots(figsize=(6, 6))
+    wedges, texts, autotexts = ax.pie(data, labels=labels, colors=colors,
+                                      autopct='%1.1f%%', startangle=140,
+                                      textprops=dict(color="w"), pctdistance=0.85)
+
+    # Set the font size for labels and percentage texts
+    for text in texts + autotexts:
+        text.set_fontsize(fontsize)
+
+    # Display the plot
+    plt.show()
+
+
+# Example usage
+plot_dummy_pie_chart(fontsize=14, num_sections=6)
