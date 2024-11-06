@@ -87,7 +87,7 @@ class ScGPT(BaseMixin):
             include_zero_gene=self.config.preprocess.include_zero_gene,
         )
 
-    def load_pretrained_config(self, set_pretrained_config=True):
+    def load_pretrained_config(self):
         model_config_file = os.path.join(self.pretrained_model_dir, 'args.json')
         model_file = os.path.join(self.pretrained_model_dir, 'best_model.pt')
         vocab_file = os.path.join(self.pretrained_model_dir, 'vocab.json')
@@ -105,16 +105,7 @@ class ScGPT(BaseMixin):
             f"Resume model from {model_file}, the model args will override the "
             f"config {model_config_file}."
         )
-        if set_pretrained_config:
-            self.config.pretrained_model = {**model_configs}
-            self.config.model.embsize = model_configs["embsize"]
-            self.config.model.nhead = model_configs["nheads"]
-            self.config.model.d_hid = model_configs["d_hid"]
-            self.config.model.nlayers = model_configs["nlayers"]
-            self.config.model.nlayers_cls = model_configs["n_layers_cls"]
-            self.config.model.dropout = model_configs["dropout"]
-            self.config.preprocess.pad_token = model_configs["pad_token"]
-            self.config.preprocess.pad_value = model_configs["pad_value"]
+        return model_configs
 
     def add_special_tokens(self):
         for s in self.special_tokens:
@@ -194,6 +185,7 @@ class ScGPT(BaseMixin):
             self.save_init_weights()
         if self.config.train.freeze:
             self.freeze_params()
+        self.best_model = copy.deepcopy(self.model)
         self.model.to(self.device)
 
     def load_param_prefix(self, model_dir):
