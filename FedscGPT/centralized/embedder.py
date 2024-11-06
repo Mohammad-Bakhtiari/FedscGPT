@@ -23,7 +23,7 @@ class Embedder(ScGPT):
         super().__init__(data_dir, pretrained_model_dir, **kwargs)
         self.gene_col = gene_col
         self.read_reference(reference_adata)
-        self.load_pretrained_config(set_pretrained_config=True)
+        self.load_pretrained_config()
         self.embed_adata = self.filter_id_in_vocab(self.adata)
         self.vocab.set_default_index(self.vocab["<pad>"])
         self.gene_ids = np.array(self.vocab(self.embed_adata.var[self.gene_col].tolist()), dtype=int)
@@ -35,6 +35,18 @@ class Embedder(ScGPT):
         self.max_length = 1200
         self.n_samples = None
         self.k = k
+
+    def load_pretrained_config(self):
+        model_configs = super().load_pretrained_config()
+        self.config.pretrained_model = {**model_configs}
+        self.config.model.embsize = model_configs["embsize"]
+        self.config.model.nhead = model_configs["nheads"]
+        self.config.model.d_hid = model_configs["d_hid"]
+        self.config.model.nlayers = model_configs["nlayers"]
+        self.config.model.nlayers_cls = model_configs["n_layers_cls"]
+        self.config.model.dropout = model_configs["dropout"]
+        self.config.preprocess.pad_token = model_configs["pad_token"]
+        self.config.preprocess.pad_value = model_configs["pad_value"]
 
     def filter_id_in_vocab(self, adata):
         adata.var["id_in_vocab"] = [
