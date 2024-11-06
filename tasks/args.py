@@ -5,22 +5,26 @@ import argparse
 def instantiate_args():
     HOME_DIR = "/home/bba1658/FedscGPT"
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', type=str, choices=['centralized', 'federated_finetune', 'federated_zeroshot',
-                                                     'centralized_finetune_inference','centralized_inference', 'federated_inference',
-                                                     'federated_prep', 'cent_prep_fed_finetune', 'centralized_clients', 'single_shot_federated'],
+    parser.add_argument('--mode', type=str, choices=['centralized', 'federated_finetune',
+                                                     'federated_zeroshot', 'centralized_finetune_inference',
+                                                     'centralized_inference', 'federated_inference',
+                                                     'federated_prep', 'cent_prep_fed_finetune',
+                                                     'centralized_clients', 'single_shot_federated'],
                         default='centralized')
     parser.add_argument('--data-dir', type=str, default=f"{HOME_DIR}/data/ms")
     parser.add_argument('--output-dir', type=str, default=f"{HOME_DIR}/output")
     parser.add_argument('--reference_adata', type=str, default='ms.h5ad')
     parser.add_argument('--query_adata', type=str, default='ms.h5ad')
-    parser.add_argument('--pretrained_model_dir', type=str, default=f'{HOME_DIR}/pretrained_models/scGPT_human')
+    parser.add_argument('--pretrained_model_dir', type=str,
+                        default=f'{HOME_DIR}/pretrained_models/scGPT_human')
     parser.add_argument("--init_weights_dir", type=str, default=f"{HOME_DIR}/init_weights/hp.pth")
     parser.add_argument("--finetune_model_dir", type=str)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--config_file', type=str, help='.yml file for the model', default='config.yml')
     parser.add_argument("--verbose", action='store_true', default=False)
     parser.add_argument("--dataset_name", type=str, default='ms')
-    parser.add_argument("--param_tuning_res", type=str, default=f"{HOME_DIR}/output/annotation/param-tuning_res")
+    parser.add_argument("--param_tuning_res", type=str,
+                        default=f"{HOME_DIR}/output/annotation/param-tuning_res")
     return parser
 
 
@@ -30,16 +34,21 @@ def add_annotation_args(parser):
     parser.add_argument('--dataset', type=str, default='ms', choices=['ms', 'hp', 'myeloid'])
 
 def add_perturbation_args(parser):
-    parser.add_argument('--dataset', type=str, default='adamson', choices=['norman', 'adamson'])
     parser.add_argument('--pyg_path', type=str)
     parser.add_argument('--split_path', type=str)
-    parser.add_argument('--perts_to_plot', type=list, default=["KCTD16+ctrl"])
+    parser.add_argument('--perts_to_plot', type=str, default="KCTD16+ctrl", help="Comma separated list of perturbations")
+    parser.add_argument('--reverse', action='store_true', default=False)
+    parser.add_argument("--early_stop", type=int, default=10)
+    parser.add_argument("--pool-size", type=int, default=300)
 
 def add_federated_perturbation_args(parser):
     parser.add_argument('--n_rounds', type=int, default=10)
     parser.add_argument('--n_epochs', type=int, default=10)
     parser.add_argument('--n_clients', type=int, default=10)
     parser.add_argument('--clients_data_dir', type=str)
+    parser.add_argument('--fed_config_file', type=str, help='.yml file for the federated model',
+                        default='fed_config.yml')
+    parser.add_argument('--per_round_eval', action='store_true', default=False)
 
 
 def add_observation_args(parser):
