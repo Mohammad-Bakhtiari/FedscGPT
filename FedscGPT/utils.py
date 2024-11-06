@@ -1,7 +1,14 @@
+"""
+# This code includes the 'compute_perturbation_metrics' method sourced from:
+# https://github.com/bowang-lab/scGPT/blob/7301b51a72f5db321fccebb51bc4dd1380d99023/scgpt/utils/util.py
+# Original repository by Bo Wang Lab, available under the respective license.
+
+"""
 import random
 import numpy as np
 import torch
 import tensorflow as tf
+from anndata import AnnData
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 SEED = 42
@@ -16,7 +23,7 @@ def set_seed(seed=SEED):
         torch.use_deterministic_algorithms(True)
     tf.random.set_seed(seed)
 set_seed()
-
+from matplotlib import colors
 import os
 import anndata
 from sklearn.metrics import confusion_matrix
@@ -24,7 +31,7 @@ import pandas as pd
 import seaborn as sns
 import scgpt as scg
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Any
 from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
 import dataclasses
 import yaml
@@ -33,7 +40,6 @@ import pickle
 import matplotlib.pyplot as plt
 import logging
 import sys
-
 
 
 
@@ -77,6 +83,8 @@ class TrainConfig:
     do_sample_in_train: bool
     DSBN: bool
     ECS: bool = dataclasses.field(init=False)
+    early_stop: int = None
+    load_param_prefixs: list = None
 
     def __post_init__(self):
         self.ECS = self.ecs_thres > 0
@@ -104,24 +112,6 @@ class ModelConfig:
     use_fast_transformer: bool
     fast_transformer_backend: str
     pre_norm: bool
-
-
-@dataclasses.dataclass
-class PreprocessConfig:
-    n_bins: int
-    pre_norm: bool
-    include_zero_gene: bool
-    input_style: str
-    output_style: str
-    input_emb_style: str
-    mask_ratio: float
-    cell_emb_style: str
-    pad_token: str
-    special_tokens: list
-    mask_value: str or int
-    max_seq_len: int
-    per_seq_batch_sample: bool
-    pad_value: int = None
 
 
 @dataclasses.dataclass
@@ -159,6 +149,7 @@ class PreprocessConfig:
     max_seq_len: int
     per_seq_batch_sample: bool
     pad_value: int = None
+    pert_pad_id: int = None
 
 
 @dataclasses.dataclass
@@ -167,6 +158,9 @@ class LogConfig:
     save_eval_interval: int
     do_eval_scib_metrics: bool
     retain_best_model: bool
+    log_error: bool = False
+    pool_size: int = None
+    top_k: int = 15
 
 
 @dataclasses.dataclass
@@ -1000,3 +994,576 @@ def eval_reference_mapping(gt, preds, output_dir="output", logger=None):
     clustermap_path = f"{output_dir}/confusion_matrix_clustermap.png"
     plt.savefig(clustermap_path)
     plt.close()
+
+
+def compute_perturbation_metrics(
+    results: Dict,
+    ctrl_adata: AnnData,
+    non_zero_genes: bool = False,
+    return_raw: bool = False,
+) -> Dict:
+    """
+    Method 'compute_perturbation_metrics' is adapted from:
+    https://github.com/bowang-lab/scGPT/blob/7301b51a72f5db321fccebb51bc4dd1380d99023/scgpt/utils/util.py#L429
+    Originally developed by Bo Wang Lab for scGPT. Please refer to the original source for more details.
+
+    Given results from a model run and the ground truth, compute metrics
+
+    Args:
+        results (:obj:`Dict`): The results from a model run
+        ctrl_adata (:obj:`AnnData`): The adata of the control condtion
+        non_zero_genes (:obj:`bool`, optional): Whether to only consider non-zero
+            genes in the ground truth when computing metrics
+        return_raw (:obj:`bool`, optional): Whether to return the raw metrics or
+            the mean of the metrics. Default is False.
+
+    Returns:
+        :obj:`Dict`: The metrics computed
+    """
+    from scipy.stats import pearsonr
+
+    # metrics:
+    #   Pearson correlation of expression on all genes, on DE genes,
+    #   Pearson correlation of expression change on all genes, on DE genes,
+
+    metrics_across_genes = {
+        "pearson": [],
+        "pearson_de": [],
+        "pearson_delta": [],
+        "pearson_de_delta": [],
+    }
+
+    metrics_across_conditions = {
+        "pearson": [],
+        "pearson_delta": [],
+    }
+
+    conditions = np.unique(results["pert_cat"])
+    assert not "ctrl" in conditions, "ctrl should not be in test conditions"
+    condition2idx = {c: np.where(results["pert_cat"] == c)[0] for c in conditions}
+
+    mean_ctrl = np.array(ctrl_adata.X.mean(0)).flatten()  # (n_genes,)
+    assert ctrl_adata.X.max() <= 1000, "gene expression should be log transformed"
+
+    true_perturbed = results["truth"]  # (n_cells, n_genes)
+    assert true_perturbed.max() <= 1000, "gene expression should be log transformed"
+    true_mean_perturbed_by_condition = np.array(
+        [true_perturbed[condition2idx[c]].mean(0) for c in conditions]
+    )  # (n_conditions, n_genes)
+    true_mean_delta_by_condition = true_mean_perturbed_by_condition - mean_ctrl
+    zero_rows = np.where(np.all(true_mean_perturbed_by_condition == 0, axis=1))[
+        0
+    ].tolist()
+    zero_cols = np.where(np.all(true_mean_perturbed_by_condition == 0, axis=0))[
+        0
+    ].tolist()
+
+    pred_perturbed = results["pred"]  # (n_cells, n_genes)
+    pred_mean_perturbed_by_condition = np.array(
+        [pred_perturbed[condition2idx[c]].mean(0) for c in conditions]
+    )  # (n_conditions, n_genes)
+    pred_mean_delta_by_condition = pred_mean_perturbed_by_condition - mean_ctrl
+
+    def corr_over_genes(x, y, conditions, res_list, skip_rows=[], non_zero_mask=None):
+        """compute pearson correlation over genes for each condition"""
+        for i, c in enumerate(conditions):
+            if i in skip_rows:
+                continue
+            x_, y_ = x[i], y[i]
+            if non_zero_mask is not None:
+                x_ = x_[non_zero_mask[i]]
+                y_ = y_[non_zero_mask[i]]
+            res_list.append(pearsonr(x_, y_)[0])
+
+    corr_over_genes(
+        true_mean_perturbed_by_condition,
+        pred_mean_perturbed_by_condition,
+        conditions,
+        metrics_across_genes["pearson"],
+        zero_rows,
+        non_zero_mask=true_mean_perturbed_by_condition != 0 if non_zero_genes else None,
+    )
+    corr_over_genes(
+        true_mean_delta_by_condition,
+        pred_mean_delta_by_condition,
+        conditions,
+        metrics_across_genes["pearson_delta"],
+        zero_rows,
+        non_zero_mask=true_mean_perturbed_by_condition != 0 if non_zero_genes else None,
+    )
+
+    def find_DE_genes(adata, condition, geneid2idx, non_zero_genes=False, top_n=20):
+        """
+        Find the DE genes for a condition
+        """
+        key_components = next(
+            iter(adata.uns["rank_genes_groups_cov_all"].keys())
+        ).split("_")
+        assert len(key_components) == 3, "rank_genes_groups_cov_all key is not valid"
+
+        condition_key = "_".join([key_components[0], condition, key_components[2]])
+
+        de_genes = adata.uns["rank_genes_groups_cov_all"][condition_key]
+        if non_zero_genes:
+            de_genes = adata.uns["top_non_dropout_de_20"][condition_key]
+            # de_genes = adata.uns["rank_genes_groups_cov_all"][condition_key]
+            # de_genes = de_genes[adata.uns["non_zeros_gene_idx"][condition_key]]
+            # assert len(de_genes) > top_n
+
+        de_genes = de_genes[:top_n]
+
+        de_idx = [geneid2idx[i] for i in de_genes]
+
+        return de_idx, de_genes
+
+    geneid2idx = dict(zip(ctrl_adata.var.index.values, range(len(ctrl_adata.var))))
+    de_idx = {
+        c: find_DE_genes(ctrl_adata, c, geneid2idx, non_zero_genes)[0]
+        for c in conditions
+    }
+    mean_ctrl_de = np.array(
+        [mean_ctrl[de_idx[c]] for c in conditions]
+    )  # (n_conditions, n_diff_genes)
+
+    true_mean_perturbed_by_condition_de = np.array(
+        [
+            true_mean_perturbed_by_condition[i, de_idx[c]]
+            for i, c in enumerate(conditions)
+        ]
+    )  # (n_conditions, n_diff_genes)
+    zero_rows_de = np.where(np.all(true_mean_perturbed_by_condition_de == 0, axis=1))[
+        0
+    ].tolist()
+    true_mean_delta_by_condition_de = true_mean_perturbed_by_condition_de - mean_ctrl_de
+
+    pred_mean_perturbed_by_condition_de = np.array(
+        [
+            pred_mean_perturbed_by_condition[i, de_idx[c]]
+            for i, c in enumerate(conditions)
+        ]
+    )  # (n_conditions, n_diff_genes)
+    pred_mean_delta_by_condition_de = pred_mean_perturbed_by_condition_de - mean_ctrl_de
+
+    corr_over_genes(
+        true_mean_perturbed_by_condition_de,
+        pred_mean_perturbed_by_condition_de,
+        conditions,
+        metrics_across_genes["pearson_de"],
+        zero_rows_de,
+    )
+    corr_over_genes(
+        true_mean_delta_by_condition_de,
+        pred_mean_delta_by_condition_de,
+        conditions,
+        metrics_across_genes["pearson_de_delta"],
+        zero_rows_de,
+    )
+
+    if not return_raw:
+        for k, v in metrics_across_genes.items():
+            metrics_across_genes[k] = np.mean(v)
+        for k, v in metrics_across_conditions.items():
+            metrics_across_conditions[k] = np.mean(v)
+    metrics = metrics_across_genes
+
+    return metrics
+
+
+def dump_perturbation_results(results: List, pool_size: int, save_file: str):
+    """
+    Dumps the perturbation results to a file, including additional control statistics.
+
+    Parameters
+    ----------
+    results : List
+        A list of tuples containing perturbation queries and their corresponding results (genes, truth, pred, control statistics).
+    pool_size : int
+        The size of the pool (number of control samples used).
+    save_file : str
+        The file path where the results will be saved.
+    """
+    data_to_save = {}
+    for query, (genes, truth, pred, ctrl_mean) in results:
+        data_to_save[query] = {
+            "pool_size": pool_size,
+            "genes": genes,
+            "truth": truth,
+            "pred": pred,
+            "ctrl_mean": ctrl_mean
+        }
+    with open(save_file, "wb") as f:
+        pickle.dump(data_to_save, f)
+
+
+def dump_pert_subgroup_results(test_metrics, subgroup_analysis, save_file):
+    # Step 8: Save everything to a single pickle file
+    results_to_save = {
+        "test_metrics": test_metrics,
+        "subgroup_analysis": subgroup_analysis
+    }
+
+    with open(save_file, "wb") as f:
+        pickle.dump(results_to_save, f)
+
+
+
+def load_and_plot_perturbation_results(genes=None, truth=None, pred=None, ctrl_mean=None, plot_filename: str = None):
+    """
+    Load the results of a perturbation and create a plot comparing predicted and observed
+    changes in gene expression over control.
+
+    Parameters:
+    ----------
+    query : str
+        The perturbation being analyzed (e.g., "gene1+ctrl").
+    genes : list of str
+        List of gene names.
+    truth : np.ndarray
+        The observed (ground truth) gene expression values for the perturbation condition.
+    pred : np.ndarray
+        The predicted gene expression values from the model for the same perturbation condition.
+    pert_changes : np.ndarray
+        The perturbation changes as calculated relative to control.
+    ctrl_stats : dict
+        A dictionary containing control statistics including mean, quartiles, and whiskers.
+        - 'mean': Mean control expression for each gene.
+    file_name : str
+        File path to save the generated plot and data.
+    """
+    csv_filename = plot_filename.replace(".png", ".csv")
+    # if os.path.exists(csv_filename):
+    #     df = pd.read_csv(csv_filename)
+    # else:
+    df = create_pert_violin_plot_df(ctrl_mean, plot_filename, genes, pred, truth)
+    plt.figure(figsize=(15, 5))
+    plt.grid(False)
+    sns.violinplot(x="Gene", y="Expression Change", hue="Type", data=df, inner="box",
+                   inner_kws={'box_width': 2, 'whis_width': 3, 'marker': 'o'}, palette="muted", width=0.8)
+    plt.axhline(0, linestyle="dashed", color="green")
+    plt.ylabel("Expression Change", fontsize=20)
+    plt.xlabel("")
+    plt.xticks(rotation=90, fontsize=20)
+    plt.yticks(fontsize=16)
+    plt.subplots_adjust(bottom=0.3, top=0.9)
+    plt.legend(loc='upper center', bbox_to_anchor=(0.22, 1.2), ncol=2, frameon=False, fontsize=20)
+    plt.savefig(plot_filename, dpi=300)
+    plt.show()
+    plt.close()
+
+
+def create_pert_violin_plot_df(ctrl_mean, csv_file, genes, pred, truth):
+    pred_changes_to_ctrl_mean = pred - ctrl_mean
+    truth_changes_to_ctrl_mean = truth - ctrl_mean
+    # Create a DataFrame for the observed and predicted changes
+    num_samples = truth_changes_to_ctrl_mean.shape[0]  # Number of samples
+    # Create DataFrames with sample info
+    truth_df = pd.DataFrame({
+        "Gene": list(genes) * num_samples,
+        "Expression Change": truth_changes_to_ctrl_mean.flatten(),
+        "Sample": [f"Sample_{i}" for i in range(num_samples)] * len(genes),
+        "Type": "Observed"
+    })
+    num_samples = pred_changes_to_ctrl_mean.shape[0]
+    pred_df = pd.DataFrame({
+        "Gene": list(genes) * num_samples,
+        "Expression Change": pred_changes_to_ctrl_mean.flatten(),
+        "Sample": [f"Sample_{i}" for i in range(num_samples)] * len(genes),
+        "Type": "Predicted"
+    })
+    df = pd.concat([truth_df, pred_df])
+    df.to_csv(csv_file, index=False)
+    return df
+
+
+
+def aggregate(fed_model, local_weights, n_local_samples, **kwargs):
+    if fed_model.fed_config.aggregation_type == "FedAvg":
+        fed_model.aggregate(local_weights)
+    elif fed_model.fed_config.aggregation_type == "WeightedFedAvg":
+        fed_model.weighted_aggregate(local_weights, n_local_samples)
+    else:
+        raise NotImplementedError(f"Aggregation type {fed_model.fed_config.aggregation_type} not implemented")
+
+
+def concat_adata(adata1, adata2):
+    assert all(adata1.var == adata2.var), "Control data variables do not match!"
+    assert all(adata1.obs.keys() == adata2.obs.keys()), "Control data observations do not match!"
+    assert adata1.uns.keys() == adata2.uns.keys(), "Control data uns keys do not match!"
+    adata = anndata.concat([adata1, adata2])
+    adata.uns = adata1.uns.copy()
+    adata.var = adata2.var.copy()
+    return adata
+
+
+def plot_condition_heatmap(df, plt_name):
+    plt.figure(figsize=(11, 10))
+    value_to_int = {j: i for i, j in enumerate(['Unseen', 'Train', 'Valid', 'Test'])}
+    n = len(value_to_int)
+    cmap = sns.color_palette("light:slateblue", as_cmap=True)
+    matrix = np.triu(df.values, 1)
+    ax = sns.heatmap(df.replace(value_to_int), cmap=colors.ListedColormap(cmap(np.linspace(0, 1, 4))),
+                     linewidths=0.05, mask=matrix)
+    ax.tick_params(axis='y', rotation=0)
+    ax.tick_params(axis='x', rotation=90)
+    colorbar = ax.collections[0].colorbar
+    r = colorbar.vmax - colorbar.vmin
+    colorbar.set_ticks([colorbar.vmin + r / n * (0.5 + i) for i in range(n)])
+    colorbar.set_ticklabels(list(value_to_int.keys()))
+    plt.savefig(plt_name, dpi=300)
+
+
+class TopKMetricsEvaluator:
+    """
+    A class to evaluate top-k metrics such as precision, recall, top-k accuracy, and Average Reciprocal Rank (ARR) for gene predictions.
+
+    Attributes
+    ----------
+    experiment_name : str
+        The name of the experiment.
+    experiment_parameters : Dict[str, Any]
+        A dictionary of additional parameters related to the experiment.
+    output_dir : str
+        The directory where the output CSV files will be stored.
+    append : bool, optional
+        Whether to append to the output files if they already exist (default is True).
+    predictions : List[List[int]]
+        List of predicted gene sets for each cell (for batch processing).
+    true_values : List[List[int]]
+        List of actual perturbed gene sets for each cell (for batch processing).
+    metrics : dict
+        A dictionary to store top-k metrics like precision, recall, accuracy, hit rate for each k.
+    arr_df : pd.DataFrame
+        DataFrame to store the Average Reciprocal Rank (ARR).
+    """
+
+    def __init__(self, experiment_name: str,
+                 experiment_parameters: Dict[str, Any],
+                 output_dir: str,
+                 predictions: List[List[int]] = None,
+                 true_values: List[List[int]] = None,
+                 append: bool = True):
+        """
+        Initialize the evaluator with predictions and true values (optional for gradual input).
+        """
+        self.predictions = predictions if predictions is not None else []
+        self.true_values = true_values if true_values is not None else []
+        self.experiment_name = experiment_name
+        self.experiment_parameters = experiment_parameters
+        self.output_dir = output_dir
+        self.append = append
+        self.topk_filepath = os.path.join(self.output_dir, f"{self.experiment_name}_top_k_metrics.csv")
+        self.arr_filepath = os.path.join(self.output_dir, f"{self.experiment_name}_arr_metrics.csv")
+        self.metrics = {'k': [], 'precision': [], 'recall': [], 'top_k_accuracy': [], 'hit_rate': [], 'min_hit': []}
+        self.arr_df = pd.DataFrame()
+        self.hit_range = []
+
+    def add_data(self, predictions: List[int], true_values: List[int]):
+        """
+        Add predictions and true values incrementally for the gradual input scenario.
+
+        Parameters
+        ----------
+        predictions : List[int]
+            Predicted gene set for a single cell.
+        true_values : List[int]
+            True perturbed gene set for a single cell.
+        """
+        self.predictions.append(predictions)
+        self.true_values.append(true_values)
+        # Adjust hit range based on the new true_values
+        self.hit_range = list(range(1, len(true_values) + 1))
+
+    def arr_for_single_cell(self, pred: List[int], true: List[int]) -> float:
+        """
+        Calculate the Average Reciprocal Rank (ARR) for a single cell.
+        """
+        reciprocal_ranks = []
+        for gene in true:
+            if gene in pred:
+                rank = pred.index(gene) + 1  # Get 1-based rank
+                reciprocal_ranks.append(1 / rank)
+            else:
+                reciprocal_ranks.append(0)
+        return np.mean(reciprocal_ranks) if reciprocal_ranks else 0
+
+    def precision_at_k(self, k: int) -> float:
+        """
+        Calculate precision at k for all cells.
+        """
+        precisions = []
+        for pred, true in zip(self.predictions, self.true_values):
+            top_k_pred = set(pred[:k])
+            relevant_in_k = top_k_pred.intersection(true)
+            precisions.append(len(relevant_in_k) / k)
+        return np.mean(precisions)
+
+    def recall_at_k(self, k: int) -> float:
+        """
+        Calculate recall at k for all cells.
+        """
+        recalls = []
+        for pred, true in zip(self.predictions, self.true_values):
+            top_k_pred = set(pred[:k])
+            relevant_in_k = top_k_pred.intersection(true)
+            recalls.append(len(relevant_in_k) / len(true))
+        return np.mean(recalls)
+
+    def top_k_accuracy(self, k: int) -> float:
+        """
+        Calculate top-k accuracy for all cells.
+        """
+        accuracies = []
+        for pred, true in zip(self.predictions, self.true_values):
+            top_k_pred = set(pred[:k])
+            accuracies.append(1 if len(top_k_pred.intersection(true)) > 0 else 0)
+        return np.mean(accuracies)
+
+    def hit_rate_at_k(self, k: int, min_hits: int = 1) -> float:
+        """
+        Calculate hit rate at k for all cells based on the number of hits.
+        """
+        hits = []
+        for pred, true in zip(self.predictions, self.true_values):
+            top_k_pred = set(pred[:k])
+            num_hits = len(top_k_pred.intersection(true))
+            hits.append(1 if num_hits >= min_hits else 0)
+        return np.mean(hits)
+
+    def update_metrics_for_k(self, k: int):
+        """
+        Gradually update metrics for a specific k value.
+        """
+        precision = self.precision_at_k(k)
+        recall = self.recall_at_k(k)
+        top_k_acc = self.top_k_accuracy(k)
+
+        for min_hit in self.hit_range:
+            self.metrics['k'].append(k)
+            self.metrics['precision'].append(precision)
+            self.metrics['recall'].append(recall)
+            self.metrics['top_k_accuracy'].append(top_k_acc)
+            self.metrics['min_hit'].append(min_hit)
+            self.metrics['hit_rate'].append(self.hit_rate_at_k(k, min_hits=min_hit))
+
+    def finalize_metrics(self):
+        """
+        Once all k values are provided, calculate ARR (k-independent) and store metrics into DataFrames.
+        """
+        # Convert the collected metrics into a DataFrame
+        self.metrics_df = pd.DataFrame(self.metrics)
+
+        # Calculate ARR and store it in a separate DataFrame
+        self.arr_df = pd.DataFrame({'ARR': [self.average_reciprocal_rank()]})
+
+        # Add additional columns for experiment parameters
+        self.add_exp_specific_columns()
+
+    def average_reciprocal_rank(self) -> float:
+        """
+        Calculate the Average Reciprocal Rank (ARR) across all cells.
+
+        Returns
+        -------
+        float
+            The ARR across all cells.
+        """
+        arrs = [self.arr_for_single_cell(pred, true) for pred, true in zip(self.predictions, self.true_values)]
+        return np.mean(arrs) if arrs else 0
+
+    def calculate_metrics_for_all_ks(self, k_range: List[int]):
+        """
+        Calculate metrics for multiple k values and store them in a DataFrame.
+
+        Parameters
+        ----------
+        k_range : list
+            List of k values to calculate metrics for (e.g., range(1, 16)).
+        """
+        metrics = {'k': [], 'precision': [], 'recall': [], 'top_k_accuracy': [], 'hit_rate': [], 'min_hit': []}
+        for k in k_range:
+            precision = self.precision_at_k(k)
+            recall = self.recall_at_k(k)
+            top_k_acc = self.top_k_accuracy(k)
+            for min_hit in self.hit_range:
+                metrics['k'].append(k)
+                metrics['precision'].append(precision)
+                metrics['recall'].append(recall)
+                metrics['top_k_accuracy'].append(top_k_acc)
+                metrics['min_hit'].append(min_hit)
+                metrics['hit_rate'].append(self.hit_rate_at_k(k, min_hits=min_hit))
+        self.metrics_df = pd.DataFrame(metrics)
+        self.arr_df = pd.DataFrame({'ARR': [self.average_reciprocal_rank()]})
+        self.add_exp_specific_columns()
+
+    def add_exp_specific_columns(self):
+        """
+        Add extra columns (experiment parameters and name) to the DataFrames.
+        """
+        if self.metrics_df.empty or self.arr_df.empty:
+            raise ValueError("Metrics dataframe is empty.")
+
+        for key, value in self.experiment_parameters.items():
+            self.metrics_df[key] = value
+            self.arr_df[key] = value
+
+        self.metrics_df['experiment'] = self.experiment_name
+        self.arr_df['experiment'] = self.experiment_name
+
+    def write_metrics_to_csv(self):
+        """
+        Write the metrics DataFrames to CSV files.
+        """
+        if not self.metrics_df.empty:
+            mode = 'a' if self.append else 'w'
+            write_header = not os.path.exists(self.topk_filepath) or not self.append
+            self.metrics_df.to_csv(self.topk_filepath, mode=mode, header=write_header, index=False)
+            self.arr_df.to_csv(self.arr_filepath, mode=mode, header=write_header, index=False)
+
+    def read_metrics_from_csv(self):
+        """
+        Read the metrics from CSV files into DataFrames.
+        """
+        self.metrics_df = pd.read_csv(self.topk_filepath)
+        self.arr_df = pd.read_csv(self.arr_filepath)
+
+
+class GPUUsageTracker:
+    def __init__(self, device_index: int = None):
+        if device_index is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = get_cuda_device(device_index)
+
+        # Initial memory stats
+        self.start_allocated = torch.cuda.memory_allocated(self.device)
+        self.start_reserved = torch.cuda.memory_reserved(self.device)
+        self.start_max_allocated = torch.cuda.max_memory_allocated(self.device)
+        self.start_max_reserved = torch.cuda.max_memory_reserved(self.device)
+
+        print(f"GPU Tracking Started on {self.device}.")
+        self.print_memory_stats("At start")
+
+    def print_memory_stats(self, context=""):
+        allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)
+        reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)
+        max_allocated = torch.cuda.max_memory_allocated(self.device) / (1024 ** 2)
+        max_reserved = torch.cuda.max_memory_reserved(self.device) / (1024 ** 2)
+
+        print(f"{context} - Allocated Memory: {allocated:.2f} MB")
+        print(f"{context} - Reserved Memory: {reserved:.2f} MB")
+        print(f"{context} - Max Allocated Memory: {max_allocated:.2f} MB")
+        print(f"{context} - Max Reserved Memory: {max_reserved:.2f} MB")
+
+    def generate_report(self):
+        print("\nGenerating GPU usage report:")
+        self.print_memory_stats("At end")
+
+        print("\nGPU Usage Summary:")
+        print(
+            f"Memory allocated increased by: {(torch.cuda.memory_allocated(self.device) - self.start_allocated) / (1024 ** 2):.2f} MB")
+        print(
+            f"Memory reserved increased by: {(torch.cuda.memory_reserved(self.device) - self.start_reserved) / (1024 ** 2):.2f} MB")
+        print(
+            f"Max memory allocated increased by: {(torch.cuda.max_memory_allocated(self.device) - self.start_max_allocated) / (1024 ** 2):.2f} MB")
+        print(
+            f"Max memory reserved increased by: {(torch.cuda.max_memory_reserved(self.device) - self.start_max_reserved) / (1024 ** 2):.2f} MB")
