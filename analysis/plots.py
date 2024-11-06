@@ -4,7 +4,8 @@ import __init__
 import argparse
 from analysis.utils import (CentralizedMetricPlotter, collect_metrics, plot_tuning_heatmap, find_best_fed,
                             analyze_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
-                            plot_best_metrics, embedding_boxplot)
+                            plot_best_metrics, embedding_boxplot, perturbation_cent_box_plt,
+                            batch_umap, accuracy_annotated_scatterplot)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -16,6 +17,8 @@ if __name__ == '__main__':
                                                      'annotation_best_metrics',
                                                      'annotation_cent_box_plt',
                                                      'reference_map_boxplot',
+                                                     'perturbation_cent_box_plt',
+                                                     'batch_samples_umap'
                                                      ], default='annotation_cent_box_plt')
     parser.add_argument("--mode", choices=['centralized', 'federated'], default='centralized')
     parser.add_argument("--root_dir", type=str, default='/home/bba1658/FedscGPT/output/annotation')
@@ -31,13 +34,19 @@ if __name__ == '__main__':
         metrics = {}
         best = find_best_fed(args.param_tuning_df, args.metric)
         for dataset in ["hp", "ms", "myeloid"]:
-            metrics[dataset] = collect_metrics("/".join([args.root_dir, "output", "annotation", dataset, args.mode]), args.metric)
+            metrics[dataset] = collect_metrics("/".join([args.root_dir, "output", "annotation", dataset, args.mode]),
+                                               "/home/bba1658/FedscGPT/data/benchmark",
+                                               args.metric)
             metrics[dataset]['federated'] = best[dataset]
         plotter = CentralizedMetricPlotter()
         df = plotter.collect_data(metrics)
         df.to_csv('clients_cent.csv')
         df = pd.read_csv('clients_cent.csv')
-        plotter.plot_data_matplotlib(df, 'Accuracy', 'centralized_metric_plot', 'svg')
+        df["Metric"] = "Accuracy"
+        df["Value"] = df["Accuracy"]
+        df.drop(columns=["Accuracy"], inplace=True)
+        accuracy_annotated_scatterplot(df, "./plots/annotation", args.format)
+        # plotter.plot_data_matplotlib(df, 'Accuracy', 'centralized_metric_plot', 'svg')
     elif args.plot == 'annotation_metric_heatmap':
         plot_tuning_heatmap(args.param_tuning_df, plot_name="metrics_heatmap", file_format=args.format)
     elif args.plot == 'annotation_communication':
@@ -49,4 +58,8 @@ if __name__ == '__main__':
     elif args.plot == 'annotation_best_metrics':
         plot_best_metrics(args.root_dir, args.param_tuning_df, img_format=args.format)
     elif args.plot == 'reference_map_boxplot':
-        embedding_boxplot(args.root_dir, args.format)
+        embedding_boxplot(args.root_dir, "/home/bba1658/FedscGPT/data/benchmark", args.format)
+    elif args.plot == "perturbation_cent_box_plt":
+        perturbation_cent_box_plt(args.root_dir, args.format)
+    elif args.plot == "batch_samples_umap":
+        batch_umap(args.data_dir, img_format='png')
