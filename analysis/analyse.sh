@@ -15,7 +15,7 @@ if [ ! -d "${results_dir}" ]; then
     mkdir -p "${results_dir}"
 fi
 
-# Plot centralized box-plots for accuracy
+## Plot centralized box-plots for accuracy
 python3 plots.py --plot "annotation_cent_box_plt" --mode "centralized" --root_dir $root_dir  --param_tuning_df  $df_file \
 --metric "accuracy"
 
@@ -37,3 +37,9 @@ python3 plots.py --plot "annotation_best_metrics" --root_dir "${root_dir}/output
 
 # Plot reference mapping boxplot
 python3 plots.py --plot "reference_map_boxplot" --root_dir "${root_dir}/output/embedding" --format 'svg'
+
+# Plot Perturbation analysis boxplot
+python3 plots.py --plot "perturbation_cent_box_plt" --root_dir "${root_dir}/output/perturbation" --format 'svg'
+
+# Plot Batch distribution UMAP
+python3 plots.py --plot "batch_samples_umap"  --data_dir $data_dir
