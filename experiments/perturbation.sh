@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# Assign command-line arguments to variables
+mode="$1"
+reverse="$2"
+dataset="$3"
+gpu="$4"
+perts_to_plot="$5"
+n_clients="$6"
+n_epochs="${7}"
+n_rounds="${8}"
+per_round_eval="${9}"
+
+# Get the root directory, which is the parent directory of the current working directory
+root_dir="$(dirname "$PWD")"
+
+directory_mode="centralized"
+if [[ "$mode" == *"federated"* ]]; then
+  directory_mode="federated"
+fi
+
+# Set up directory paths
+data_dir="${root_dir}/data/benchmark/perturbation/${dataset}"
+if [ "${reverse}" == True ]; then
+    reference="${data_dir}/reverse/perturb_processed.h5ad"
+    output="${root_dir}/output/perturbation/reverse/${dataset}/${directory_mode}"
+    pyg_path="${data_dir}/reverse/data_pyg"
+    split_path="${data_dir}/reverse/splits"
+else
+    reference="${data_dir}/centralized-train/perturb_processed.h5ad"
+    output="${root_dir}/output/perturbation/${dataset}/${directory_mode}"
+    pyg_path="${data_dir}/data_pyg"
+    split_path="${data_dir}/splits"
+fi
+query="${data_dir}/perturb_processed.h5ad"
+INTI_WEIGHTS_DIR="${root_dir}/init_weights"
+
+
+if [ ! -d "$output" ]; then
+    mkdir -p $output
+fi
+
+export CUBLAS_WORKSPACE_CONFIG=:4096:8
+cmd="python ${root_dir}/tasks/perturbation.py \
+ --dataset_name $dataset \
+ --data-dir $data_dir \
+ --reference_adata $reference \
+ --query_adata $query \
+ --perts_to_plot $perts_to_plot \
+ --pyg_path $pyg_path \
+ --split_path $split_path \
+ --output-dir $output \
+ --mode $mode \
+ --gpu $gpu \
+ --pretrained_model_dir ${root_dir}/pretrained_models/scGPT_human \
+ --config_file ${root_dir}/experiments/configs/perturbation/config.yml \
+ --n_clients $n_clients \
+ --fed_config_file ${root_dir}/experiments/configs/perturbation/fed_config.yml \
+ --init_weights_dir ${INTI_WEIGHTS_DIR}/${dataset}.pth"
+
+#python /home/bba1658/FedscGPT/tasks/perturbation.py --dataset adamson --data-dir /home/bba1658/FedscGPT/data/benchmark/perturbation/adamson --reference_adata /home/bba1658/FedscGPT/data/benchmark/perturbation/adamson/centralized-train/perturb_processed.h5ad --query_adata /home/bba1658/FedscGPT/data/benchmark/perturbation/adamson/centralized-test/perturb_processed.h5ad --pyg_path /home/bba1658/FedscGPT/data/benchmark/perturbation/adamson/data_pyg --split_path /home/bba1658/FedscGPT/data/benchmark/perturbation/adamson/splits --output-dir /home/bba1658/FedscGPT/output/perturbation/adamson/centralized --mode centralized_inference --gpu 0 --pretrained_model_dir /home/bba1658/FedscGPT/pretrained_models/scGPT_human --config_file /home/bba1658/FedscGPT/experiments/configs/perturbation/config.yml --init_weights_dir /home/bba1658/FedscGPT/init_weights/adamson.pth --verbose
+
+# Add optional arguments if they are set
+if [ "${#n_epochs}" != 0 ]; then
+    cmd="$cmd --n_epochs $n_epochs"
+fi
+
+# Check and add --n_rounds if n_rounds is not empty and not "None"
+if [ "${#n_rounds}" != 0 ]; then
+    cmd="$cmd --n_rounds $n_rounds"
+fi
+
+if [ "${per_round_eval}" == True ]; then
+    cmd="$cmd --per_round_eval"
+fi
+
+if [ "${reverse}" == True ]; then
+    cmd="$cmd --reverse \
+    --pool-size 30 \
+    --early_stop 2"
+
+else
+    cmd="$cmd --early_stop 10 \
+    --pool-size 300"
+fi
+
+if [ "${per_round_eval}" == True ]; then
+    cmd="$cmd --per_round_eval"
+fi
+# Execute the command
+eval $cmd
