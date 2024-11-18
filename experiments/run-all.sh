@@ -19,7 +19,7 @@ chmod +x run_embedding.sh
 wait
 
 chmod +x run_perturbation.sh
- arguments: mode, reverse, n_epochs, n_rounds, GPU, n_clients, per_round_eval
+# arguments: mode, reverse, n_epochs, n_rounds, GPU, n_clients, per_round_eval
 ./run_perturbation.sh centralized False 15 0 0 0 False &
 ./run_perturbation.sh centralized_clients False 15 0 1 2 False &
 wait
