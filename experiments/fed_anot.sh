@@ -32,6 +32,7 @@ data_dir="${root_dir}/data/scgpt/benchmark/${args[0]}"
 reference="${data_dir}/${args[1]}"
 query="${data_dir}/${args[2]}"
 output="${root_dir}/output/annotation/${args[0]}/param_tuning"
+INTI_WEIGHTS_DIR="${root_dir}/models/init"
 
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
