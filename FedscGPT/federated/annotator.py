@@ -115,8 +115,8 @@ class ClientAnnotator(Client, Training):
 
 
 class FedAnnotator(FedBase, FedAvg):
-    def __init__(self, reference_adata, data_dir, output_dir, **kwargs):
-        FedBase.__init__(self, data_dir=data_dir, output_dir=output_dir, **kwargs)
+    def __init__(self, reference_adata, data_dir, output_dir, n_rounds, **kwargs):
+        FedBase.__init__(self, data_dir=data_dir, output_dir=output_dir, n_rounds=n_rounds, **kwargs)
         FedAvg.__init__(self, n_rounds=self.fed_config.n_rounds, **kwargs)
         adata = read_h5ad(data_dir, reference_adata)
         n_total_samples = len(adata)
