@@ -28,7 +28,7 @@ INIT_WEIGHTS_DIR="${root_dir}/init_weights"
 
 IFS='|' read -r -a args <<< "${datasets[$DATASET]}"
 
-data_dir="${root_dir}/data/benchmark/${args[0]}"
+data_dir="${root_dir}/scgpt/data/benchmark/${args[0]}"
 reference="${data_dir}/${args[1]}"
 query="${data_dir}/${args[2]}"
 output="${root_dir}/output/annotation/${args[0]}/param_tuning"
