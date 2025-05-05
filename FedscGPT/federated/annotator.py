@@ -118,13 +118,16 @@ class FedAnnotator(FedBase, FedAvg):
         FedBase.__init__(self, data_dir=data_dir, output_dir=output_dir, **kwargs)
         FedAvg.__init__(self, self.fed_config.n_rounds, **kwargs)
         adata = read_h5ad(data_dir, reference_adata)
+        n_total_samples = len(adata)
         self.distribute_adata_by_batch(adata, kwargs['batch_key'])
         for c in range(self.n_clients):
             client = ClientAnnotator(reference_adata='adata.h5ad',
                                      data_dir=self.clients_data_dir[c],
                                      output_dir=self.clients_output_dir[c],
                                      log_id=f"client_{self.client_ids[c]}",
-                                     logger=self.logger, **kwargs)
+                                     logger=self.logger,
+                                     n_total_samples=n_total_samples,
+                                     **kwargs)
             self.clients.append(client)
         self.retain_best_model_retain(False)
         # TODO: Support post-finetune federated zeroshot
