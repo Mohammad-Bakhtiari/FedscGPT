@@ -291,13 +291,14 @@ class LossMeter:
 
 class FedBase:
 
-    def __init__(self, fed_config_file, task, data_dir, output_dir, client_ids=None, n_rounds=None, **kwargs):
+    def __init__(self, fed_config_file, task, data_dir, output_dir, client_ids=None, n_rounds=None, smpc=False, **kwargs):
         self.data_dir = data_dir
         self.output_dir = output_dir
         self.fed_config = load_fed_config(fed_config_file, task)
         if n_rounds:
             self.fed_config.n_rounds = n_rounds
         self.client_ids = client_ids
+        self.smpc = smpc
         self.logger = None
         self.aggregation_type = self.fed_config.aggregation_type
         self.init_model = None
@@ -345,10 +346,16 @@ class FedBase:
             self.local_model_weights.append(client.model.state_dict())
 
     def update_clients_model(self, **kwargs):
-        local_updates = []
+        if self.smpc:
+            return [client.local_update(self.global_weights, **kwargs) for client in self.clients]
+        weights = []
+        n_samples = []
         for client in self.clients:
-            local_updates.append(client.local_update(self.global_weights, **kwargs))
-        return local_updates
+            w, n_s = client.local_update(self.global_weights, **kwargs)
+            weights.append(w)
+            n_samples.append(n_s)
+        return weights, n_samples
+
 
     def create_dirs(self, path):
 
