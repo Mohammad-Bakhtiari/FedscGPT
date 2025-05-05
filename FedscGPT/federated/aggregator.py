@@ -1,5 +1,3 @@
-from FedscGPT import utils
-utils.set_seed()
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Union, Any
 import torch

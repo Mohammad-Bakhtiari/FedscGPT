@@ -1,5 +1,3 @@
-from FedscGPT import utils
-utils.set_seed()
 from torch.utils.data import DataLoader
 import torch
 from typing import Dict, List

@@ -1,5 +1,3 @@
-from FedscGPT import utils
-utils.set_seed()
 import torch.nn as nn
 import torch
 import time
