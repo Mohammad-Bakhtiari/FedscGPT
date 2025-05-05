@@ -2,9 +2,7 @@
 
 """
 import __init__
-from FedscGPT import utils
-utils.set_seed()
-from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches
+from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches, set_seed
 from FedscGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
 from FedscGPT.federated.annotator import FedAnnotator
 from FedscGPT.federated.aggregator import FedAvg
@@ -96,15 +94,6 @@ def centralized_inference(annotator=None,
     return annotator
 
 
-def aggregate(annotator, local_weights, n_local_samples, **kwargs):
-    if annotator.fed_config.aggregation_type == "FedAvg":
-        annotator.aggregate(local_weights)
-    elif annotator.fed_config.aggregation_type == "WeightedFedAvg":
-        annotator.weighted_aggregate(local_weights, n_local_samples)
-    else:
-        raise NotImplementedError(f"Aggregation type {annotator.fed_config.aggregation_type} not implemented")
-
-
 def federated_finetune(**kwargs):
     annotator = fed_prep(**kwargs)
     annotator.post_prep_setup()
@@ -115,7 +104,7 @@ def federated_finetune(**kwargs):
     for round in range(1, annotator.fed_config.n_rounds + 1):
         annotator.logger.federated(f"Round {round}")
         local_weights = annotator.update_clients_model(round_num=round)
-        aggregate(annotator, local_weights, n_local_samples)
+        annotator.aggregate(local_weights, n_local_samples)
         last_round = round == annotator.fed_config.n_rounds
         cent_inf(annotator=inference_model, weights=annotator.global_weights, save_results=last_round, round_number=round)
         if annotator.stop():
@@ -193,6 +182,7 @@ if __name__ == '__main__':
     add_annotation_args(parser)
     add_federated_annotation_args(parser)
     args = parser.parse_args()
+    set_seed(args.seed)
     create_output_dir(args)
     if args.mode == "federated_finetune":
         federated_finetune(task='annotation', **vars(args))
