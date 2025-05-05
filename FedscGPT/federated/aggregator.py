@@ -16,6 +16,7 @@ class Aggregator(ABC):
         Parameters:
         - n_rounds (int): Maximum number of aggregation rounds.
         """
+        print(f"Aggregator initialized with n_rounds={n_rounds}, smpc={smpc}, debug={debug}")
         self.n_rounds = n_rounds
         self.current_round = 0
         self.smpc = smpc
@@ -73,6 +74,7 @@ class FedAvg(Aggregator):
         Initializes the FedAvg aggregator with the specified number of rounds.
 
         """
+        print(f"FedAvg aggregator initialized with weighted={weighted}")
         super().__init__(**kwargs)
         self.weighted = weighted
 
