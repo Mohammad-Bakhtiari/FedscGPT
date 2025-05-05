@@ -1,7 +1,7 @@
 from FedscGPT import utils
 utils.set_seed()
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 import torch
 
 
@@ -11,7 +11,7 @@ class Aggregator(ABC):
     other distributed systems where model parameters need to be aggregated.
     """
 
-    def __init__(self, global_weights, n_rounds, smpc=False, debug=False, **kwargs):
+    def __init__(self, n_rounds, smpc=False, debug=False, **kwargs):
         """
         Initializes the aggregator with the specified number of rounds.
 
@@ -23,8 +23,9 @@ class Aggregator(ABC):
         self.global_weights = {}
         self.smpc = smpc
         self.debug = debug
-        self.global_weights = global_weights
-        self.global_model_keys = list(global_weights.keys())
+        self.global_weights = None
+        self.global_model_keys = None
+        self.global_weight_shapes = None
 
     @abstractmethod
     def aggregate(self, local_weights, **kwargs):
@@ -50,18 +51,37 @@ class Aggregator(ABC):
         """
         pass
 
-    def get_global_decrypted(self, encrypted_weights: List) -> None:
+    def get_global_decrypted(self, encrypted_weights: List) -> Dict[str, List[torch.tensor]]:
         """
         Decrypts and updates global weights from a list of encrypted tensors.
 
         Args:
             encrypted_weights (List): List of encrypted tensors corresponding to model parameters.
         """
-        self.global_weights = {
+        decrypted_weights = {
             key: encrypted_weights[i].get_plain_text().clone().detach().to(torch.float32)
             for i, key in enumerate(self.global_model_keys)
         }
+        return decrypted_weights
 
+
+    def set_global_weight_struct(self, global_weights: Dict[str, torch.Tensor]) -> None:
+        """
+        Stores only the structure (keys and shapes) of global weights.
+
+        Args:
+            global_weights (Dict[str, torch.Tensor]): Dictionary of global weights.
+        """
+        self.global_model_keys = list(global_weights.keys())
+        self.global_weight_shapes = {key: tensor.shape for key, tensor in global_weights.items()}
+        self.global_weights = {key: None for key in self.global_model_keys}
+
+    def update_global_weights(self, weights: Dict[str, List[torch.Tensor]]) -> None:
+        if self.debug:
+            assert self.global_model_keys == list(weights.keys()), f"Key mismatch: {self.global_model_keys} vs {list(weights.keys())}"
+            for key in self.global_model_keys:
+                assert self.global_weight_shapes[key] == weights[key].shape, f"Shape mismatch for {key}: {self.global_weight_shapes[key]} vs {weights[key].shape}"
+        self.global_weights = weights
 
 class FedAvg(Aggregator):
     def __init__(self, weighted, **kwargs):
@@ -97,16 +117,17 @@ class FedAvg(Aggregator):
             assert n_local_samples is not None, "Missing 'n_local_samples' for weighted aggregation"
             sample_ratios = [n / sum(n_local_samples) for n in n_local_samples]
 
-        self.global_weights = {}
+        global_weights = {}
         for param in local_weights[0].keys():
             if self.weighted:
-                self.global_weights[param] = torch.stack(
+                global_weights[param] = torch.stack(
                     [local_weights[i][param] * sample_ratios[i] for i in range(n_clients)]
                 ).sum(0)
             else:
-                self.global_weights[param] = torch.stack(
+                global_weights[param] = torch.stack(
                     [local_weights[i][param] for i in range(n_clients)]
                 ).sum(0) / n_clients
+        self.update_global_weights(global_weights)
 
     def aggregate_smpc(self, encrypted_weights_list: List[List]) -> None:
         """
@@ -123,11 +144,11 @@ class FedAvg(Aggregator):
 
         if self.weighted:
             # Weights are already scaled client-side
-            self.get_global_decrypted(summed)
+            global_weights = self.get_global_decrypted(summed)
         else:
             averaged = [param / n_clients for param in summed]
-            self.get_global_decrypted(averaged)
-
+            global_weights = self.get_global_decrypted(averaged)
+        self.update_global_weights(global_weights)
 
     def stop(self, **kwargs):
         """
