@@ -29,7 +29,7 @@ def set_seed(seed=None):
     crypten.init()
     cfg.debug.debug_mode = True
     crypten.manual_seed(seed, seed, seed)
-    cfg.encoder.precision_bits = 32
+    cfg.encoder.precision_bits = 64
     print(f"✅ Seed set to {seed} (from `set_seed()`)")
 
 import os
