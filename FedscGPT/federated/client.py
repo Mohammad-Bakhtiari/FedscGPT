@@ -1,9 +1,7 @@
-from FedscGPT.centralized import Training
 from FedscGPT.utils import check_weights_nan
 
-class Client(Training):
+class Client:
     def __init__(self, n_total_samples, smpc=False, debug=False, **kwargs):
-        super().__init__(**kwargs)
         self.smpc = smpc
         self.n_samples = self.adata.X.shape[0]
         self.sample_ration = self.n_samples / n_total_samples

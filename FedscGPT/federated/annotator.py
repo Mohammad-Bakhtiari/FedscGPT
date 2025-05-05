@@ -10,8 +10,9 @@ from FedscGPT.preprocessor.aggregation import aggregate_gene_counts, aggregate_b
     aggregate_local_gene_sets, aggregate_local_celltype_sets
 from FedscGPT.federated.aggregator import FedAvg
 from FedscGPT.federated.client import Client
+from FedscGPT.centralized.annotator import Training
 
-class ClientAnnotator(Client):
+class ClientAnnotator(Client, Training):
     """
     cell_id2type: Here is calculated locally. No global ID!
     """
