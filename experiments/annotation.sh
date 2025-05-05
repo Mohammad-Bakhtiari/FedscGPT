@@ -23,11 +23,11 @@ elif [[ "$mode" == *"federated"* ]]; then
 fi
 
 # Set up directory paths
-data_dir="${root_dir}/data/benchmark/${dataset}"
+data_dir="${root_dir}/data/scgpt/benchmark/${dataset}"
 reference="${data_dir}/${reference_file}"
 query="${data_dir}/${query_file}"
 output="${root_dir}/output/annotation/${dataset}/${general_mode}"
-INTI_WEIGHTS_DIR="${root_dir}/init_weights"
+INTI_WEIGHTS_DIR="${root_dir}/models/init"
 
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 cmd="python ${root_dir}/tasks/annotation.py \
@@ -40,7 +40,7 @@ cmd="python ${root_dir}/tasks/annotation.py \
  --batch_key \"$batch_key\" \
  --mode $mode \
  --gpu $gpu \
- --pretrained_model_dir ${root_dir}/pretrained_models/scGPT_human \
+ --pretrained_model_dir ${root_dir}/models/pretrained_models/scGPT_human \
  --config_file ${root_dir}/experiments/configs/annotation/config.yml \
  --fed_config_file ${root_dir}/experiments/configs/annotation/fed_config.yml \
  --init_weights_dir ${INTI_WEIGHTS_DIR}/${dataset}.pth"
