@@ -3,19 +3,34 @@ import numpy as np
 import torch
 import tensorflow as tf
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import crypten
+from crypten.config import cfg
+from collections import OrderedDict
 
 SEED = 42
-def set_seed(seed=SEED):
+def set_seed(seed=None):
+    """Sets the seed for reproducibility. Checks for an environment variable first, then defaults to SEED."""
+    global SEED
+    if seed is None:
+        seed = SEED
+    else:
+        SEED = seed
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
         torch.use_deterministic_algorithms(True)
-    tf.random.set_seed(seed)
-set_seed()
+
+    crypten.init()
+    cfg.debug.debug_mode = True
+    crypten.manual_seed(seed, seed, seed)
+    cfg.encoder.precision_bits = 32
+    print(f"✅ Seed set to {seed} (from `set_seed()`)")
 
 import os
 import anndata
@@ -1000,3 +1015,25 @@ def eval_reference_mapping(gt, preds, output_dir="output", logger=None):
     clustermap_path = f"{output_dir}/confusion_matrix_clustermap.png"
     plt.savefig(clustermap_path)
     plt.close()
+
+def check_weights_nan(weights, when, debug):
+    if debug:
+        # Convert odict_values to a list
+        if isinstance(weights, (dict, OrderedDict)):  # Ensure it's a dictionary-like object
+            weights = weights if isinstance(weights, dict) else dict(weights)  # Convert OrderedDict to dict
+
+            for name, param in weights.items():
+                if torch.isnan(param).any() or torch.isinf(param).any():
+                    print(f"⚠️ NaN or Inf found in {name} {when}!")
+
+        elif isinstance(weights, list):  # Handle list of tensors
+            for param in weights:
+                if torch.isnan(param).any() or torch.isinf(param).any():
+                    print(f"⚠️ NaN or Inf found {when}!")
+
+        elif isinstance(weights, torch.Tensor):  # Handle single tensor case
+            if torch.isnan(weights).any() or torch.isinf(weights).any():
+                print(f"⚠️ NaN or Inf found {when}!")
+
+        else:
+            print(f"⚠️ Unexpected type {type(weights)} in check_weights_nan {when}!")
