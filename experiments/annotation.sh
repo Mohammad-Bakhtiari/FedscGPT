@@ -10,6 +10,7 @@ batch_key="$6"
 gpu="$7"
 n_epochs="${8}"
 n_rounds="${9}"
+smpc="${10-flase}"
 
 # Get the root directory, which is the parent directory of the current working directory
 root_dir="$(dirname "$PWD")"
@@ -54,6 +55,10 @@ fi
 # Check and add --n_rounds if n_rounds is not empty and not "None"
 if [ "${#n_rounds}" != 0 ]; then
     cmd="$cmd --n_rounds $n_rounds"
+fi
+
+if [ "$smpc" == "true" ]; then
+    cmd="$cmd --smpc"
 fi
 
 # Execute the command
