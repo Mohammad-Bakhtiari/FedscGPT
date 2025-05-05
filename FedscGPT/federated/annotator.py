@@ -9,9 +9,9 @@ from FedscGPT.preprocessor.local import Preprocessor
 from FedscGPT.preprocessor.aggregation import aggregate_gene_counts, aggregate_bin_edges, aggregate_hvg_stats, \
     aggregate_local_gene_sets, aggregate_local_celltype_sets
 from FedscGPT.federated.aggregator import FedAvg
+from FedscGPT.federated.client import Client
 
-
-class ClientAnnotator(Training):
+class ClientAnnotator(Client):
     """
     cell_id2type: Here is calculated locally. No global ID!
     """
@@ -99,7 +99,7 @@ class ClientAnnotator(Training):
         else:
             self.model.load_state_dict(global_weights)
         self.train()
-        return self.get_weights()
+        return self.get_local_updates()
 
     def centralized_training(self, init_weights=None):
         if init_weights is None:
@@ -112,32 +112,10 @@ class ClientAnnotator(Training):
         return trained_weights
 
 
-    def get_weights(self):
-        """ Get the weights of the model
-        Returns
-        -------
-        dict
-            The weights of the model
-        """
-        return self.model.state_dict()
-
-    def set_weights(self, state_dict):
-        """ Set the weights of the model
-        Parameters
-        ----------
-        state_dict: dict
-            The weights of the model
-        """
-        with torch.no_grad():
-            for name, param in self.model.named_parameters():
-                if name in state_dict:
-                    param.data.copy_(state_dict[name].to(param.device))
-
-
 class FedAnnotator(FedBase, FedAvg):
     def __init__(self, reference_adata, data_dir, output_dir, **kwargs):
         FedBase.__init__(self, data_dir=data_dir, output_dir=output_dir, **kwargs)
-        FedAvg.__init__(self, self.fed_config.n_rounds)
+        FedAvg.__init__(self, self.fed_config.n_rounds, **kwargs)
         adata = read_h5ad(data_dir, reference_adata)
         self.distribute_adata_by_batch(adata, kwargs['batch_key'])
         for c in range(self.n_clients):
