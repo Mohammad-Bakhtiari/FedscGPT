@@ -3,11 +3,12 @@ import crypten
 import torch
 
 class Client:
-    def __init__(self, n_total_samples, smpc=False, debug=False, **kwargs):
+    def __init__(self, n_total_samples, smpc=False, debug=False, weighted=False, **kwargs):
         self.smpc = smpc
         self.n_samples = self.adata.X.shape[0]
         self.sample_ration = self.n_samples / n_total_samples
         self.debug = debug
+        self.weighted = weighted
 
     def get_local_updates(self):
         """Get the local updates.
@@ -17,15 +18,15 @@ class Client:
         dict, int : Without SMPC
         list of crypten.cryptensor, crypten.cryptensor : With SMPC
         """
+        weights = self.get_weights()
         if self.smpc:
-            weights = self.get_weights().values()
-            if self.aggregation == "weighted_fedavg":
+            weights = weights.values()
+            if self.weighted:
                weights = [param * self.sample_ration for param in weights]
             check_weights_nan(weights, "after training", self.debug)
             encrypted_weights = [crypten.cryptensor(param) for param in weights]
             return encrypted_weights
-
-        return self.get_weights(), self.n_samples
+        return weights
 
     def get_weights(self):
         """ Get the weights of the model

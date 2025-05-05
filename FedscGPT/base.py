@@ -346,15 +346,14 @@ class FedBase:
             self.local_model_weights.append(client.model.state_dict())
 
     def update_clients_model(self, **kwargs):
-        if self.smpc:
-            return [client.local_update(self.global_weights, **kwargs) for client in self.clients]
-        weights = []
-        n_samples = []
-        for client in self.clients:
-            w, n_s = client.local_update(self.global_weights, **kwargs)
-            weights.append(w)
-            n_samples.append(n_s)
-        return weights, n_samples
+        return [client.local_update(self.global_weights, **kwargs) for client in self.clients]
+        # weights = []
+        # n_samples = []
+        # for client in self.clients:
+        #     w, n_s = client.local_update(self.global_weights, **kwargs)
+        #     weights.append(w)
+        #     n_samples.append(n_s)
+        # return weights, n_samples
 
 
     def create_dirs(self, path):
