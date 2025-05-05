@@ -18,8 +18,9 @@ class ClientAnnotator(Client, Training):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        Training.__init__(self, **kwargs)
         self.n_samples = len(self.adata)
+        Client.__init__(self, **kwargs)
         self.preprocessor = Preprocessor(
             log=self.log,
             use_key=self.config.dataset.raw_data_key,
