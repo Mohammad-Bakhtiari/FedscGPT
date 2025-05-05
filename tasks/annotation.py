@@ -104,7 +104,7 @@ def federated_finetune(**kwargs):
     for round in range(1, annotator.fed_config.n_rounds + 1):
         annotator.logger.federated(f"Round {round}")
         local_weights = annotator.update_clients_model(round_num=round)
-        annotator.aggregate(local_weights, n_local_samples)
+        annotator.aggregate(local_weights, n_local_samples=n_local_samples)
         last_round = round == annotator.fed_config.n_rounds
         cent_inf(annotator=inference_model, weights=annotator.global_weights, save_results=last_round, round_number=round)
         if annotator.stop():
