@@ -1,4 +1,6 @@
 from FedscGPT.utils import check_weights_nan
+import crypten
+import torch
 
 class Client:
     def __init__(self, n_total_samples, smpc=False, debug=False, **kwargs):
