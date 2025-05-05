@@ -303,6 +303,8 @@ class FedBase:
         self.aggregation_type = self.fed_config.aggregation_type
         self.init_model = None
         self.global_weights = None
+        self.global_model_keys = None
+        self.global_weight_shapes = None
         self.global_model = None
         self.local_model_weights = []
         self.local_n_samples = []
@@ -405,3 +407,5 @@ class FedBase:
 
     def init_global_weights(self):
         self.global_weights = torch.load(self.clients[0].init_weights_dir)
+        self.global_model_keys = list(self.global_weights.keys())
+        self.global_weight_shapes = {key: tensor.shape for key, tensor in self.global_weights.items()}

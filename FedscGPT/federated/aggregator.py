@@ -20,12 +20,8 @@ class Aggregator(ABC):
         """
         self.n_rounds = n_rounds
         self.current_round = 0
-        self.global_weights = {}
         self.smpc = smpc
         self.debug = debug
-        self.global_weights = None
-        self.global_model_keys = None
-        self.global_weight_shapes = None
 
     @abstractmethod
     def aggregate(self, local_weights, **kwargs):
@@ -65,22 +61,12 @@ class Aggregator(ABC):
         return decrypted_weights
 
 
-    def set_global_weight_struct(self, global_weights: Dict[str, torch.Tensor]) -> None:
-        """
-        Stores only the structure (keys and shapes) of global weights.
-
-        Args:
-            global_weights (Dict[str, torch.Tensor]): Dictionary of global weights.
-        """
-        self.global_model_keys = list(global_weights.keys())
-        self.global_weight_shapes = {key: tensor.shape for key, tensor in global_weights.items()}
-        self.global_weights = {key: None for key in self.global_model_keys}
-
     def update_global_weights(self, weights: Dict[str, List[torch.Tensor]]) -> None:
         if self.debug:
             assert self.global_model_keys == list(weights.keys()), f"Key mismatch: {self.global_model_keys} vs {list(weights.keys())}"
             for key in self.global_model_keys:
                 assert self.global_weight_shapes[key] == weights[key].shape, f"Shape mismatch for {key}: {self.global_weight_shapes[key]} vs {weights[key].shape}"
+        assert self.global_model_keys is not None, "Global model keys are not set. Call set_global_weight_struct() first."
         self.global_weights = weights
 
 class FedAvg(Aggregator):
