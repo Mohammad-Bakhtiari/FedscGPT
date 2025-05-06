@@ -55,7 +55,10 @@ class ClientEmbedder(Embedder):
             hashed_indices (list of list of str): shape (n_query, k)
         """
         distances = []
-        for ref_vector in self.embed_adata.obsm["X_scGPT"]:
+
+        reference = torch.tensor(self.embed_adata.obsm["X_scGPT"], dtype=secure_embeddings.dtype, device=secure_embeddings.device)
+        reference = crypten.cryptensor(reference)
+        for ref_vector in reference:
             diff = secure_embeddings - ref_vector
             sq_diff = diff * diff
             d = sq_diff.sum(dim=1)  # (n_query,)
