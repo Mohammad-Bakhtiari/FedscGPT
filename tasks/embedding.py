@@ -40,6 +40,8 @@ if __name__ == '__main__':
     add_federated_embedding_args(parser)
     args = parser.parse_args()
     set_seed(args.seed)
+    print(**vars(args))
+    exit()
     if args.mode == 'centralized':
         centralized_zero_shot_embedding(task="embedding", **vars(args))
     elif args.mode == 'federated_zeroshot':
