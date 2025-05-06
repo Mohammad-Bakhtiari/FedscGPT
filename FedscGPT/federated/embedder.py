@@ -184,7 +184,9 @@ class FedEmbedder(FedBase):
                                     output_dir=self.clients_output_dir[c],
                                     log_id=f"client_{self.client_ids[c]}",
                                     k=self.k,
-                                    logger=self.logger, **kwargs)
+                                    logger=self.logger,
+                                    smpc=smpc,
+                                    **kwargs)
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
         if self.smpc:
