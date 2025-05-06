@@ -58,7 +58,7 @@ class ClientEmbedder(Embedder):
         reference = torch.tensor(
             self.embed_adata.obsm["X_scGPT"],
             dtype=torch.float32,
-            device=self.device
+            device=secure_embeddings.device,
         )
         reference = crypten.cryptensor(reference)
         for ref_vector in reference:
