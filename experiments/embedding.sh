@@ -19,7 +19,7 @@ if [[ "$mode" == *"federated"* ]]; then
 fi
 
 # Set up directory paths
-data_dir="${root_dir}/data/benchmark/${dataset}"
+data_dir="${root_dir}/data/scgpt/benchmark/${dataset}"
 reference="${data_dir}/${reference_file}"
 query="${data_dir}/${query_file}"
 output="${root_dir}/output/embedding/${dataset}/${directory_mode}"
@@ -40,6 +40,6 @@ python ${root_dir}/tasks/embedding.py \
  --gene_col "$gene_col" \
  --mode $mode \
  --gpu $gpu \
- --pretrained_model_dir "${root_dir}/pretrained_models/scGPT_human" \
+ --pretrained_model_dir "${root_dir}/models/pretrained_models/scGPT_human" \
  --config_file "${root_dir}/experiments/configs/embedding/config.yml" \
  --fed_config_file "${root_dir}/experiments/configs/embedding/fed_config.yml"
