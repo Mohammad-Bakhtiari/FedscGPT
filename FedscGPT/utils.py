@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import crypten
 from crypten.config import cfg
 from collections import OrderedDict
+import hashlib
 
 SEED = 42
 def set_seed(seed=None):
@@ -1037,3 +1038,76 @@ def check_weights_nan(weights, when, debug):
 
         else:
             print(f"⚠️ Unexpected type {type(weights)} in check_weights_nan {when}!")
+
+
+def smpc_encrypt_embedding(embed_query):
+    """
+        Securely secret-shares embeddings using CrypTen for SMPC-based computation.
+
+        Args:
+            embeddings (torch.Tensor): The raw cell embeddings.
+
+        Returns:
+            crypten.CrypTensor: The secret-shared encrypted tensor for SMPC.
+        """
+    embed_query.obsm['secure_embed'] = crypten.cryptensor(embed_query.obsm["X_scGPT"])
+
+def concat_encrypted_distances(distances):
+    return crypten.cat(distances, dim=1)
+
+def mask_selected_min(temp, argmin, n_ref):
+    """
+    Masks the current minimum values in an encrypted tensor to enable iterative top-k selection.
+
+    Args:
+        temp (CrypTensor): The current encrypted distance matrix (n_query, n_ref).
+        argmin (CrypTensor): Indices of the minimum value per row.
+        n_ref (int): Number of reference samples (used for one-hot encoding).
+
+    Returns:
+        CrypTensor: Updated tensor with the selected minimum values masked (set to large value).
+    """
+    one_hot = crypten.one_hot(argmin, n_ref)
+    return temp + one_hot * crypten.cryptensor(torch.tensor([1e9]))
+
+
+def top_k_encrypted_distances(encrypted_dist_matrix, k):
+    n_ref = encrypted_dist_matrix.size(1)
+    topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k, n_ref)
+    topk_dists = [
+        crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
+        for idx in topk_indices
+    ]
+    return concat_encrypted_distances(topk_dists), topk_indices
+
+
+def top_k_ind_selection(dist_matrix, k, n_ref):
+    topk_indices = []
+    for _ in range(k):
+        _, argmin = dist_matrix.min(dim=1)
+        topk_indices.append(argmin)
+        mask_selected_min(dist_matrix, argmin, n_ref)
+    return topk_indices
+
+
+def get_plain_indices(topk_indices):
+    """
+    Converts a list of CrypTensors representing top-k indices to a NumPy array.
+
+    Args:
+        topk_indices (list of CrypTensor): List of (n_query,) encrypted index tensors.
+
+    Returns:
+        np.ndarray: Shape (n_query, k), decrypted indices.
+    """
+    topk_indices_tensor = crypten.stack(topk_indices, dim=1)  # shape: (n_query, k)
+    topk_indices_plain = topk_indices_tensor.get_plain_text().long().cpu().numpy()
+    return topk_indices_plain
+
+def encrypted_present_hashes(hash_to_index, labels):
+    hashed = [hashlib.sha256(l.encode()).hexdigest() for l in labels]
+    presence = torch.zeros(len(hash_to_index))
+    for h in hashed:
+        idx = hash_to_index[h]
+        presence[idx] = 1
+    return crypten.cryptensor(presence)
