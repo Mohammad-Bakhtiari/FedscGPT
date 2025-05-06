@@ -26,6 +26,10 @@ data_dir="${root_dir}/data/scgpt/benchmark/${dataset}"
 reference="${data_dir}/${reference_file}"
 query="${data_dir}/${query_file}"
 output="${root_dir}/output/embedding/${dataset}/${directory_mode}"
+if [ "$smpc" == "true" ]; then
+    output="${output}/smpc"
+fi
+
 
 if [ ! -d "$output" ]; then
     mkdir -p "$output"
