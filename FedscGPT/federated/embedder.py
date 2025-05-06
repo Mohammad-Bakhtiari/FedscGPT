@@ -317,7 +317,7 @@ class FedEmbedder(FedBase):
         """
         self.collect_global_celltypes()
         client_distances, client_hashes = [], []
-        query_embedding = self.embed_query.obsm["secure" if self.smpc else "X_scGPT"]
+        query_embedding = self.embed_query.obsm["secure_embed" if self.smpc else "X_scGPT"]
         for client in self.clients:
             distances, hashed_indices = client.compute_local_distances(query_embedding)
             client_distances.append(distances)
