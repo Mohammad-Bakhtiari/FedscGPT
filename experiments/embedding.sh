@@ -45,7 +45,8 @@ cmd="python ${root_dir}/tasks/embedding.py \
  --gpu $gpu \
  --pretrained_model_dir ${root_dir}/models/pretrained_models/scGPT_human \
  --config_file ${root_dir}/experiments/configs/embedding/config.yml \
- --fed_config_file ${root_dir}/experiments/configs/embedding/fed_config.yml"
+ --fed_config_file ${root_dir}/experiments/configs/embedding/fed_config.yml \
+ --init_weights_dir ${root_dir}/models/init/${dataset}.pth"
 
 if [ "$smpc" == "true" ]; then
     cmd="$cmd --smpc"

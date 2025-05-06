@@ -42,7 +42,6 @@ if __name__ == '__main__':
     set_seed(args.seed)
     for i, j in vars(args).items():
         print(f"{i}: {j}")
-    exit()
     if args.mode == 'centralized':
         centralized_zero_shot_embedding(task="embedding", **vars(args))
     elif args.mode == 'federated_zeroshot':
