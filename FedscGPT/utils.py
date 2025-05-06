@@ -1040,18 +1040,6 @@ def check_weights_nan(weights, when, debug):
             print(f"⚠️ Unexpected type {type(weights)} in check_weights_nan {when}!")
 
 
-def smpc_encrypt_embedding(embed_query):
-    """
-        Securely secret-shares embeddings using CrypTen for SMPC-based computation.
-
-        Args:
-            embeddings (torch.Tensor): The raw cell embeddings.
-
-        Returns:
-            crypten.CrypTensor: The secret-shared encrypted tensor for SMPC.
-        """
-    embed_query.obsm['secure_embed'] = crypten.cryptensor(embed_query.obsm["X_scGPT"])
-
 def concat_encrypted_distances(distances):
     return crypten.cat(distances, dim=1)
 

@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import crypten
 from FedscGPT.base import FedBase, BaseMixin
-from FedscGPT.utils import (read_h5ad, smpc_encrypt_embedding, concat_encrypted_distances, top_k_encrypted_distances,
+from FedscGPT.utils import (read_h5ad, concat_encrypted_distances, top_k_encrypted_distances,
                             get_plain_indices, top_k_ind_selection, encrypted_present_hashes)
 from FedscGPT.centralized.embedder import Embedder
 
@@ -54,18 +54,26 @@ class ClientEmbedder(Embedder):
             encrypted_topk (CrypTensor): shape (n_query, k)
             hashed_indices (list of list of str): shape (n_query, k)
         """
-        distances = []
+        # distances = []
         reference = torch.tensor(
             self.embed_adata.obsm["X_scGPT"],
             dtype=torch.float32,
-            device=secure_embeddings.device,
+            device=self.device,
         )
         reference = crypten.cryptensor(reference)
-        for ref_vector in reference:
-            diff = secure_embeddings - ref_vector
-            sq_diff = diff * diff
-            d = sq_diff.sum(dim=1)  # (n_query,)
-            distances.append(d.unsqueeze(1))
+        # for ref_vector in reference:
+        #     diff = secure_embeddings - ref_vector
+        #     sq_diff = diff * diff
+        #     d = sq_diff.sum(dim=1)  # (n_query,)
+        #     distances.append(d.unsqueeze(1))
+        query_norm = secure_embeddings.square().sum(dim=1).unsqueeze(1)  # (n_query, 1)
+        ref_norm = reference.square().sum(dim=1).unsqueeze(0)  # (1, n_ref)
+
+        # Step 2: Compute dot product
+        cross = secure_embeddings @ reference.transpose(0, 1)  # (n_query, n_ref)
+
+        # Step 3: Compute pairwise distances: ||x - y||² = ||x||² + ||y||² - 2x·y
+        distances = query_norm + ref_norm - 2 * cross
 
         encrypted_dist_matrix = concat_encrypted_distances(distances)
         encrypted_topk, topk_indices = top_k_encrypted_distances(encrypted_dist_matrix, self.k)
@@ -196,7 +204,9 @@ class FedEmbedder(FedBase):
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
         if self.smpc:
-            smpc_encrypt_embedding(self.embed_query)
+            self.embed_query.obsm['secure_embed'] = crypten.cryptensor(self.embed_query.obsm["X_scGPT"],
+                                                                       device=self.device
+                                                                       )
 
 
     def embed_query_adata(self, query_adata, **kwargs):

@@ -293,6 +293,8 @@ class FedBase:
         self.data_dir = data_dir
         self.output_dir = output_dir
         self.fed_config = load_fed_config(fed_config_file, task)
+        if "gpu" in kwargs:
+            self.device = get_cuda_device(kwargs["gpu"])
         if n_rounds:
             self.fed_config.n_rounds = n_rounds
         self.client_ids = client_ids
