@@ -1044,31 +1044,37 @@ def concat_encrypted_distances(distances):
     return crypten.cat(distances, dim=1)
 
 
-def suppress_argmin(dist_matrix, argmin, batch_size=128):
+def suppress_argmin(dist_matrix, argmin, batch_size=128, large_val=1e9):
     """
-    Securely suppresses (masks) the minimum value in each row of an encrypted distance matrix
-    using memory-efficient batching. Returns a new encrypted matrix.
+    Securely suppresses the minimum value in each row of an encrypted distance matrix
+    by replacing it with a large value. This is done using one-hot masking.
+    Args:
+        dist_matrix (CrypTensor): shape (n_query, n_ref)
+        argmin (CrypTensor): shape (n_query,) — index of min value in each row (encrypted)
+        batch_size (int): number of rows per batch to reduce memory load
+        large_val (float): value used to mask the argmin entries
+    Returns:
+        CrypTensor: updated encrypted matrix with suppressed minimum values.
     """
     n_query, n_ref = dist_matrix.size()
-    large_val = crypten.cryptensor(torch.tensor(1e9, device=dist_matrix.device))
+    large_val_enc = crypten.cryptensor(torch.tensor(large_val, device=dist_matrix.device))
     updated_batches = []
     for start in range(0, n_query, batch_size):
         end = min(start + batch_size, n_query)
         bs = end - start
-        dist_batch = dist_matrix[start:end]  # (bs, n_ref)
-        argmin_batch = argmin[start:end]  # (bs,)
-        row_masks = []
-        for i in range(bs):
-            # Create plaintext index row: [0, 1, ..., n_ref - 1]
-            index_row = torch.arange(n_ref, device=dist_matrix.device)
-            index_row_enc = crypten.cryptensor(index_row)
-            argmin_i = argmin_batch[i].expand(n_ref)  # (n_ref,)
-            row_mask = (index_row_enc == argmin_i) * crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device))
-            row_masks.append(row_mask.unsqueeze(0))  # (1, n_ref)
-        match_mask = crypten.cat(row_masks, dim=0)  # (bs, n_ref)
-        updated = dist_batch + match_mask * large_val
+        dist_batch = dist_matrix[start:end]        # (bs, n_ref)
+        argmin_batch = argmin[start:end]           # (bs,)
+        index_matrix = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(bs, n_ref)
+        index_enc = crypten.cryptensor(index_matrix)
+        argmin_exp = argmin_batch.unsqueeze(1).expand(bs, n_ref)
+        argmin_enc = crypten.cryptensor(argmin_exp)
+        match_mask = (index_enc == argmin_enc).float()
+        updated = dist_batch + match_mask * large_val_enc
+        print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
         updated_batches.append(updated)
+        import pdb; pdb.set_trace()
     return crypten.cat(updated_batches, dim=0)
+
 
 
 
