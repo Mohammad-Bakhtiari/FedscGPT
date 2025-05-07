@@ -1101,7 +1101,7 @@ def top_k_ind_selection(dist_matrix, k):
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
         topk_indices.append(argmin)
-        suppress_argmin(dist_matrix, argmin)
+        dist_matrix = suppress_argmin(dist_matrix, argmin)
     return topk_indices
 
 
