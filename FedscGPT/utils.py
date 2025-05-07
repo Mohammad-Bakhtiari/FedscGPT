@@ -1066,13 +1066,14 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128, large_val=1e9):
         argmin_batch = argmin[start:end]           # (bs,)
         index_matrix = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(bs, n_ref)
         index_enc = crypten.cryptensor(index_matrix)
+        import pdb; pdb.set_trace()
         argmin_exp = argmin_batch.unsqueeze(1).expand(bs, n_ref)
         argmin_enc = crypten.cryptensor(argmin_exp)
         match_mask = (index_enc == argmin_enc).float()
         updated = dist_batch + match_mask * large_val_enc
         print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
         updated_batches.append(updated)
-        import pdb; pdb.set_trace()
+
     return crypten.cat(updated_batches, dim=0)
 
 
