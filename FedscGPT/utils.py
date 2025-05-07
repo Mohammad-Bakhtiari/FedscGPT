@@ -1062,11 +1062,12 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
 
         # Build one-hot mask
         index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(bs, n_ref)
-        index_range_enc = crypten.cryptensor(index_range.float())
-        match_mask_rows = []
+        row_masks = []
         for i in range(bs):
-            row_match = (index_range_enc[i] == argmin_batch[i])  # both are CrypTensors
-            match_mask_rows.append(row_match.unsqueeze(0))  # keep batch dimension
+            index_row = crypten.cryptensor(index_range)  # (n_ref,)
+            argmin_i = argmin_batch[i].expand_as(index_row)  # (n_ref,)
+            row_mask = (index_row == argmin_i).float().unsqueeze(0)  # (1, n_ref)
+            row_masks.append(row_mask)
 
         match_mask = crypten.stack(match_mask_rows)  # (bs, n_ref)
         one_hot_mask = match_mask * crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device))
