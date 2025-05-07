@@ -1049,14 +1049,21 @@ def mask_selected_min(temp, argmin, n_ref):
 
     Args:
         temp (CrypTensor): The current encrypted distance matrix (n_query, n_ref).
-        argmin (CrypTensor): Indices of the minimum value per row.
-        n_ref (int): Number of reference samples (used for one-hot encoding).
+        argmin (CrypTensor): Encrypted indices of the minimum value per row.
+        n_ref (int): Number of reference samples.
 
     Returns:
-        CrypTensor: Updated tensor with the selected minimum values masked (set to large value).
+        CrypTensor: Updated tensor with selected minima masked (set to large value).
     """
-    one_hot = crypten.one_hot(argmin, n_ref)
-    return temp + one_hot * crypten.cryptensor(torch.tensor([1e9]))
+    # Create one-hot mask securely inside CrypTen
+    # Shape: (n_query, n_ref)
+    index_range = crypten.arange(n_ref).unsqueeze(0)          # (1, n_ref)
+    argmin_expanded = argmin.unsqueeze(1)                     # (n_query, 1)
+    one_hot = (index_range == argmin_expanded).float()        # (n_query, n_ref)
+
+    # Mask out selected index by adding a large number
+    mask_value = crypten.cryptensor(torch.tensor([1e9], device=temp.device))
+    return temp + one_hot * mask_value
 
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
