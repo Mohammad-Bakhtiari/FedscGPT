@@ -1078,26 +1078,27 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
     topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
+    import pdb; pdb.set_trace()
     # topk_dists = [
     #     crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
     #     for idx in topk_indices
     # ]
-    topk_dists = []
-    for idx in topk_indices:  # each idx shape: (n_query,)
-        row_dists = []
-        for i in range(encrypted_dist_matrix.size(0)):  # over queries
-            # Build encrypted one-hot selector for this row
-            one_hot = torch.zeros(encrypted_dist_matrix.size(1), device=encrypted_dist_matrix.device)
-            one_hot[idx[i].item()] = 1.0
-            one_hot_enc = crypten.cryptensor(one_hot).unsqueeze(0)  # shape: (1, n_ref)
-
-            # Select distance via dot-product
-            dist = (encrypted_dist_matrix[i:i + 1] * one_hot_enc).sum(dim=1)  # shape: (1,)
-            row_dists.append(dist)
-
-        # Stack this kth-distance for all queries
-        topk_dists.append(crypten.cat(row_dists, dim=0))  # shape: (n_query,)
-    return concat_encrypted_distances(topk_dists), topk_indices
+    n_query, n_ref = encrypted_matrix.size()
+    topk_values = []
+    for k_idx in topk_indices:  # Each is (n_query,)
+        # Create index matrix (n_query, n_ref)
+        index_range = torch.arange(n_ref, device=encrypted_matrix.device).unsqueeze(0).expand(n_query, n_ref)
+        index_range_enc = crypten.cryptensor(index_range)
+        # Expand k_idx to match shape
+        k_idx_expanded = k_idx.unsqueeze(1).expand(n_query, n_ref)
+        k_idx_enc = crypten.cryptensor(k_idx_expanded)
+        # One-hot encoded mask: (n_query, n_ref)
+        one_hot_mask = (index_range_enc == k_idx_enc).float()
+        # Select values using masked dot product
+        masked = encrypted_matrix * one_hot_mask
+        selected = masked.sum(dim=1, keepdim=True)  # shape: (n_query, 1)
+        topk_values.append(selected)
+        return concat_encrypted_distances(topk_dists), topk_indices
 
 
 def top_k_ind_selection(dist_matrix, k):
