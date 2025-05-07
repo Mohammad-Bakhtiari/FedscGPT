@@ -1060,7 +1060,7 @@ def mask_selected_min(temp, argmin, n_ref):
     index_range = torch.arange(n_ref, device=temp.device).unsqueeze(0).float()        # (1, n_ref)
     index_range = crypten.cryptensor(index_range)
     argmin_expanded = argmin.unsqueeze(1)                     # (n_query, 1)
-    one_hot = (index_range == argmin_expanded).float()        # (n_query, n_ref)
+    one_hot = (index_range == argmin_expanded).type(torch.float)
 
     # Mask out selected index by adding a large number
     mask_value = crypten.cryptensor(torch.tensor([1e9], device=temp.device))
