@@ -1057,7 +1057,8 @@ def mask_selected_min(temp, argmin, n_ref):
     """
     # Create one-hot mask securely inside CrypTen
     # Shape: (n_query, n_ref)
-    index_range = crypten.arange(n_ref).unsqueeze(0)          # (1, n_ref)
+    index_range = torch.arange(n_ref, device=temp.device).unsqueeze(0).float()        # (1, n_ref)
+    index_range = crypten.cryptensor(index_range)
     argmin_expanded = argmin.unsqueeze(1)                     # (n_query, 1)
     one_hot = (index_range == argmin_expanded).float()        # (n_query, n_ref)
 
