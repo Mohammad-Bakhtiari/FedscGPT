@@ -1044,7 +1044,7 @@ def concat_encrypted_distances(distances):
     return crypten.cat(distances, dim=1)
 
 
-def suppress_argmin(dist_matrix, argmin, batch_size=128, large_val=1e9):
+def suppress_argmin(dist_matrix, argmin_onehot, batch_size=128, large_val=1e9):
     """
     Securely suppresses the minimum value in each row of an encrypted distance matrix
     by replacing it with a large value. This is done using one-hot masking.
@@ -1061,18 +1061,11 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128, large_val=1e9):
     updated_batches = []
     for start in range(0, n_query, batch_size):
         end = min(start + batch_size, n_query)
-        bs = end - start
-        dist_batch = dist_matrix[start:end]        # (bs, n_ref)
-        argmin_batch = argmin[start:end]           # (bs,)
-        index_matrix = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(bs, n_ref)
-        index_enc = crypten.cryptensor(index_matrix)
-        import pdb; pdb.set_trace()
-        argmin_exp = argmin_batch.unsqueeze(1).expand(bs, n_ref)
-        argmin_enc = crypten.cryptensor(argmin_exp)
-        match_mask = (index_enc == argmin_enc).float()
-        updated = dist_batch + match_mask * large_val_enc
-        print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
+        dist_batch = dist_matrix[start:end]  # (bs, n_ref)
+        mask_batch = argmin_onehot[start:end]  # (bs, n_ref)
+        updated = dist_batch + mask_batch * large_val_enc  # Masked add
         updated_batches.append(updated)
+        import pdb; pdb.set_trace()
 
     return crypten.cat(updated_batches, dim=0)
 
