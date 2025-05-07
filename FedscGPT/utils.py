@@ -1052,36 +1052,26 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
     n_query, n_ref = dist_matrix.size()
     large_val = crypten.cryptensor(torch.tensor(1e9, device=dist_matrix.device))
     updated_batches = []
-
     for start in range(0, n_query, batch_size):
         end = min(start + batch_size, n_query)
         bs = end - start
-
-        dist_batch = dist_matrix[start:end]                 # (bs, n_ref)
-        argmin_batch = argmin[start:end].unsqueeze(1)       # (bs, 1)
-
-        # Build one-hot mask
-        index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(bs, n_ref)
+        dist_batch = dist_matrix[start:end]  # (bs, n_ref)
+        argmin_batch = argmin[start:end]  # (bs,)
         row_masks = []
         for i in range(bs):
-            index_row = crypten.cryptensor(index_range)  # (n_ref,)
-            argmin_i = argmin_batch[i].expand_as(index_row)  # (n_ref,)
-            row_mask = (index_row == argmin_i).float().unsqueeze(0)  # (1, n_ref)
-            row_masks.append(row_mask)
-
-        match_mask = crypten.stack(match_mask_rows)  # (bs, n_ref)
-        one_hot_mask = match_mask * crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device))
-
-        # Apply masking
-        updated = dist_batch + one_hot_mask * large_val
-
+            # Create plaintext index row: [0, 1, ..., n_ref - 1]
+            index_row = torch.arange(n_ref, device=dist_matrix.device)
+            index_row_enc = crypten.cryptensor(index_row)
+            argmin_i = argmin_batch[i].expand(n_ref)  # (n_ref,)
+            row_mask = (index_row_enc == argmin_i) * crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device))
+            row_masks.append(row_mask.unsqueeze(0))  # (1, n_ref)
+        match_mask = crypten.cat(row_masks, dim=0)  # (bs, n_ref)
+        updated = dist_batch + match_mask * large_val
         print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
         updated_batches.append(updated)
-
     # Check all shapes match
     shapes = [b.size() for b in updated_batches]
     assert all(s[1] == n_ref for s in shapes), f"Inconsistent n_ref across batches: {shapes}"
-
     return crypten.cat(updated_batches, dim=0)
 
 
