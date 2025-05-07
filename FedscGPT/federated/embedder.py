@@ -202,11 +202,9 @@ class FedEmbedder(FedBase):
                                     **kwargs)
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
-        import pdb; pdb.set_trace()
         if self.smpc:
-            self.embed_query.obsm['secure_embed'] = crypten.cryptensor(self.embed_query.obsm["X_scGPT"],
-                                                                       device=self.device
-                                                                       )
+            embed_query = torch.tensor(self.embed_query.obsm["X_scGPT"], dtype=torch.float32, device=self.device)
+            self.embed_query.obsm['secure_embed'] = crypten.cryptensor(embed_query)
 
 
     def embed_query_adata(self, query_adata, **kwargs):
