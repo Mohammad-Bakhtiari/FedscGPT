@@ -17,6 +17,7 @@ class ClientEmbedder(Embedder):
         self.smpc = smpc
         self.hash_index_map = {}  # To map hashes back to local indices
         self.embed_adata = self.embed_adata_file()
+        del self.model
 
     def compute_local_distances(self, query_embeddings):
         """
