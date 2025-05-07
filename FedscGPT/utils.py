@@ -1067,11 +1067,7 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
             row_masks.append(row_mask.unsqueeze(0))  # (1, n_ref)
         match_mask = crypten.cat(row_masks, dim=0)  # (bs, n_ref)
         updated = dist_batch + match_mask * large_val
-        print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
         updated_batches.append(updated)
-    # Check all shapes match
-    shapes = [b.size() for b in updated_batches]
-    assert all(s[1] == n_ref for s in shapes), f"Inconsistent n_ref across batches: {shapes}"
     return crypten.cat(updated_batches, dim=0)
 
 
@@ -1082,10 +1078,25 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
     topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
-    topk_dists = [
-        crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
-        for idx in topk_indices
-    ]
+    # topk_dists = [
+    #     crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
+    #     for idx in topk_indices
+    # ]
+    topk_dists = []
+    for idx in topk_indices:  # each idx shape: (n_query,)
+        row_dists = []
+        for i in range(encrypted_dist_matrix.size(0)):  # over queries
+            # Build encrypted one-hot selector for this row
+            one_hot = torch.zeros(encrypted_dist_matrix.size(1), device=encrypted_dist_matrix.device)
+            one_hot[idx[i].item()] = 1.0
+            one_hot_enc = crypten.cryptensor(one_hot).unsqueeze(0)  # shape: (1, n_ref)
+
+            # Select distance via dot-product
+            dist = (encrypted_dist_matrix[i:i + 1] * one_hot_enc).sum(dim=1)  # shape: (1,)
+            row_dists.append(dist)
+
+        # Stack this kth-distance for all queries
+        topk_dists.append(crypten.cat(row_dists, dim=0))  # shape: (n_query,)
     return concat_encrypted_distances(topk_dists), topk_indices
 
 
