@@ -1044,24 +1044,33 @@ def concat_encrypted_distances(distances):
     return crypten.cat(distances, dim=1)
 
 
-def mask_selected_min(dist_matrix, argmin):
+def suppress_argmin(dist_matrix, argmin):
     """
-    Masks the argmin index in each row by adding a large constant to avoid re-selection.
-    This version avoids one-hot encoding.
+    Securely masks the minimum value in each row of an encrypted distance matrix.
+
+    Args:
+        dist_matrix (CrypTensor): shape (n_query, n_ref)
+        argmin (CrypTensor): shape (n_query,)
     """
     n_query, n_ref = dist_matrix.size()
-    large_val = crypten.cryptensor(torch.tensor([1e9], device=dist_matrix.device))
 
-    # Create index tensor to scatter large value
-    row_indices = torch.arange(n_query, device=dist_matrix.device)
-    update_mask = crypten.cryptensor(torch.zeros_like(dist_matrix.get_plain_text()))
+    # Create (n_query, n_ref) plaintext index matrix
+    index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(n_query, n_ref)
+    index_range_enc = crypten.cryptensor(index_range)
 
-    # Set 1e9 at (row, argmin) positions — securely
-    for i in range(n_query):
-        update_mask[i, argmin.get_plain_text()[i].long()] = 1.0
+    # Broadcast argmin: shape (n_query, 1) → (n_query, n_ref) by broadcast
+    argmin_broadcast = argmin.unsqueeze(1)
 
-    update_mask = crypten.cryptensor(update_mask)
-    dist_matrix += update_mask * large_val
+    # Use encrypted comparison to build one-hot mask (CrypTen bool → float)
+    match_mask = index_range_enc == argmin_broadcast
+    one_hot_mask = match_mask.mul(crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device)))
+
+    # Apply large value to masked positions
+    large_val = crypten.cryptensor(torch.tensor(1e9, device=dist_matrix.device))
+    dist_matrix = dist_matrix + one_hot_mask * large_val
+
+    return dist_matrix
+
 
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
@@ -1078,7 +1087,7 @@ def top_k_ind_selection(dist_matrix, k):
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
         topk_indices.append(argmin)
-        mask_selected_min(dist_matrix, argmin)
+        suppress_argmin(dist_matrix, argmin)
     return topk_indices
 
 
