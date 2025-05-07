@@ -1075,27 +1075,9 @@ def suppress_argmin(dist_matrix, argmin_onehot, batch_size=128, large_val=1e9):
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
     topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
-    import pdb; pdb.set_trace()
-    # topk_dists = [
-    #     crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
-    #     for idx in topk_indices
-    # ]
-    n_query, n_ref = encrypted_matrix.size()
-    topk_values = []
-    for k_idx in topk_indices:  # Each is (n_query,)
-        # Create index matrix (n_query, n_ref)
-        index_range = torch.arange(n_ref, device=encrypted_matrix.device).unsqueeze(0).expand(n_query, n_ref)
-        index_range_enc = crypten.cryptensor(index_range)
-        # Expand k_idx to match shape
-        k_idx_expanded = k_idx.unsqueeze(1).expand(n_query, n_ref)
-        k_idx_enc = crypten.cryptensor(k_idx_expanded)
-        # One-hot encoded mask: (n_query, n_ref)
-        one_hot_mask = (index_range_enc == k_idx_enc).float()
-        # Select values using masked dot product
-        masked = encrypted_matrix * one_hot_mask
-        selected = masked.sum(dim=1, keepdim=True)  # shape: (n_query, 1)
-        topk_values.append(selected)
-        return concat_encrypted_distances(topk_dists), topk_indices
+    topk_dists = [[(encrypted_dist_matrix * topk_indices[i]).sum(dim=1, keepdim=True) for i in range(k)]]
+    encrypted_topk = crypten.cat(topk_dists, dim=1)
+    return encrypted_topk, topk_indices
 
 
 def top_k_ind_selection(dist_matrix, k):
