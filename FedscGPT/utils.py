@@ -1065,11 +1065,8 @@ def suppress_argmin(dist_matrix, argmin_onehot, batch_size=128, large_val=1e9):
         mask_batch = argmin_onehot[start:end]  # (bs, n_ref)
         updated = dist_batch + mask_batch * large_val_enc  # Masked add
         updated_batches.append(updated)
-        import pdb; pdb.set_trace()
 
     return crypten.cat(updated_batches, dim=0)
-
-
 
 
 
