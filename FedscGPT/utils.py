@@ -1048,14 +1048,6 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
     """
     Securely suppresses (masks) the minimum value in each row of an encrypted distance matrix
     using memory-efficient batching. Returns a new encrypted matrix.
-
-    Args:
-        dist_matrix (CrypTensor): shape (n_query, n_ref)
-        argmin (CrypTensor): shape (n_query,)
-        batch_size (int): Batch size to control memory usage
-
-    Returns:
-        CrypTensor: Updated matrix with minima suppressed (masked with +1e9)
     """
     n_query, n_ref = dist_matrix.size()
     large_val = crypten.cryptensor(torch.tensor(1e9, device=dist_matrix.device))
@@ -1065,7 +1057,6 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
         end = min(start + batch_size, n_query)
         bs = end - start
 
-        # Slice batch from inputs
         dist_batch = dist_matrix[start:end]                 # (bs, n_ref)
         argmin_batch = argmin[start:end].unsqueeze(1)       # (bs, 1)
 
@@ -1077,10 +1068,19 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
 
         # Apply masking
         updated = dist_batch + one_hot_mask * large_val
+
+        # Force consistent shape (in case CrypTen pads weirdly)
+        updated = updated.reshape(bs, n_ref)
+
+        print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
         updated_batches.append(updated)
 
-    # Combine all processed batches
+    # Check all shapes match
+    shapes = [b.size() for b in updated_batches]
+    assert all(s[1] == n_ref for s in shapes), f"Inconsistent n_ref across batches: {shapes}"
+
     return crypten.cat(updated_batches, dim=0)
+
 
 
 
