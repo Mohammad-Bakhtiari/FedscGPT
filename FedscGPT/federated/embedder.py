@@ -261,7 +261,7 @@ class FedEmbedder(FedBase):
         encrypted_concat = concat_encrypted_distances(client_distances)
         all_hashes = sum(client_hashes, [])  # flatten across clients → list of (n_query, k)
         # Secure top-k from encrypted distances
-        topk_indices = top_k_ind_selection(encrypted_concat.clone(), self.k, encrypted_concat.size(1))
+        topk_indices = top_k_ind_selection(encrypted_concat.clone(), self.k)
 
         topk_indices = get_plain_indices(topk_indices)
         k_nearest_samples = []

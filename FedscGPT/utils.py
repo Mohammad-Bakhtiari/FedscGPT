@@ -1043,33 +1043,29 @@ def check_weights_nan(weights, when, debug):
 def concat_encrypted_distances(distances):
     return crypten.cat(distances, dim=1)
 
-def mask_selected_min(temp, argmin, n_ref):
+
+def mask_selected_min(dist_matrix, argmin):
     """
-    Masks the current minimum values in an encrypted tensor to enable iterative top-k selection.
-
-    Args:
-        temp (CrypTensor): The current encrypted distance matrix (n_query, n_ref).
-        argmin (CrypTensor): Encrypted indices of the minimum value per row.
-        n_ref (int): Number of reference samples.
-
-    Returns:
-        CrypTensor: Updated tensor with selected minima masked (set to large value).
+    Masks the argmin index in each row by adding a large constant to avoid re-selection.
+    This version avoids one-hot encoding.
     """
-    # Create one-hot mask securely inside CrypTen
-    # Shape: (n_query, n_ref)
-    index_range = torch.arange(n_ref, device=temp.device).unsqueeze(0).float()        # (1, n_ref)
-    index_range = crypten.cryptensor(index_range)
-    argmin_expanded = argmin.unsqueeze(1)                     # (n_query, 1)
-    one_hot = (index_range == argmin_expanded).type(torch.float)
+    n_query, n_ref = dist_matrix.size()
+    large_val = crypten.cryptensor(torch.tensor([1e9], device=dist_matrix.device))
 
-    # Mask out selected index by adding a large number
-    mask_value = crypten.cryptensor(torch.tensor([1e9], device=temp.device))
-    return temp + one_hot * mask_value
+    # Create index tensor to scatter large value
+    row_indices = torch.arange(n_query, device=dist_matrix.device)
+    update_mask = crypten.cryptensor(torch.zeros_like(dist_matrix.get_plain_text()))
+
+    # Set 1e9 at (row, argmin) positions — securely
+    for i in range(n_query):
+        update_mask[i, argmin.get_plain_text()[i].long()] = 1.0
+
+    update_mask = crypten.cryptensor(update_mask)
+    dist_matrix += update_mask * large_val
 
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
-    n_ref = encrypted_dist_matrix.size(1)
-    topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k, n_ref)
+    topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
     topk_dists = [
         crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
         for idx in topk_indices
@@ -1077,12 +1073,12 @@ def top_k_encrypted_distances(encrypted_dist_matrix, k):
     return concat_encrypted_distances(topk_dists), topk_indices
 
 
-def top_k_ind_selection(dist_matrix, k, n_ref):
+def top_k_ind_selection(dist_matrix, k):
     topk_indices = []
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
         topk_indices.append(argmin)
-        mask_selected_min(dist_matrix, argmin, n_ref)
+        mask_selected_min(dist_matrix, argmin)
     return topk_indices
 
 
