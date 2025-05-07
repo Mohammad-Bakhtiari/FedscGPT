@@ -203,7 +203,6 @@ class FedEmbedder(FedBase):
                                     **kwargs)
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
-        del self.model
         if self.smpc:
             self.embed_query.obsm['secure_embed'] = crypten.cryptensor(self.embed_query.obsm["X_scGPT"],
                                                                        device=self.device
@@ -213,6 +212,7 @@ class FedEmbedder(FedBase):
     def embed_query_adata(self, query_adata, **kwargs):
         embedder = Embedder(reference_adata=query_adata, k=self.k, **kwargs)
         embedder.embed_adata_file()
+        del embedder.model
         return embedder.adata, embedder.embed_adata
 
 
