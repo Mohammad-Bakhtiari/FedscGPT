@@ -1069,9 +1069,6 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
         # Apply masking
         updated = dist_batch + one_hot_mask * large_val
 
-        # Force consistent shape (in case CrypTen pads weirdly)
-        updated = updated.reshape(bs, n_ref)
-
         print(f"[DEBUG] Appending batch {len(updated_batches)}: shape = {updated.size()}")
         updated_batches.append(updated)
 
