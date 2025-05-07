@@ -1078,7 +1078,6 @@ def suppress_argmin(dist_matrix, argmin, batch_size=128):
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
     topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
-    import pdb; pdb.set_trace()
     # topk_dists = [
     #     crypten.gather(encrypted_dist_matrix, dim=1, index=idx.unsqueeze(1))
     #     for idx in topk_indices

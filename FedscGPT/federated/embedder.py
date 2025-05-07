@@ -75,7 +75,7 @@ class ClientEmbedder(Embedder):
 
         # Step 3: Compute pairwise distances: ||x - y||² = ||x||² + ||y||² - 2x·y
         distances = query_norm + ref_norm - 2 * cross
-
+        import pdb; pdb.set_trace()
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
         hashed_indices = self.hash_indices(get_plain_indices(topk_indices))
         return encrypted_topk, hashed_indices
