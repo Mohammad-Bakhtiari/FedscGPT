@@ -75,7 +75,6 @@ class ClientEmbedder(Embedder):
 
         # Step 3: Compute pairwise distances: ||x - y||² = ||x||² + ||y||² - 2x·y
         distances = query_norm + ref_norm - 2 * cross
-        import pdb; pdb.set_trace()
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
         hashed_indices = self.hash_indices(get_plain_indices(topk_indices))
         return encrypted_topk, hashed_indices
@@ -203,6 +202,7 @@ class FedEmbedder(FedBase):
                                     **kwargs)
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
+        import pdb; pdb.set_trace()
         if self.smpc:
             self.embed_query.obsm['secure_embed'] = crypten.cryptensor(self.embed_query.obsm["X_scGPT"],
                                                                        device=self.device
