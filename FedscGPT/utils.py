@@ -1046,43 +1046,28 @@ def concat_encrypted_distances(distances):
 
 def suppress_argmin(dist_matrix, argmin, batch_size=128):
     """
-    Securely suppresses (masks) the minimum value in each row of an encrypted distance matrix.
-    This is done in memory-efficient batches to reduce VRAM usage.
-
-    Args:
-        dist_matrix (CrypTensor): shape (n_query, n_ref), encrypted distance matrix
-        argmin (CrypTensor): shape (n_query,), encrypted indices of minima
-        batch_size (int): Number of rows to process at once to save memory
-
-    Returns:
-        CrypTensor: Updated distance matrix with minima suppressed via large constant
+    Updates `dist_matrix` in-place row-wise by suppressing argmin entries.
     """
     n_query, n_ref = dist_matrix.size()
     large_val = crypten.cryptensor(torch.tensor(1e9, device=dist_matrix.device))
 
-    updated_batches = []
-
     for start in range(0, n_query, batch_size):
         end = min(start + batch_size, n_query)
+        batch_size_actual = end - start
 
-        # Slice for this batch
-        dist_batch = dist_matrix[start:end]          # (B, n_ref)
-        argmin_batch = argmin[start:end].unsqueeze(1)  # (B, 1)
+        dist_batch = dist_matrix[start:end]
+        argmin_batch = argmin[start:end].unsqueeze(1)
 
-        # Create index matrix (B, n_ref)
-        index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(end - start, n_ref)
+        index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(batch_size_actual, n_ref)
         index_range_enc = crypten.cryptensor(index_range.float())
 
-        # Secure comparison to build one-hot mask (B, n_ref)
         match_mask = (index_range_enc == argmin_batch)
         one_hot_mask = match_mask * crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device))
 
-        # Apply suppression (add large value at argmin position)
-        dist_batch = dist_batch + one_hot_mask * large_val
-        updated_batches.append(dist_batch)
+        dist_matrix[start:end] = dist_batch + one_hot_mask * large_val  # update in-place safely
 
-    # Concatenate all updated batches
-    return crypten.cat(updated_batches, dim=0)
+    return dist_matrix
+
 
 
 
