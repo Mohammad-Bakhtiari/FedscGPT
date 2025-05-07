@@ -1046,27 +1046,42 @@ def concat_encrypted_distances(distances):
 
 def suppress_argmin(dist_matrix, argmin, batch_size=128):
     """
-    Updates `dist_matrix` in-place row-wise by suppressing argmin entries.
+    Securely suppresses (masks) the minimum value in each row of an encrypted distance matrix
+    using memory-efficient batching. Returns a new encrypted matrix.
+
+    Args:
+        dist_matrix (CrypTensor): shape (n_query, n_ref)
+        argmin (CrypTensor): shape (n_query,)
+        batch_size (int): Batch size to control memory usage
+
+    Returns:
+        CrypTensor: Updated matrix with minima suppressed (masked with +1e9)
     """
     n_query, n_ref = dist_matrix.size()
     large_val = crypten.cryptensor(torch.tensor(1e9, device=dist_matrix.device))
+    updated_batches = []
 
     for start in range(0, n_query, batch_size):
         end = min(start + batch_size, n_query)
-        batch_size_actual = end - start
+        bs = end - start
 
-        dist_batch = dist_matrix[start:end]
-        argmin_batch = argmin[start:end].unsqueeze(1)
+        # Slice batch from inputs
+        dist_batch = dist_matrix[start:end]                 # (bs, n_ref)
+        argmin_batch = argmin[start:end].unsqueeze(1)       # (bs, 1)
 
-        index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(batch_size_actual, n_ref)
+        # Build one-hot mask
+        index_range = torch.arange(n_ref, device=dist_matrix.device).unsqueeze(0).expand(bs, n_ref)
         index_range_enc = crypten.cryptensor(index_range.float())
-
         match_mask = (index_range_enc == argmin_batch)
         one_hot_mask = match_mask * crypten.cryptensor(torch.tensor(1.0, device=dist_matrix.device))
 
-        dist_matrix[start:end] = dist_batch + one_hot_mask * large_val  # update in-place safely
+        # Apply masking
+        updated = dist_batch + one_hot_mask * large_val
+        updated_batches.append(updated)
 
-    return dist_matrix
+    # Combine all processed batches
+    return crypten.cat(updated_batches, dim=0)
+
 
 
 
