@@ -168,13 +168,7 @@ class ClientEmbedder(Embedder):
             set of str: Unique cell type labels.
         """
         labels = self.adata.obs[self.celltype_key].unique()
-        if self.smpc:
-            assert global_hash_to_index is not None, "Global hash to index mapping is required for SMPC mode."
-            return encrypted_present_hashes(global_hash_to_index, labels)
         return set(labels)
-
-    def hash_labels(self):
-        return [hashlib.sha256(label.encode()).hexdigest() for label in set(self.adata.obs[self.celltype_key].unique())]
 
 
 
@@ -368,10 +362,3 @@ class FedEmbedder(FedBase):
         # Broadcast to all clients
         for client in self.clients:
             client.label_to_index = self.label_to_index
-
-    def global_hash_to_index(self):
-        hashed_labels = set()
-        for client in self.clients:
-            hashed_labels |= set(client.hash_labels())  # returns set of hashes
-        hashed_labels = sorted(list(hashed_labels))
-        self.hash_to_index = {h: i for i, h in enumerate(hashed_labels)}
