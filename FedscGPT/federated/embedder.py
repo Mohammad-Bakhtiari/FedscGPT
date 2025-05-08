@@ -16,7 +16,6 @@ class ClientEmbedder(Embedder):
         self.enc_celltype_ind_offset = None
         self.celltype_ind_offset = None
         self.celltypes_ind = None
-        self.enc_celltypes_ind = None
         self.label_to_index = None
         self.smpc = smpc
         self.hash_index_map = {}  # To map hashes back to local indices
@@ -200,6 +199,7 @@ class ClientEmbedder(Embedder):
         self.enc_celltype_ind_offset = crypten.cryptensor(
             torch.tensor(global_indices, dtype=torch.float32, device=self.device)
         )
+        import pdb; pdb.set_trace()
 
     def report_n_local_samples(self):
         return crypten.cryptensor(torch.tensor(self.n_samples, dtype=torch.float32, device=self.device))
