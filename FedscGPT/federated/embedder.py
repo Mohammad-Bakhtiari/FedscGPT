@@ -182,6 +182,7 @@ class ClientEmbedder(Embedder):
             global_label_to_index (dict): Maps each cell type string to a unique integer index.
             ind_offset (int): Offset to make local labels globally unique.
         """
+        # TODO: Check its effect on fedetated without SMPC
         cell_types = self.embed_adata.obs[self.celltype_key]
 
         for ct in cell_types:
@@ -191,7 +192,6 @@ class ClientEmbedder(Embedder):
         local_indices = np.array([global_label_to_index[ct] for ct in cell_types])
         global_indices = local_indices + ind_offset
 
-        # Store
         self.celltypes_ind = local_indices
         self.celltype_ind_offset = global_indices
         self.enc_celltype_ind_offset = crypten.cryptensor(
@@ -388,13 +388,15 @@ class FedEmbedder(FedBase):
         sorted_labels = sorted(list(all_labels))
         self.label_to_index = {label: idx for idx, label in enumerate(sorted_labels)}
         self.index_to_label = {idx: label for label, idx in self.label_to_index.items()}
-
-        # Broadcast to all clients
-        client_offset = 0
-        for client in self.clients:
-            client.harmonize_celltypes(self.label_to_index, client_offset)
-            client_offset += self.total_n_samples
-
+        if self.smpc:
+            self.aggregate_total_n_samples()
+            client_offset = 0
+            for client in self.clients:
+                client.harmonize_celltypes(self.label_to_index, client_offset)
+                client_offset += self.total_n_samples
+        else:
+            for client in self.clients:
+                client.harmonize_celltypes(self.label_to_index, 0)
     def aggregate_total_n_samples(self):
         encrypted_counts = [
             client.report_n_local_samples()
