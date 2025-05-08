@@ -62,11 +62,6 @@ class ClientEmbedder(Embedder):
             device=self.device,
         )
         reference = crypten.cryptensor(reference)
-        # for ref_vector in reference:
-        #     diff = secure_embeddings - ref_vector
-        #     sq_diff = diff * diff
-        #     d = sq_diff.sum(dim=1)  # (n_query,)
-        #     distances.append(d.unsqueeze(1))
         query_norm = secure_embeddings.square().sum(dim=1).unsqueeze(1)  # (n_query, 1)
         ref_norm = reference.square().sum(dim=1).unsqueeze(0)  # (1, n_ref)
 
@@ -75,6 +70,7 @@ class ClientEmbedder(Embedder):
 
         # Step 3: Compute pairwise distances: ||x - y||² = ||x||² + ||y||² - 2x·y
         distances = query_norm + ref_norm - 2 * cross
+        del reference, query_norm, ref_norm, cross
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
         hashed_indices = self.hash_indices(get_plain_indices(topk_indices))
         return encrypted_topk, hashed_indices
@@ -268,6 +264,7 @@ class FedEmbedder(FedBase):
         for i, row in enumerate(all_hashes):
             row_hashes = []
             for ind in topk_indices[i]:
+                import pdb; pdb.set_trace()
                 row_hashes.append(row[ind])
             k_nearest_samples.append(row_hashes)
         return k_nearest_samples
