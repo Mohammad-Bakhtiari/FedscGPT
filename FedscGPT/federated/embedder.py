@@ -276,7 +276,7 @@ class FedEmbedder(FedBase):
         distances = crypten.cat(client_distances, dim=1)
         indices = crypten.cat(client_indices, dim=1)
         one_hot_indices = top_k_ind_selection(distances.clone(), self.k)
-        top_k_indices = [(k * indices).sum(dim=1) for k in one_hot_indices]
+        top_k_indices = [(one_hot_indices[k] * indices).sum(dim=1) for k in range(self.k)]
         import pdb; pdb.set_trace()
         # TODO: find global top-k indices
         encrypted_concat = concat_encrypted_distances(client_distances)
