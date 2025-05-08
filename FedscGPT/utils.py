@@ -1078,7 +1078,9 @@ def top_k_encrypted_distances(encrypted_dist_matrix, k):
     encrypted_topk = (encrypted_dist_matrix * topk_indices[0]).sum(dim=1, keepdim=True)
     for i in range(1, k):
         next_k = (encrypted_dist_matrix * topk_indices[i]).sum(dim=1, keepdim=True)
-        encrypted_topk = crypten.cat([encrypted_topk, next_k])
+        import pdb; pdb.set_trace()
+        encrypted_topk = crypten.cat([encrypted_topk, next_k], dim=1)
+
     return encrypted_topk, topk_indices
 
 
