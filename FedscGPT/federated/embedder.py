@@ -253,9 +253,8 @@ class FedEmbedder(FedBase):
         Returns:
             list[list[str]]: Global top-k hashed reference IDs for each query cell.
         """
-        # Combine all (n_query, k) CrypTensors → shape (n_query, k * n_clients)
         encrypted_concat = concat_encrypted_distances(client_distances)
-        all_hashes = sum(client_hashes, [])  # flatten across clients → list of (n_query, k)
+        all_hashes = list(itertools.chain.from_iterable(client_hashes))
         # Secure top-k from encrypted distances
         topk_indices = top_k_ind_selection(encrypted_concat.clone(), self.k)
 
@@ -332,6 +331,7 @@ class FedEmbedder(FedBase):
         query_embedding = self.embed_query.obsm["secure_embed" if self.smpc else "X_scGPT"]
         for client in self.clients:
             distances, hashed_indices = client.compute_local_distances(query_embedding)
+            import pdb; pdb.set_trace()
             client_distances.append(distances)
             client_hashes.append(hashed_indices)
 
