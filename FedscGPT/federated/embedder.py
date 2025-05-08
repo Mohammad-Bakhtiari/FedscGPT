@@ -74,12 +74,9 @@ class ClientEmbedder(Embedder):
         distances = query_norm + ref_norm - 2 * cross
         del reference, query_norm, ref_norm, cross
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
-        topk_celltype_indices = [(k @ self.enc_celltype_ind_offset.unsqueeze(1)).squeeze(1) for k in topk_indices]
-        topk_celltype_indices = crypten.stack(topk_celltype_indices, dim=1)
-        import pdb; pdb.set_trace()
-        assert any([len(row.unique())==self.k for row in topk_celltype_indices]), f"Topk indices are not unique: {topk_celltype_indices}"
-        hashed_indices = self.hash_indices(get_plain_indices(topk_indices))
-        return encrypted_topk, hashed_indices
+        topk_mapped_ind = [(k @ self.enc_celltype_ind_offset.unsqueeze(1)).squeeze(1) for k in topk_indices]
+        topk_mapped_ind = crypten.stack(topk_mapped_ind, dim=1)
+        return encrypted_topk, topk_mapped_ind
 
     def hash_indices(self, indices):
         """
@@ -264,7 +261,7 @@ class FedEmbedder(FedBase):
             k_nearest_samples.append(temp)
         return k_nearest_samples
 
-    def secure_top_k_distance_agg(self, client_distances, client_hashes):
+    def secure_top_k_distance_agg(self, client_distances, client_indices):
         """
         Securely aggregates encrypted top-k distances from all clients and returns
         global top-k hashed reference indices per query cell.
@@ -276,6 +273,11 @@ class FedEmbedder(FedBase):
         Returns:
             list[list[str]]: Global top-k hashed reference IDs for each query cell.
         """
+        distances = crypten.cat(client_distances, dim=1)
+        indices = crypten.cat(client_indices, dim=1)
+        top_k_indices = top_k_ind_selection(distances.clone(), k)
+        import pdb; pdb.set_trace()
+        # TODO: find global top-k indices
         encrypted_concat = concat_encrypted_distances(client_distances)
         all_hashes = list(itertools.chain.from_iterable(client_hashes))
         # Secure top-k from encrypted distances
@@ -286,7 +288,6 @@ class FedEmbedder(FedBase):
         for i, row in enumerate(all_hashes):
             row_hashes = []
             for ind in topk_indices[i]:
-                import pdb; pdb.set_trace()
                 row_hashes.append(row[ind])
             k_nearest_samples.append(row_hashes)
         return k_nearest_samples
@@ -350,13 +351,12 @@ class FedEmbedder(FedBase):
             tuple: Ground truth labels, predicted labels.
         """
         self.collect_global_celltypes()
-        client_distances, client_hashes = [], []
+        client_distances, client_indices = [], []
         query_embedding = self.embed_query.obsm["secure_embed" if self.smpc else "X_scGPT"]
         for client in self.clients:
-            distances, hashed_indices = client.compute_local_distances(query_embedding)
-            import pdb; pdb.set_trace()
+            distances, indices = client.compute_local_distances(query_embedding)
             client_distances.append(distances)
-            client_hashes.append(hashed_indices)
+            client_indices.append(indices)
 
         # Aggregate distances and perform majority voting
         k_nearest_samples = self.global_aggregate_distances(client_distances, client_hashes)
