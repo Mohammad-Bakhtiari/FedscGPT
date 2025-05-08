@@ -1063,6 +1063,7 @@ def suppress_argmin(dist_matrix, argmin_onehot, batch_size=128, large_val=1e9):
         end = min(start + batch_size, n_query)
         dist_batch = dist_matrix[start:end]  # (bs, n_ref)
         mask_batch = argmin_onehot[start:end]  # (bs, n_ref)
+        import pdb; pdb.set_trace()
         updated = dist_batch + mask_batch * large_val_enc  # Masked add
         updated_batches.append(updated)
 
