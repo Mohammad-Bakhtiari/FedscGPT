@@ -78,8 +78,8 @@ class ClientEmbedder(Embedder):
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
         topk_celltype_indices = [(k @ self.enc_celltype_ind_offset.unsqueeze(1)).squeeze(1) for k in topk_indices]
         topk_celltype_indices = crypten.stack(topk_celltype_indices, dim=1)
-        assert any([len(row.unique())==self.k for row in topk_celltype_indices]), f"Topk indices are not unique: {topk_celltype_indices}"
         import pdb; pdb.set_trace()
+        assert any([len(row.unique())==self.k for row in topk_celltype_indices]), f"Topk indices are not unique: {topk_celltype_indices}"
         hashed_indices = self.hash_indices(get_plain_indices(topk_indices))
         return encrypted_topk, hashed_indices
 
