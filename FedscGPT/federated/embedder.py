@@ -230,7 +230,7 @@ class FedEmbedder(FedBase):
         return embedder.adata, embedder.embed_adata
 
 
-    def global_aggregate_distances(self, client_distances, client_hashes):
+    def global_aggregate_distances(self, client_distances, client_indices):
         """
         Aggregates distance information from all clients and determines the global top-k nearest neighbors
         for each query sample.
@@ -241,7 +241,7 @@ class FedEmbedder(FedBase):
             client_distances (list):
                 - If SMPC is disabled: list of np.ndarray, each of shape (n_query, k)
                 - If SMPC is enabled: list of CrypTensor, each of shape (n_query, k)
-            client_hashes (list of list of list of str):
+            client_indices (list of list of list of str):
                 Hashed reference indices from each client. Shape: (n_clients, n_query, k)
 
         Returns:
@@ -249,9 +249,9 @@ class FedEmbedder(FedBase):
                 Global top-k hashed reference indices per query sample. Shape: (n_query, k)
         """
         if self.smpc:
-            return self.secure_top_k_distance_agg(client_distances, client_hashes)
+            return self.secure_top_k_distance_agg(client_distances, client_indices)
         all_distances = np.hstack(client_distances)
-        all_hashes = np.hstack(client_hashes)
+        all_hashes = np.hstack(client_indices)
         sorted_indices = np.argsort(all_distances, axis=1)
         k_nearest_samples = []
         for r, row in enumerate(sorted_indices):
@@ -359,7 +359,7 @@ class FedEmbedder(FedBase):
             client_indices.append(indices)
 
         # Aggregate distances and perform majority voting
-        k_nearest_samples = self.global_aggregate_distances(client_distances, client_hashes)
+        k_nearest_samples = self.global_aggregate_distances(client_distances, client_indices)
         client_votes = []
 
         # Each client computes votes based on the query embeddings
