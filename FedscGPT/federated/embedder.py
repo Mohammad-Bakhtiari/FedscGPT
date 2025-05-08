@@ -356,28 +356,9 @@ class FedEmbedder(FedBase):
             self.label_to_index (dict): Mapping from cell type label (or hash in SMPC) to global index.
             self.index_to_label (dict): Reverse mapping for predictions.
         """
-        if self.smpc:
-            # Step 1: Build global hash index
-            self.global_hash_to_index()
-
-            # Step 2: Secure aggregation of presence
-            encrypted_presence = self.clients[0].report_celltypes(self.hash_to_index)
-            for client in self.clients[1:]:
-                encrypted_presence += client.report_celltypes(self.hash_to_index)
-
-            global_presence = encrypted_presence.get_plain_text().int()
-
-            # Step 3: Build final label set based on presence
-            all_labels = []
-            for h, i in self.hash_to_index.items():
-                if global_presence[i] > 0:
-                    all_labels.append(h)
-
-        else:
-            # Non-SMPC: Collect plain labels
-            all_labels = set()
-            for client in self.clients:
-                all_labels |= client.report_celltypes()
+        all_labels = set()
+        for client in self.clients:
+            all_labels |= client.report_celltypes()
 
         # Build mappings (sorted for deterministic ordering)
         sorted_labels = sorted(list(all_labels))
