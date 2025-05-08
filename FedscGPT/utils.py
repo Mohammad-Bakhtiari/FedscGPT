@@ -1075,6 +1075,7 @@ def suppress_argmin(dist_matrix, argmin_onehot, batch_size=128, large_val=1e9):
 
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
     topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
+    import pdb; pdb.set_trace()
     encrypted_topk = (encrypted_dist_matrix * topk_indices[0]).sum(dim=1, keepdim=True)
     for i in range(1, k):
         next_k = (encrypted_dist_matrix * topk_indices[i]).sum(dim=1, keepdim=True)
@@ -1087,7 +1088,6 @@ def top_k_ind_selection(dist_matrix, k):
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
         topk_indices.append(argmin)
-        import pdb; pdb.set_trace()
         dist_matrix = suppress_argmin(dist_matrix, argmin)
     return topk_indices
 
