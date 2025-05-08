@@ -72,6 +72,7 @@ class ClientEmbedder(Embedder):
         distances = query_norm + ref_norm - 2 * cross
         del reference, query_norm, ref_norm, cross
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
+        import pdb; pdb.set_trace()
         hashed_indices = self.hash_indices(get_plain_indices(topk_indices))
         return encrypted_topk, hashed_indices
 
