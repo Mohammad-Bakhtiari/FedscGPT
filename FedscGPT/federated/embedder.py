@@ -191,15 +191,12 @@ class ClientEmbedder(Embedder):
             assert ct in global_label_to_index, f"Cell type '{ct}' not found in global label index."
 
         # Map and offset
-        local_indices = np.array([global_label_to_index[ct] for ct in cell_types])
-        global_indices = local_indices + ind_offset
-
+        self.global_celltype_map = global_label_to_index
+        global_indices =  np.arange(self.n_samples)+ ind_offset
         self.celltypes_ind = local_indices
         self.celltype_ind_offset = global_indices
-        self.enc_celltype_ind_offset = crypten.cryptensor(
-            torch.tensor(global_indices, dtype=torch.float32, device=self.device)
-        )
-        import pdb; pdb.set_trace()
+        self.enc_celltype_ind_offset = crypten.cryptensor(torch.tensor(global_indices, dtype=torch.float32, device=self.device))
+
 
     def report_n_local_samples(self):
         return crypten.cryptensor(torch.tensor(self.n_samples, dtype=torch.float32, device=self.device))
