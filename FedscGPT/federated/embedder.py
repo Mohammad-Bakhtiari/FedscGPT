@@ -6,13 +6,17 @@ import torch
 import crypten
 from FedscGPT.base import FedBase, BaseMixin
 from FedscGPT.utils import (read_h5ad, concat_encrypted_distances, top_k_encrypted_distances,
-                            get_plain_indices, top_k_ind_selection, encrypted_present_hashes)
+                            get_plain_indices, top_k_ind_selection, encrypted_present_hashes, save_data_batches)
 from FedscGPT.centralized.embedder import Embedder
 
 
 class ClientEmbedder(Embedder):
     def __init__(self, smpc=False, **kwargs):
         super().__init__(**kwargs)
+        self.enc_celltype_ind_offset = None
+        self.celltype_ind_offset = None
+        self.celltypes_ind = None
+        self.enc_celltypes_ind = None
         self.label_to_index = None
         self.smpc = smpc
         self.hash_index_map = {}  # To map hashes back to local indices
@@ -160,7 +164,7 @@ class ClientEmbedder(Embedder):
                 vote.append(vote_counts)
         return vote
 
-    def report_celltypes(self, global_hash_to_index=None):
+    def report_celltypes(self):
         """
         Report the unique cell types present in this client's reference data.
 
@@ -170,6 +174,32 @@ class ClientEmbedder(Embedder):
         labels = self.adata.obs[self.celltype_key].unique()
         return set(labels)
 
+    def harmonize_celltypes(self, global_label_to_index, ind_offset):
+        """
+        Maps local cell types to global label indices with an offset and encrypts them.
+
+        Args:
+            global_label_to_index (dict): Maps each cell type string to a unique integer index.
+            ind_offset (int): Offset to make local labels globally unique.
+        """
+        cell_types = self.embed_adata.obs[self.celltype_key]
+
+        for ct in cell_types:
+            assert ct in global_label_to_index, f"Cell type '{ct}' not found in global label index."
+
+        # Map and offset
+        local_indices = np.array([global_label_to_index[ct] for ct in cell_types])
+        global_indices = local_indices + ind_offset
+
+        # Store
+        self.celltypes_ind = local_indices
+        self.celltype_ind_offset = global_indices
+        self.enc_celltype_ind_offset = crypten.cryptensor(
+            torch.tensor(global_indices, dtype=torch.float32, device=self.device)
+        )
+
+    def report_n_local_samples(self):
+        return crypten.cryptensor(torch.tensor(self.n_samples, dtype=torch.float32, device=self.device))
 
 
 class FedEmbedder(FedBase):
@@ -360,5 +390,18 @@ class FedEmbedder(FedBase):
         self.index_to_label = {idx: label for label, idx in self.label_to_index.items()}
 
         # Broadcast to all clients
+        client_offset = 0
         for client in self.clients:
-            client.label_to_index = self.label_to_index
+            client.harmonize_celltypes(self.label_to_index, client_offset)
+            client_offset += self.total_n_samples
+
+    def aggregate_total_n_samples(self):
+        encrypted_counts = [
+            client.report_n_local_samples()
+            for client in self.clients
+        ]
+        total = encrypted_counts[0]
+        for count in encrypted_counts[1:]:
+            total = total + count
+
+        self.total_n_samples = int(total.get_plain_text().item())
