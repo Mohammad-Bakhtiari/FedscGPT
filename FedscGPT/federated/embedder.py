@@ -276,21 +276,9 @@ class FedEmbedder(FedBase):
         distances = crypten.cat(client_distances, dim=1)
         indices = crypten.cat(client_indices, dim=1)
         one_hot_indices = top_k_ind_selection(distances.clone(), self.k)
-        top_k_indices = [(one_hot_indices[k] * indices).sum(dim=1) for k in range(self.k)]
+        top_k_indices = [(one_hot_indices[k] * indices).sum(dim=1).unsqueeze(dim=1) for k in range(self.k)]
         import pdb; pdb.set_trace()
-        # TODO: find global top-k indices
-        encrypted_concat = concat_encrypted_distances(client_distances)
-        all_hashes = list(itertools.chain.from_iterable(client_hashes))
-        # Secure top-k from encrypted distances
-        topk_indices = top_k_ind_selection(encrypted_concat.clone(), self.k)
-
-        topk_indices = get_plain_indices(topk_indices)
-        k_nearest_samples = []
-        for i, row in enumerate(all_hashes):
-            row_hashes = []
-            for ind in topk_indices[i]:
-                row_hashes.append(row[ind])
-            k_nearest_samples.append(row_hashes)
+        k_nearest_samples = crypten.cat(top_k_indices, dim=1)
         return k_nearest_samples
 
     def aggregate_client_votes(self, client_votes):
