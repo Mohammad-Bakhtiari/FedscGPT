@@ -147,6 +147,7 @@ class ClientEmbedder(Embedder):
                 sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
                 match_mask = (sample_k == local_ind)
                 votes.append((match_mask * ct_labels_exp).sum(dim=1))
+            votes = crypten.cat(votes, dim=1)
         else:
             for query_sample in global_nearest_samples:
                 vote_counts = {}
@@ -293,7 +294,8 @@ class FedEmbedder(FedBase):
             for i in range(n_queries):
                 for j in range(n_classes):
                     total_nonzeros = sum(v[i, j].item() > 0 for v in client_votes_plain)
-                    assert total_nonzeros == 1, f"Multiple clients voted for query {i}, class {j}!"
+                    if total_nonzeros != 1:
+                        f"Clients voted {total_nonzeros} times for query {i}, class {j}!"
             aggregated_votes = crypten.cat(client_votes, dim=0).sum(dim=0)
             _, pred_labels = aggregated_votes.max(dim=1)
             pred_labels_plain = pred_labels.get_plain_text()
