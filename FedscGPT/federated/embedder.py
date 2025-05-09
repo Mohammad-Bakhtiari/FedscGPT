@@ -390,7 +390,7 @@ class FedEmbedder(FedBase):
 
         # Build mappings (sorted for deterministic ordering)
         sorted_labels = sorted(list(all_labels))
-        self.label_to_index = {label: idx for idx, label in enumerate(1, sorted_labels)}
+        self.label_to_index = {label: idx for idx, label in enumerate(sorted_labels, 1)}
         self.index_to_label = {idx: label for label, idx in self.label_to_index.items()}
         if self.smpc:
             self.aggregate_total_n_samples()
