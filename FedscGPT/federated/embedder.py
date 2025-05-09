@@ -199,8 +199,8 @@ class ClientEmbedder(Embedder):
         """
         # TODO: Check its effect on fedetated without SMPC
         cell_types = self.embed_adata.obs[self.celltype_key].values
-        self.mapped_ct = [self.global_celltype_map[ct] for ct in cell_types]
-        self.global_celltype_map = global_label_to_index
+        self.mapped_ct = [global_label_to_index[ct] for ct in cell_types]
+        self.ind_offset = ind_offset
         global_indices =  np.arange(self.n_samples)+ ind_offset
         self.celltype_ind_offset = global_indices
         self.enc_celltype_ind_offset = crypten.cryptensor(torch.tensor(global_indices, dtype=torch.float32, device=self.device))
