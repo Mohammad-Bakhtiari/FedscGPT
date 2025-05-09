@@ -137,18 +137,22 @@ class ClientEmbedder(Embedder):
                 - If SMPC is enabled: returns a list of encrypted fixed-length vote vectors (CrypTensors),
                   where each index corresponds to a global label index.
         """
-        vote = []
+        votes = []
         if self.smpc:
             n_queries = global_nearest_samples.size(0)
             local_ind = self.enc_celltype_ind_offset.unsqueeze(0)
-            enc_celltype_labels = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
+            ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
+            ct_labels_exp = ct_labels_enc.unsqueeze(0).expand(n_queries, self.n_samples)
             for k in range(self.k):
                 sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
                 match_mask = (sample_k == local_ind)
+                vote = (match_mask * ct_labels_exp).sum(dim=1)
                 import pdb; pdb.set_trace()
-                match_numeric = match_mask.float()
-
-
+                match_numeric = match_mask * crypten.cryptensor(torch.tensor(1.0, device=self.device))
+                absent = crypten.cryptensor(torch.tensor(1.0, dtype=torch.float32, device=self.device)) - match_numeric
+                offset = absent * torch.tensor(self.ind_offset, dtype=torch.float32, device=self.device).expand(n_queries, self.n_samples)
+                local_avl_samples = (match_mask * sample_k) - torch.tensor(self.ind_offset, dtype=torch.float32, device=self.device)  + offset
+                vote = local_avl_samples * ct_labels_exp
                 # Optional: e.g., get matched cell type values
                 # cell_types = self.enc_celltype_labels.unsqueeze(0).expand(n_queries, n_ref)
                 # matched_values = (cell_types * match_numeric).sum(dim=1)
@@ -386,7 +390,7 @@ class FedEmbedder(FedBase):
 
         # Build mappings (sorted for deterministic ordering)
         sorted_labels = sorted(list(all_labels))
-        self.label_to_index = {label: idx for idx, label in enumerate(sorted_labels)}
+        self.label_to_index = {label: idx for idx, label in enumerate(1, sorted_labels)}
         self.index_to_label = {idx: label for label, idx in self.label_to_index.items()}
         if self.smpc:
             self.aggregate_total_n_samples()
