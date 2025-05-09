@@ -139,16 +139,19 @@ class ClientEmbedder(Embedder):
         """
         vote = []
         if self.smpc:
-            n_labels = len(self.label_to_index)
-            for query_sample in global_nearest_samples:
-                vote_vector = torch.zeros(n_labels)
-                for hash_value in query_sample:
-                    if hash_value in self.hash_index_map:
-                        local_index = self.hash_index_map[hash_value]
-                        label = self.adata.obs[self.celltype_key].values[local_index]
-                        label_idx = self.label_to_index[label]  # label could be hash
-                        vote_vector[label_idx] += 1
-                vote.append(crypten.cryptensor(vote_vector))
+            import pdb; pdb.set_trace()
+            global_nearest_samples
+            self.enc_celltype_ind_offset
+            # n_labels = len(self.label_to_index)
+            # for query_sample in global_nearest_samples:
+            #     vote_vector = torch.zeros(n_labels)
+            #     for hash_value in query_sample:
+            #         if hash_value in self.hash_index_map:
+            #             local_index = self.hash_index_map[hash_value]
+            #             label = self.adata.obs[self.celltype_key].values[local_index]
+            #             label_idx = self.label_to_index[label]  # label could be hash
+            #             vote_vector[label_idx] += 1
+            #     vote.append(crypten.cryptensor(vote_vector))
         else:
             for query_sample in global_nearest_samples:
                 vote_counts = {}
@@ -277,7 +280,6 @@ class FedEmbedder(FedBase):
         indices = crypten.cat(client_indices, dim=1)
         one_hot_indices = top_k_ind_selection(distances.clone(), self.k)
         top_k_indices = [(one_hot_indices[k] * indices).sum(dim=1).unsqueeze(dim=1) for k in range(self.k)]
-        import pdb; pdb.set_trace()
         k_nearest_samples = crypten.cat(top_k_indices, dim=1)
         return k_nearest_samples
 
