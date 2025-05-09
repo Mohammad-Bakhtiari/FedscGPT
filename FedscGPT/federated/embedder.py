@@ -146,31 +146,7 @@ class ClientEmbedder(Embedder):
             for k in range(self.k):
                 sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
                 match_mask = (sample_k == local_ind)
-                vote = (match_mask * ct_labels_exp).sum(dim=1)
-                import pdb; pdb.set_trace()
-                match_numeric = match_mask * crypten.cryptensor(torch.tensor(1.0, device=self.device))
-                absent = crypten.cryptensor(torch.tensor(1.0, dtype=torch.float32, device=self.device)) - match_numeric
-                offset = absent * torch.tensor(self.ind_offset, dtype=torch.float32, device=self.device).expand(n_queries, self.n_samples)
-                local_avl_samples = (match_mask * sample_k) - torch.tensor(self.ind_offset, dtype=torch.float32, device=self.device)  + offset
-                vote = local_avl_samples * ct_labels_exp
-                # Optional: e.g., get matched cell type values
-                # cell_types = self.enc_celltype_labels.unsqueeze(0).expand(n_queries, n_ref)
-                # matched_values = (cell_types * match_numeric).sum(dim=1)
-
-
-                results.append(match_numeric)
-            global_nearest_samples
-            self.enc_celltype_ind_offset
-            # n_labels = len(self.label_to_index)
-            # for query_sample in global_nearest_samples:
-            #     vote_vector = torch.zeros(n_labels)
-            #     for hash_value in query_sample:
-            #         if hash_value in self.hash_index_map:
-            #             local_index = self.hash_index_map[hash_value]
-            #             label = self.adata.obs[self.celltype_key].values[local_index]
-            #             label_idx = self.label_to_index[label]  # label could be hash
-            #             vote_vector[label_idx] += 1
-            #     vote.append(crypten.cryptensor(vote_vector))
+                votes.append((match_mask * ct_labels_exp).sum(dim=1))
         else:
             for query_sample in global_nearest_samples:
                 vote_counts = {}
