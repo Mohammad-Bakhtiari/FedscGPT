@@ -285,6 +285,20 @@ class FedEmbedder(FedBase):
             np.ndarray: The final predicted labels for the query data.
         """
         if self.smpc:
+            n_clients = len(client_votes)
+            client_votes_plain = [v.get_plain_text() for v in client_votes]  # List of (n_queries, n_classes)
+
+            n_queries, n_classes = client_votes_plain[0].shape
+
+            for i in range(n_queries):
+                for j in range(n_classes):
+                    total_nonzeros = sum(v[i, j].item() > 0 for v in client_votes_plain)
+                    assert total_nonzeros == 1, f"Multiple clients voted for query {i}, class {j}!"
+            aggregated_votes = crypten.cat(client_votes, dim=0).sum(dim=0)
+            _, pred_labels = aggregated_votes.max(dim=1)
+            pred_labels_plain = pred_labels.get_plain_text()
+            import pdb; pdb.set_trace()
+
             n_queries = len(client_votes[0])
             n_labels = len(self.label_to_index)
             # Initialize encrypted vote matrix
