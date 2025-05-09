@@ -200,7 +200,6 @@ class FedEmbedder(FedBase):
         self.smpc = smpc
         self.k = k
         adata = read_h5ad(data_dir, reference_adata)
-        import pdb; pdb.set_trace()
         self.distribute_adata_by_batch(adata, kwargs['batch_key'], keep_vars=True)
         self.celltype_key = kwargs['celltype_key']
         for c in range(self.n_clients):
@@ -290,6 +289,7 @@ class FedEmbedder(FedBase):
             aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
             pred_labels, _ = aggregated_votes.max(dim=1)
             pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
+            pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels_plain], dtype=object)
             return pred_labels_plain
 
         aggregated_votes = [{} for _ in range(self.embed_query.shape[0])]
