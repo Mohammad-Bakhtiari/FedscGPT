@@ -297,9 +297,10 @@ class FedEmbedder(FedBase):
                     if total_nonzeros != 1:
                         f"Clients voted {total_nonzeros} times for query {i}, class {j}!"
             aggregated_votes = crypten.cat(client_votes, dim=0).sum(dim=0)
+            import pdb; pdb.set_trace()
             _, pred_labels = aggregated_votes.max(dim=1)
             pred_labels_plain = pred_labels.get_plain_text()
-            import pdb; pdb.set_trace()
+
 
             n_queries = len(client_votes[0])
             n_labels = len(self.label_to_index)
