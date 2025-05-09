@@ -139,7 +139,21 @@ class ClientEmbedder(Embedder):
         """
         vote = []
         if self.smpc:
-            import pdb; pdb.set_trace()
+            n_queries = global_nearest_samples.size(0)
+            local_ind = self.enc_celltype_ind_offset.unsqueeze(0)
+            enc_celltype_labels = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
+            for k in range(self.k):
+                sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
+                match_mask = (sample_k == local_ind)
+                match_numeric = match_mask.float()
+
+
+                # Optional: e.g., get matched cell type values
+                # cell_types = self.enc_celltype_labels.unsqueeze(0).expand(n_queries, n_ref)
+                # matched_values = (cell_types * match_numeric).sum(dim=1)
+
+
+                results.append(match_numeric)
             global_nearest_samples
             self.enc_celltype_ind_offset
             # n_labels = len(self.label_to_index)
@@ -184,12 +198,8 @@ class ClientEmbedder(Embedder):
             ind_offset (int): Offset to make local labels globally unique.
         """
         # TODO: Check its effect on fedetated without SMPC
-        cell_types = self.embed_adata.obs[self.celltype_key]
-
-        for ct in cell_types:
-            assert ct in global_label_to_index, f"Cell type '{ct}' not found in global label index."
-
-        # Map and offset
+        cell_types = self.embed_adata.obs[self.celltype_key].values
+        self.mapped_ct = [self.global_celltype_map[ct] for ct in cell_types]
         self.global_celltype_map = global_label_to_index
         global_indices =  np.arange(self.n_samples)+ ind_offset
         self.celltype_ind_offset = global_indices
