@@ -145,6 +145,7 @@ class ClientEmbedder(Embedder):
             for k in range(self.k):
                 sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
                 match_mask = (sample_k == local_ind)
+                import pdb; pdb.set_trace()
                 match_numeric = match_mask.float()
 
 
