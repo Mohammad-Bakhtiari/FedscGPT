@@ -200,6 +200,7 @@ class FedEmbedder(FedBase):
         self.smpc = smpc
         self.k = k
         adata = read_h5ad(data_dir, reference_adata)
+        import pdb; pdb.set_trace()
         self.distribute_adata_by_batch(adata, kwargs['batch_key'], keep_vars=True)
         self.celltype_key = kwargs['celltype_key']
         for c in range(self.n_clients):
@@ -364,6 +365,8 @@ class FedEmbedder(FedBase):
         else:
             for client in self.clients:
                 client.harmonize_celltypes(self.label_to_index, 0)
+
+
     def aggregate_total_n_samples(self):
         encrypted_counts = [
             client.report_n_local_samples()
