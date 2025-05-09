@@ -136,6 +136,7 @@ class ScGPT(BaseMixin):
     def instantiate_transformer_model(self):
         kwargs = copy.deepcopy(self.config.model.__dict__)
         print(kwargs["embsize"])
+        exit()
         self.model = TransformerModel(
             len(self.vocab),
             d_model=kwargs.pop("embsize"),
