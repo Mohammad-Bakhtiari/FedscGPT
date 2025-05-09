@@ -286,40 +286,10 @@ class FedEmbedder(FedBase):
             np.ndarray: The final predicted labels for the query data.
         """
         if self.smpc:
-            n_clients = len(client_votes)
-            client_votes_plain = [v.get_plain_text() for v in client_votes]  # List of (n_queries, n_classes)
-
-            n_queries, n_classes = client_votes_plain[0].shape
-
-            for i in range(n_queries):
-                for j in range(n_classes):
-                    total_nonzeros = sum(v[i, j].item() > 0 for v in client_votes_plain)
-                    if total_nonzeros != 1:
-                        f"Clients voted {total_nonzeros} times for query {i}, class {j}!"
-            aggregated_votes = crypten.cat(client_votes, dim=0).sum(dim=0)
-            import pdb; pdb.set_trace()
-            _, pred_labels = aggregated_votes.max(dim=1)
-            pred_labels_plain = pred_labels.get_plain_text()
-
-
-            n_queries = len(client_votes[0])
-            n_labels = len(self.label_to_index)
-            # Initialize encrypted vote matrix
-            encrypted_vote_matrix = [crypten.cryptensor(torch.zeros(n_labels)) for _ in range(n_queries)]
-
-            # Add votes securely across clients
-            for client_vote in client_votes:
-                for i in range(n_queries):
-                    encrypted_vote_matrix[i] += client_vote[i]
-
-            # Decrypt and determine predicted label
-            final_predictions = []
-            for enc_votes in encrypted_vote_matrix:
-                plain_votes = enc_votes.get_plain_text().tolist()
-                max_idx = int(np.argmax(plain_votes))
-                final_predictions.append(self.index_to_label[max_idx])  # label may be hash or raw
-
-            return np.array(final_predictions)
+            aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
+            pred_labels, _ = aggregated_votes.max(dim=1)
+            pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
+            return pred_labels_plain
 
         aggregated_votes = [{} for _ in range(self.embed_query.shape[0])]
         for client_vote in client_votes:
