@@ -147,6 +147,7 @@ class ClientEmbedder(Embedder):
                 sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
                 match_mask = (sample_k == local_ind)
                 votes.append((match_mask * ct_labels_exp).sum(dim=1))
+            import pdb; pdb.set_trace()
             votes = crypten.cat(votes, dim=1)
         else:
             for query_sample in global_nearest_samples:
