@@ -24,15 +24,14 @@ fi
 
 # === Set paths ===
 root_dir="$(dirname "$PWD")"
-INIT_WEIGHTS_DIR="${root_dir}/init_weights"
 
 IFS='|' read -r -a args <<< "${datasets[$DATASET]}"
 
 data_dir="${root_dir}/data/scgpt/benchmark/${args[0]}"
 reference="${data_dir}/${args[1]}"
 query="${data_dir}/${args[2]}"
-output="${root_dir}/output/annotation/${args[0]}/param_tuning"
-INTI_WEIGHTS_DIR="${root_dir}/models/init"
+output="${root_dir}/output/annotation/${args[0]}"
+init_weights_dir="${root_dir}/models/init"
 
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
@@ -53,5 +52,5 @@ python "${root_dir}/tasks/annotation.py" \
  --n_epochs "$N_EPOCHS" \
  --n_rounds "$N_ROUNDS" \
  --param_tuning_res "${root_dir}/output/annotation/param-tuning-res" \
- --init_weights_dir "$INIT_WEIGHTS_DIR/${args[0]}.pth" \
+ --init_weights_dir "$init_weights_dir/${args[0]}.pth" \
  --param_tuning

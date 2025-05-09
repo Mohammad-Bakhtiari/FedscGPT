@@ -157,8 +157,8 @@ class ClientEmbedder(Embedder):
                         if label not in vote_counts:
                             vote_counts[label] = 0
                         vote_counts[label] += 1
-                vote.append(vote_counts)
-        return vote
+                votes.append(vote_counts)
+        return votes
 
     def report_celltypes(self):
         """
