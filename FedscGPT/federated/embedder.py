@@ -290,6 +290,7 @@ class FedEmbedder(FedBase):
             np.ndarray: The final predicted labels for the query data.
         """
         if self.smpc:
+            import pdb; pdb.set_trace()
             aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
             pred_labels, _ = aggregated_votes.max(dim=1)
             pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
