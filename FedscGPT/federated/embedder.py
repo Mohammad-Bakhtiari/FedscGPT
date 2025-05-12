@@ -294,13 +294,12 @@ class FedEmbedder(FedBase):
             np.ndarray: The final predicted labels for the query data.
         """
         if self.smpc:
-            import pdb; pdb.set_trace()
             aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
             flat_indices = aggregated_votes.view(-1).unsqueeze(1)
             class_range = torch.arange(self.n_classes, dtype=torch.long, device=self.device).view(1, -1)
             enc_one_hot = (flat_indices == class_range).view(self.n_query_samples, self.k, self.n_classes)
             _, arg_max = enc_one_hot.sum(dim=1).max(dim=1)
-            pred_labels = (arg_max.get_plain_text().argmax(dim=1) + 1).cpu().numpy().astype('int')
+            pred_labels = arg_max.get_plain_text().argmax(dim=1).cpu().numpy().astype('int')
             # pred_labels, _ = aggregated_votes.max(dim=1)
             # pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
             pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels], dtype=object)
