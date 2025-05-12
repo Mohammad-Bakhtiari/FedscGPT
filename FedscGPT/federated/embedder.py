@@ -141,7 +141,8 @@ class ClientEmbedder(Embedder):
         if self.smpc:
             n_queries = global_nearest_samples.size(0)
             local_ind = self.enc_celltype_ind_offset.unsqueeze(0)
-            ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
+            # ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
+            ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device))
             ct_labels_exp = ct_labels_enc.unsqueeze(0).expand(n_queries, self.n_samples)
             for k in range(self.k):
                 sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
@@ -183,9 +184,12 @@ class ClientEmbedder(Embedder):
         cell_types = self.embed_adata.obs[self.celltype_key].values
         self.mapped_ct = [global_label_to_index[ct] for ct in cell_types]
         self.ind_offset = ind_offset
-        global_indices =  np.arange(self.n_samples)+ ind_offset
-        self.celltype_ind_offset = global_indices
-        self.enc_celltype_ind_offset = crypten.cryptensor(torch.tensor(global_indices, dtype=torch.float32, device=self.device))
+        # global_indices =  np.arange(self.n_samples)+ ind_offset
+        # self.celltype_ind_offset = global_indices
+        # self.enc_celltype_ind_offset = crypten.cryptensor(torch.tensor(global_indices, dtype=torch.float32, device=self.device))
+        if self.smpc:
+            global_indices = torch.arange(self.n_samples, dtype=torch.long, device=self.device) + ind_offset
+            self.enc_celltype_ind_offset = crypten.cryptensor(global_indices)
 
 
     def report_n_local_samples(self):

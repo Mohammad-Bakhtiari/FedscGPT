@@ -1086,7 +1086,6 @@ def top_k_ind_selection(dist_matrix, k):
     topk_indices = []
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
-        import pdb; pdb.set_trace()
         topk_indices.append(argmin)
         dist_matrix = suppress_argmin(dist_matrix, argmin)
     return topk_indices
