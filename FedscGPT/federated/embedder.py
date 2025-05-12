@@ -192,6 +192,7 @@ class ClientEmbedder(Embedder):
             ind_offset (int): Offset to make local labels globally unique.
         """
         # TODO: Check its effect on fedetated without SMPC
+        self.label_to_index = global_label_to_index
         cell_types = self.embed_adata.obs[self.celltype_key].values
         self.mapped_ct = [global_label_to_index[ct] for ct in cell_types]
         self.ind_offset = ind_offset
