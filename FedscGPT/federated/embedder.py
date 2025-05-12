@@ -321,6 +321,7 @@ class FedEmbedder(FedBase):
     #     return np.array(final_predictions)
 
     def aggregate_client_votes(self, client_votes):
+        import pdb; pdb.set_trace()
         # client_votes: list of (n_query, k) MPCTensors of 1-based label indices
         stacked = crypten.stack(client_votes, dim=2)  # → (n_query, k, n_clients)
         n_query, k, n_clients = stacked.size()
