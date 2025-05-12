@@ -321,20 +321,23 @@ class FedEmbedder(FedBase):
     #     return np.array(final_predictions)
 
     def aggregate_client_votes(self, client_votes):
-        # stack into (n_query, k, n_clients)
-        stacked = crypten.stack(client_votes, dim=2)
+        # client_votes: list of (n_query, k) MPCTensors of 1-based label indices
+        stacked = crypten.stack(client_votes, dim=2)  # → (n_query, k, n_clients)
         n_query, k, n_clients = stacked.size()
-        # flatten neighbor+client axis → (n_query, k * n_clients)
-        flat_votes = stacked.reshape(n_query, k * n_clients)
-        # count per class by eq+sum
+
+        # collapse neighbor+client axis
+        flat_votes = stacked.flatten(start_dim=1, end_dim=2)  # → (n_query, k * n_clients)
+
+        # count occurrences of each class 1..n_classes
         n_classes = len(self.index_to_label)
         counts = []
-        for c in range(n_classes):
-            mask = (flat_votes == c)  # MPCTensor (n_query, k*n_clients)
-            count = mask.sum(dim=1)  # MPCTensor (n_query,)
-            counts.append(count.unsqueeze(1))  # list of (n_query,1)
+        for c in range(1, n_classes + 1):
+            mask = flat_votes.eq(c)  # (n_query, k*n_clients)
+            count = mask.sum(dim=1, keepdim=True)  # (n_query, 1)
+            counts.append(count)
+
         total_votes = crypten.cat(counts, dim=1)  # (n_query, n_classes)
-        pred, _ = total_votes.max(dim=1)
+        pred, _ = total_votes.max(dim=1)  # argmax over classes
         labels = pred.get_plain_text().cpu().numpy().astype(int)
         return np.array([self.index_to_label[i] for i in labels], dtype=object)
 
