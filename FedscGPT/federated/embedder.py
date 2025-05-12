@@ -162,16 +162,21 @@ class ClientEmbedder(Embedder):
     #             votes.append(vote_counts)
     #     return votes
     def vote(self, global_nearest_samples):
+        import torch.nn.functional as F
         n_queries = global_nearest_samples.size(0)
+        n_samples = self.n_samples
         n_classes = len(self.label_to_index)
-        ct_label_tensor = torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device)
-        ct_onehot = torch.nn.functional.one_hot(ct_label_tensor, num_classes=n_classes)
-        ct_onehot_enc = crypten.cryptensor(ct_onehot)
-        votes = []
-        for k_idx in range(self.k):
-            mask = global_nearest_samples[:, k_idx].unsqueeze(2)
-            votes.append((mask * ct_onehot_enc.unsqueeze(0)).sum(dim=1))
-        return sum(votes)
+        ct_labels = torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device)
+        ct_onehot_enc = crypten.cryptensor(F.one_hot(ct_labels, num_classes=n_classes).to(self.device))
+        local_idx_enc = self.enc_celltype_ind_offset.unsqueeze(0)
+        total_votes = None
+        for i in range(self.k):
+            idx_k = global_nearest_samples[:, i]
+            mask = idx_k.unsqueeze(1).expand(n_queries, n_samples)
+            match = (mask == local_idx_enc)
+            votes_k = (match.unsqueeze(2) * ct_onehot_enc.unsqueeze(0)).sum(dim=1)
+            total_votes = votes_k if total_votes is None else total_votes + votes_k
+        return total_votes
 
     def report_celltypes(self):
         """
