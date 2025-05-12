@@ -321,24 +321,18 @@ class FedEmbedder(FedBase):
     #     return np.array(final_predictions)
 
     def aggregate_client_votes(self, client_votes):
-        import pdb; pdb.set_trace()
         # client_votes: list of (n_query, k) MPCTensors of 1-based label indices
-        stacked = crypten.stack(client_votes, dim=2)  # → (n_query, k, n_clients)
-        n_query, k, n_clients = stacked.size()
-
-        # collapse neighbor+client axis
-        flat_votes = stacked.flatten(start_dim=1, end_dim=2)  # → (n_query, k * n_clients)
-
-        # count occurrences of each class 1..n_classes
+        stacked = crypten.stack(client_votes, dim=2)  # (n_query, k, n_clients)
+        flat_votes = stacked.flatten(start_dim=1, end_dim=2)  # (n_query, k * n_clients)
         n_classes = len(self.index_to_label)
-        counts = []
-        for c in range(1, n_classes + 1):
-            mask = flat_votes.eq(c)  # (n_query, k*n_clients)
-            count = mask.sum(dim=1, keepdim=True)  # (n_query, 1)
-            counts.append(count)
-
-        total_votes = crypten.cat(counts, dim=1)  # (n_query, n_classes)
-        pred, _ = total_votes.max(dim=1)  # argmax over classes
+        # build a plain torch.LongTensor [1,2,...,n_classes] on the same device
+        class_ids = torch.arange(1, n_classes + 1, device=self.device, dtype=torch.long)
+        # broadcast-compare once: (n_query, k*n_clients, n_classes)
+        eq_mask = flat_votes.unsqueeze(2).eq(class_ids)
+        # sum over the neighbor+client axis → (n_query, n_classes)
+        total_votes = eq_mask.sum(dim=1)
+        # pick the class with the most votes
+        pred, _ = total_votes.max(dim=1)
         labels = pred.get_plain_text().cpu().numpy().astype(int)
         return np.array([self.index_to_label[i] for i in labels], dtype=object)
 
