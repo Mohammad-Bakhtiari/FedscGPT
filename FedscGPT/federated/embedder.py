@@ -118,65 +118,50 @@ class ClientEmbedder(Embedder):
         """
         return str(self.log_id)
 
-    # def vote(self, global_nearest_samples):
-    #     """
-    #    Perform per-query voting based on the client's local reference data.
-    #
-    #     For each query cell, votes are cast based on the labels of locally matched
-    #     reference cells whose hashed indices appear in the global nearest neighbor list.
-    #
-    #     Args:
-    #         global_nearest_samples (List[List[str]]):
-    #             A list where each element corresponds to a query cell and contains
-    #             the hashed indices of its top-k nearest neighbors (combined across clients).
-    #
-    #     Returns:
-    #         Union[List[Dict[str, int]], List[crypten.CrypTensor]]:
-    #             - If SMPC is disabled: returns a list of dictionaries (one per query) where each key is a label and
-    #               the value is the count of votes.
-    #             - If SMPC is enabled: returns a list of encrypted fixed-length vote vectors (CrypTensors),
-    #               where each index corresponds to a global label index.
-    #     """
-    #     votes = []
-    #     if self.smpc:
-    #         n_queries = global_nearest_samples.size(0)
-    #         local_ind = self.enc_celltype_ind_offset.unsqueeze(0)
-    #         # ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
-    #         ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device))
-    #         ct_labels_exp = ct_labels_enc.unsqueeze(0).expand(n_queries, self.n_samples)
-    #         for k in range(self.k):
-    #             sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
-    #             match_mask = (sample_k == local_ind)
-    #             votes.append((match_mask * ct_labels_exp).sum(dim=1).unsqueeze(1))
-    #         votes = crypten.cat(votes, dim=1)
-    #     else:
-    #         for query_sample in global_nearest_samples:
-    #             vote_counts = {}
-    #             for hash_value in query_sample:
-    #                 if hash_value in self.hash_index_map:
-    #                     local_index = self.hash_index_map[hash_value]
-    #                     label = self.adata.obs[self.celltype_key].values[local_index]
-    #                     if label not in vote_counts:
-    #                         vote_counts[label] = 0
-    #                     vote_counts[label] += 1
-    #             votes.append(vote_counts)
-    #     return votes
     def vote(self, global_nearest_samples):
-        import torch.nn.functional as F
-        n_queries = global_nearest_samples.size(0)
-        n_samples = self.n_samples
-        n_classes = len(self.label_to_index)
-        ct_labels = torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device)
-        ct_onehot_enc = crypten.cryptensor(F.one_hot(ct_labels, num_classes=n_classes).to(self.device))
-        local_idx_enc = self.enc_celltype_ind_offset.unsqueeze(0)
-        total_votes = None
-        for i in range(self.k):
-            idx_k = global_nearest_samples[:, i]
-            mask = idx_k.unsqueeze(1).expand(n_queries, n_samples)
-            match = (mask == local_idx_enc)
-            votes_k = (match.unsqueeze(2) * ct_onehot_enc.unsqueeze(0)).sum(dim=1)
-            total_votes = votes_k if total_votes is None else total_votes + votes_k
-        return total_votes
+        """
+       Perform per-query voting based on the client's local reference data.
+
+        For each query cell, votes are cast based on the labels of locally matched
+        reference cells whose hashed indices appear in the global nearest neighbor list.
+
+        Args:
+            global_nearest_samples (List[List[str]]):
+                A list where each element corresponds to a query cell and contains
+                the hashed indices of its top-k nearest neighbors (combined across clients).
+
+        Returns:
+            Union[List[Dict[str, int]], List[crypten.CrypTensor]]:
+                - If SMPC is disabled: returns a list of dictionaries (one per query) where each key is a label and
+                  the value is the count of votes.
+                - If SMPC is enabled: returns a list of encrypted fixed-length vote vectors (CrypTensors),
+                  where each index corresponds to a global label index.
+        """
+        votes = []
+        if self.smpc:
+            n_queries = global_nearest_samples.size(0)
+            local_ind = self.enc_celltype_ind_offset.unsqueeze(0)
+            # ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
+            ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device))
+            ct_labels_exp = ct_labels_enc.unsqueeze(0).expand(n_queries, self.n_samples)
+            for k in range(self.k):
+                sample_k = global_nearest_samples[:, k].unsqueeze(1).expand(n_queries, self.n_samples)
+                match_mask = (sample_k == local_ind)
+                votes.append((match_mask * ct_labels_exp).sum(dim=1).unsqueeze(1))
+            votes = crypten.cat(votes, dim=1)
+        else:
+            for query_sample in global_nearest_samples:
+                vote_counts = {}
+                for hash_value in query_sample:
+                    if hash_value in self.hash_index_map:
+                        local_index = self.hash_index_map[hash_value]
+                        label = self.adata.obs[self.celltype_key].values[local_index]
+                        if label not in vote_counts:
+                            vote_counts[label] = 0
+                        vote_counts[label] += 1
+                votes.append(vote_counts)
+        return votes
+
 
     def report_celltypes(self):
         """
@@ -336,20 +321,22 @@ class FedEmbedder(FedBase):
     #     return np.array(final_predictions)
 
     def aggregate_client_votes(self, client_votes):
-        if self.smpc:
-            total = crypten.stack(client_votes, dim=2).sum(dim=2)
-            pred, _ = total.max(dim=1)
-            labels = pred.get_plain_text().cpu().numpy().astype(int)
-            return np.array([self.index_to_label[i] for i in labels], dtype=object)
-        aggregated = [{} for _ in range(self.embed_query.shape[0])]
-        for votes in client_votes:
-            for i, vc in enumerate(votes):
-                for label, count in vc.items():
-                    aggregated[i][label] = aggregated[i].get(label, 0) + count
-        final = []
-        for vc in aggregated:
-            final.append(max(vc, key=vc.get) if vc else None)
-        return np.array(final, dtype=object)
+        # stack into (n_query, k, n_clients)
+        stacked = crypten.stack(client_votes, dim=2)
+        n_query, k, n_clients = stacked.size()
+        # flatten neighbor+client axis → (n_query, k * n_clients)
+        flat_votes = stacked.reshape(n_query, k * n_clients)
+        # count per class by eq+sum
+        n_classes = len(self.index_to_label)
+        counts = []
+        for c in range(n_classes):
+            mask = (flat_votes == c)  # MPCTensor (n_query, k*n_clients)
+            count = mask.sum(dim=1)  # MPCTensor (n_query,)
+            counts.append(count.unsqueeze(1))  # list of (n_query,1)
+        total_votes = crypten.cat(counts, dim=1)  # (n_query, n_classes)
+        pred, _ = total_votes.max(dim=1)
+        labels = pred.get_plain_text().cpu().numpy().astype(int)
+        return np.array([self.index_to_label[i] for i in labels], dtype=object)
 
     def federated_reference_map(self):
         """
