@@ -222,7 +222,6 @@ def load_config(file_path: str, task, verbose) -> Config:
     model_config = ModelConfig(**config_dict[task]['model'])
     log_config = LogConfig(**config_dict[task]['log'])
     dataset_config = DatasetConfig(**config_dict[task]['dataset'])
-    print(model_config)
     return Config(preprocess=preprocess_config,
                   train=train_config,
                   model=model_config,

@@ -23,7 +23,6 @@ class BaseMixin:
         self.output_dir = output_dir
         self.celltype_key = celltype_key
         self.batch_key = batch_key
-        print(config_file)
         self.config = load_config(config_file, task, verbose)
         print(self.config.model.embsize)
         if n_epochs:
