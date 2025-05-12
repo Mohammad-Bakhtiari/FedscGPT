@@ -205,6 +205,7 @@ class FedEmbedder(FedBase):
         self.index_to_label = None
         self.smpc = smpc
         self.k = k
+        self.n_classes = None
         adata = read_h5ad(data_dir, reference_adata)
         self.distribute_adata_by_batch(adata, kwargs['batch_key'], keep_vars=True)
         self.celltype_key = kwargs['celltype_key']
@@ -219,6 +220,7 @@ class FedEmbedder(FedBase):
                                     **kwargs)
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
+        self.n_query_samples = self.query.shape[0]
         if self.smpc:
             embed_query = torch.tensor(self.embed_query.obsm["X_scGPT"], dtype=torch.float32, device=self.device)
             self.embed_query.obsm['secure_embed'] = crypten.cryptensor(embed_query)
@@ -294,9 +296,14 @@ class FedEmbedder(FedBase):
         if self.smpc:
             import pdb; pdb.set_trace()
             aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
-            pred_labels, _ = aggregated_votes.max(dim=1)
-            pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
-            pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels_plain], dtype=object)
+            flat_indices = aggregated_votes.view(-1).unsqueeze(1)
+            class_range = torch.arange(self.n_classes, dtype=torch.long, device=self.device).view(1, -1)
+            enc_one_hot = (flat_indices == class_range).view(self.n_query_samples, self.k, self.n_classes)
+            _, arg_max = enc_one_hot.sum(dim=1).max(dim=1)
+            pred_labels = (arg_max.get_plain_text().argmax(dim=1) + 1).cpu().numpy().astype('int')
+            # pred_labels, _ = aggregated_votes.max(dim=1)
+            # pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
+            pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels], dtype=object)
             return pred_labels_plain
 
         aggregated_votes = [{} for _ in range(self.embed_query.shape[0])]
@@ -363,6 +370,7 @@ class FedEmbedder(FedBase):
         sorted_labels = sorted(list(all_labels))
         self.label_to_index = {label: idx for idx, label in enumerate(sorted_labels, 1)}
         self.index_to_label = {idx: label for label, idx in self.label_to_index.items()}
+        self.n_classes = len(self.label_to_index)
         if self.smpc:
             self.aggregate_total_n_samples()
             client_offset = 0
