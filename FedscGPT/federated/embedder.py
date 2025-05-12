@@ -281,58 +281,44 @@ class FedEmbedder(FedBase):
         k_nearest_samples = crypten.cat(top_k_indices, dim=1)
         return k_nearest_samples
 
-    # def aggregate_client_votes(self, client_votes):
-    #     """
-    #     Aggregate the vote counts from all clients.
-    #
-    #     Args:
-    #         client_votes (list of dict): A list of dictionaries containing vote counts from each client.
-    #
-    #     Returns:
-    #         np.ndarray: The final predicted labels for the query data.
-    #     """
-    #     if self.smpc:
-    #         import pdb; pdb.set_trace()
-    #         aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
-    #         pred_labels, _ = aggregated_votes.max(dim=1)
-    #         pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
-    #         pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels_plain], dtype=object)
-    #         return pred_labels_plain
-    #
-    #     aggregated_votes = [{} for _ in range(self.embed_query.shape[0])]
-    #     for client_vote in client_votes:
-    #         for r, sample in enumerate(client_vote):
-    #             for label, count in sample.items():
-    #                 temp = aggregated_votes[r]
-    #                 if label not in temp:
-    #                     temp[label] = 0
-    #                 temp[label] += count
-    #                 aggregated_votes[r] = temp
-    #
-    #     # Determine the label with the most votes for each query point
-    #     final_predictions = []
-    #     for r in range(self.embed_query.shape[0]):
-    #         if aggregated_votes[r]:
-    #             final_label = max(aggregated_votes[r], key=aggregated_votes[r].get)
-    #             final_predictions.append(final_label)
-    #         else:
-    #             final_predictions.append(None)  # Handle cases where there are no votes
-    #
-    #     return np.array(final_predictions)
-
     def aggregate_client_votes(self, client_votes):
-        stacked = crypten.stack(client_votes, dim=2)  # (n_q, k, n_c)
-        flat_votes = stacked.flatten(1, 2)  # (n_q, k*n_c)
+        """
+        Aggregate the vote counts from all clients.
 
-        # assume 0..n_classes-1
-        n_classes = len(self.index_to_label)
-        class_ids = torch.arange(n_classes, device=self.device, dtype=torch.long)
-        eq_mask = flat_votes.unsqueeze(2).eq(class_ids)  # (n_q, k*n_c, n_classes)
-        total = eq_mask.sum(dim=1)  # (n_q, n_classes)
+        Args:
+            client_votes (list of dict): A list of dictionaries containing vote counts from each client.
 
-        pred, _ = total.max(dim=1)
-        labels = pred.get_plain_text().cpu().numpy().astype(int)
-        return np.array([self.index_to_label[i] for i in labels], dtype=object)
+        Returns:
+            np.ndarray: The final predicted labels for the query data.
+        """
+        if self.smpc:
+            # import pdb; pdb.set_trace()
+            aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
+            pred_labels, _ = aggregated_votes.max(dim=1)
+            pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
+            pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels_plain], dtype=object)
+            return pred_labels_plain
+
+        aggregated_votes = [{} for _ in range(self.embed_query.shape[0])]
+        for client_vote in client_votes:
+            for r, sample in enumerate(client_vote):
+                for label, count in sample.items():
+                    temp = aggregated_votes[r]
+                    if label not in temp:
+                        temp[label] = 0
+                    temp[label] += count
+                    aggregated_votes[r] = temp
+
+        # Determine the label with the most votes for each query point
+        final_predictions = []
+        for r in range(self.embed_query.shape[0]):
+            if aggregated_votes[r]:
+                final_label = max(aggregated_votes[r], key=aggregated_votes[r].get)
+                final_predictions.append(final_label)
+            else:
+                final_predictions.append(None)  # Handle cases where there are no votes
+
+        return np.array(final_predictions)
 
     def federated_reference_map(self):
         """
