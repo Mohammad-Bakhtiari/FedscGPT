@@ -1,18 +1,18 @@
-import scgpt as scg
 import faiss
 import hashlib
 import numpy as np
 import torch
 import crypten
-from FedscGPT.base import FedBase, BaseMixin
-from FedscGPT.utils import (read_h5ad, concat_encrypted_distances, top_k_encrypted_distances,
-                            get_plain_indices, top_k_ind_selection, encrypted_present_hashes, save_data_batches)
+from FedscGPT.base import FedBase
+from FedscGPT.utils import read_h5ad, top_k_encrypted_distances, top_k_ind_selection
 from FedscGPT.centralized.embedder import Embedder
 
 
 class ClientEmbedder(Embedder):
     def __init__(self, smpc=False, **kwargs):
         super().__init__(**kwargs)
+        self.ind_offset = None
+        self.mapped_ct = None
         self.enc_celltype_ind_offset = None
         self.celltype_ind_offset = None
         self.label_to_index = None
@@ -41,7 +41,7 @@ class ClientEmbedder(Embedder):
         """
         if self.smpc:
             return self.compute_squared_distances(query_embeddings)
-        # Perform local similarity search using faiss
+
         index = faiss.IndexFlatL2(self.embed_adata.obsm["X_scGPT"].shape[1])
         index.add(self.embed_adata.obsm["X_scGPT"])
         D, I = index.search(query_embeddings, self.k)
@@ -57,20 +57,16 @@ class ClientEmbedder(Embedder):
             encrypted_topk (CrypTensor): shape (n_query, k)
             hashed_indices (list of list of str): shape (n_query, k)
         """
-        # distances = []
         reference = torch.tensor(
             self.embed_adata.obsm["X_scGPT"],
             dtype=torch.float32,
             device=self.device,
         )
         reference = crypten.cryptensor(reference)
-        query_norm = secure_embeddings.square().sum(dim=1).unsqueeze(1)  # (n_query, 1)
-        ref_norm = reference.square().sum(dim=1).unsqueeze(0)  # (1, n_ref)
+        query_norm = secure_embeddings.square().sum(dim=1).unsqueeze(1)
+        ref_norm = reference.square().sum(dim=1).unsqueeze(0)
+        cross = secure_embeddings @ reference.transpose(0, 1)
 
-        # Step 2: Compute dot product
-        cross = secure_embeddings @ reference.transpose(0, 1)  # (n_query, n_ref)
-
-        # Step 3: Compute pairwise distances: ||x - y||² = ||x||² + ||y||² - 2x·y
         distances = query_norm + ref_norm - 2 * cross
         del reference, query_norm, ref_norm, cross
         encrypted_topk, topk_indices = top_k_encrypted_distances(distances, self.k)
@@ -97,10 +93,9 @@ class ClientEmbedder(Embedder):
         for query_set in indices:
             hash_list = []
             for index in query_set:
-                # Include client-specific salt in the hash
                 index_hash = hashlib.sha256(f"{client_salt}-{index}".encode()).hexdigest()
                 hash_list.append(index_hash)
-                self.hash_index_map[index_hash] = index  # Store the map locally
+                self.hash_index_map[index_hash] = index
             hash_I.append(hash_list)
 
         return hash_I
@@ -141,7 +136,6 @@ class ClientEmbedder(Embedder):
         if self.smpc:
             n_queries = global_nearest_samples.size(0)
             local_ind = self.enc_celltype_ind_offset.unsqueeze(0)
-            # ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.float32, device=self.device))
             ct_labels_enc = crypten.cryptensor(torch.tensor(self.mapped_ct, dtype=torch.long, device=self.device))
             ct_labels_exp = ct_labels_enc.unsqueeze(0).expand(n_queries, self.n_samples)
             for k in range(self.k):
@@ -181,14 +175,10 @@ class ClientEmbedder(Embedder):
             global_label_to_index (dict): Maps each cell type string to a unique integer index.
             ind_offset (int): Offset to make local labels globally unique.
         """
-        # TODO: Check its effect on fedetated without SMPC
         self.label_to_index = global_label_to_index
         cell_types = self.embed_adata.obs[self.celltype_key].values
         self.mapped_ct = [global_label_to_index[ct] for ct in cell_types]
         self.ind_offset = ind_offset
-        # global_indices =  np.arange(self.n_samples)+ ind_offset
-        # self.celltype_ind_offset = global_indices
-        # self.enc_celltype_ind_offset = crypten.cryptensor(torch.tensor(global_indices, dtype=torch.float32, device=self.device))
         if self.smpc:
             global_indices = torch.arange(self.n_samples, dtype=torch.long, device=self.device) + ind_offset
             self.enc_celltype_ind_offset = crypten.cryptensor(global_indices)
@@ -201,6 +191,7 @@ class ClientEmbedder(Embedder):
 class FedEmbedder(FedBase):
     def __init__(self, data_dir, reference_adata, query_adata, output_dir, k, smpc=False, **kwargs):
         super().__init__(data_dir=data_dir, output_dir=output_dir, **kwargs)
+        self.total_n_samples = None
         self.label_to_index = None
         self.index_to_label = None
         self.smpc = smpc
@@ -271,10 +262,13 @@ class FedEmbedder(FedBase):
 
         Args:
             client_distances (list of CrypTensor): Encrypted local top-k distance matrices from clients.
-            client_hashes (list of list of list of str): Corresponding hashed reference indices.
 
         Returns:
             list[list[str]]: Global top-k hashed reference IDs for each query cell.
+
+        Parameters
+        ----------
+        client_indices
         """
         distances = crypten.cat(client_distances, dim=1)
         indices = crypten.cat(client_indices, dim=1)
@@ -300,8 +294,6 @@ class FedEmbedder(FedBase):
             enc_one_hot = (flat_indices == class_range).view(self.n_query_samples, self.k, self.n_classes)
             _, arg_max = enc_one_hot.sum(dim=1).max(dim=1)
             pred_labels = arg_max.get_plain_text().argmax(dim=1).cpu().numpy().astype('int')
-            # pred_labels, _ = aggregated_votes.max(dim=1)
-            # pred_labels_plain = pred_labels.get_plain_text().cpu().numpy().astype('int')
             pred_labels_plain = np.array([self.index_to_label[label] for label in pred_labels], dtype=object)
             return pred_labels_plain
 
@@ -315,7 +307,6 @@ class FedEmbedder(FedBase):
                     temp[label] += count
                     aggregated_votes[r] = temp
 
-        # Determine the label with the most votes for each query point
         final_predictions = []
         for r in range(self.embed_query.shape[0]):
             if aggregated_votes[r]:
@@ -341,11 +332,9 @@ class FedEmbedder(FedBase):
             client_distances.append(distances)
             client_indices.append(indices)
 
-        # Aggregate distances and perform majority voting
         k_nearest_samples = self.global_aggregate_distances(client_distances, client_indices)
         client_votes = []
 
-        # Each client computes votes based on the query embeddings
         for client in self.clients:
             votes = client.vote(k_nearest_samples)
             client_votes.append(votes)
