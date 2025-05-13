@@ -1,5 +1,6 @@
 #!/bin/bash
 smpc="${1-true}"
+GPU=${2-0}
 
 # Declare an associative array to store dataset configurations
 declare -A datasets
@@ -12,7 +13,6 @@ datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|com
 
 root_dir="$(dirname "$PWD")"
 INTI_WEIGHTS_DIR="${root_dir}/init_weights"
-GPU=0
 N_ROUNDS=20
 smpc_subdir=""
 if [ "$smpc" == "true" ]; then
