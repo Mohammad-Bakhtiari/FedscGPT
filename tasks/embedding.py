@@ -56,7 +56,7 @@ def clients_local_embedding(**kwargs):
     fed_embedder = FedEmbedder(**kwargs)
     print(f"Embedding query adata for {len(fed_embedder.clients)} clients.")
     for client in fed_embedder.clients:
-        client.embed_adata_file()
+        # client.embed_adata_file()
         plot_embedding(client.embed_adata,
                        fed_embedder.embed_query,
                        cell_type_key=kwargs['celltype_key'],
