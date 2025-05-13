@@ -1041,39 +1041,82 @@ def check_weights_nan(weights, when, debug):
 
 
 def concat_encrypted_distances(distances):
+    """
+    Concatenate a list of encrypted distance tensors along the feature dimension.
+
+    Parameters
+    ----------
+    distances : list of crypten.CrypTensor
+        List of encrypted distance tensors, each of shape (n_query, k_i).
+
+    Returns
+    -------
+    crypten.CrypTensor
+        Concatenated encrypted distances with shape (n_query, sum(k_i)).
+    """
     return crypten.cat(distances, dim=1)
 
 
 def suppress_argmin(dist_matrix, argmin_onehot, batch_size=128, large_val=1e9):
     """
-    Securely suppresses the minimum value in each row of an encrypted distance matrix
-    by replacing it with a large value. This is done using one-hot masking.
-    Args:
-        dist_matrix (CrypTensor): shape (n_query, n_ref)
-        argmin (CrypTensor): shape (n_query,) — index of min value in each row (encrypted)
-        batch_size (int): number of rows per batch to reduce memory load
-        large_val (float): value used to mask the argmin entries
-    Returns:
-        CrypTensor: updated encrypted matrix with suppressed minimum values.
+    Securely suppress the minimum value in each row of an encrypted distance matrix by masking.
+
+    This replaces the current minimum in each query row with a large value to exclude it
+    from subsequent minimum searches, using one-hot encoded masks in batches for efficiency.
+
+    Parameters
+    ----------
+    dist_matrix : crypten.CrypTensor
+        Encrypted distance matrix, shape (n_query, n_ref).
+    argmin_onehot : crypten.CrypTensor or torch.Tensor
+        One-hot mask tensor indicating positions of the current minimum values.
+        Shape (n_query, n_ref).
+    batch_size : int, optional
+        Number of rows to process per batch. Default is 128.
+    large_val : float, optional
+        Large value to add at masked positions. Default is 1e9.
+
+    Returns
+    -------
+    crypten.CrypTensor
+        Encrypted distance matrix with minimum values suppressed, shape (n_query, n_ref).
     """
     n_query, n_ref = dist_matrix.size()
-    large_val_enc = crypten.cryptensor(torch.tensor(large_val, device=dist_matrix.device))
+    large_val_enc = crypten.cryptensor(
+        torch.tensor(large_val, device=dist_matrix.device)
+    )
     updated_batches = []
     for start in range(0, n_query, batch_size):
         end = min(start + batch_size, n_query)
         dist_batch = dist_matrix[start:end]  # (bs, n_ref)
         mask_batch = argmin_onehot[start:end]  # (bs, n_ref)
-        updated = dist_batch + mask_batch * large_val_enc  # Masked add
+        updated = dist_batch + mask_batch * large_val_enc
         updated_batches.append(updated)
 
     return crypten.cat(updated_batches, dim=0)
 
 
-
-
-
-
 def top_k_encrypted_distances(encrypted_dist_matrix, k):
+    """
+    Extract the top-k smallest encrypted distances from each query to references.
+
+    This uses one-hot index selection to mask out other distances.
+
+    Parameters
+    ----------
+    encrypted_dist_matrix : crypten.CrypTensor
+        Encrypted squared distance matrix, shape (n_query, n_ref).
+    k : int
+        Number of smallest distances to extract per query.
+
+    Returns
+    -------
+    encrypted_topk : crypten.CrypTensor
+        Encrypted tensor of top-k distances per query, shape (n_query, k).
+    topk_indices : list of crypten.CrypTensor
+        List of one-hot index masks for each of the k smallest distances,
+        each mask of shape (n_query, n_ref).
+    """
     topk_indices = top_k_ind_selection(encrypted_dist_matrix.clone(), k)
     encrypted_topk = (encrypted_dist_matrix * topk_indices[0]).sum(dim=1, keepdim=True)
     for i in range(1, k):
@@ -1083,31 +1126,72 @@ def top_k_encrypted_distances(encrypted_dist_matrix, k):
 
 
 def top_k_ind_selection(dist_matrix, k):
-    topk_indices = []
+    """
+    Securely select one-hot masks for the k smallest entries in each row.
+
+    Iteratively finds the minimum entry, masks it, and repeats to build k masks.
+
+    Parameters
+    ----------
+    dist_matrix : crypten.CrypTensor
+        Encrypted distance matrix, shape (n_query, n_ref).
+    k : int
+        Number of minima to select per query.
+
+    Returns
+    -------
+    list of crypten.CrypTensor
+        List of k one-hot mask tensors, each of shape (n_query, n_ref),
+        where True (1) indicates the position of the i-th smallest value.
+    """
+    masks = []
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
-        topk_indices.append(argmin)
-        dist_matrix = suppress_argmin(dist_matrix, argmin)
-    return topk_indices
+        onehot = crypten.one_hot(argmin, num_classes=dist_matrix.size(1))
+        masks.append(onehot)
+        dist_matrix = suppress_argmin(dist_matrix, onehot)
+    return masks
 
 
 def get_plain_indices(topk_indices):
     """
-    Converts a list of CrypTensors representing top-k indices to a NumPy array.
+    Decrypt and collect top-k index selections into a NumPy array.
 
-    Args:
-        topk_indices (list of CrypTensor): List of (n_query,) encrypted index tensors.
+    Parameters
+    ----------
+    topk_indices : list of crypten.CrypTensor
+        List of encrypted index masks, each of shape (n_query,) indicating positions.
 
-    Returns:
-        np.ndarray: Shape (n_query, k), decrypted indices.
+    Returns
+    -------
+    np.ndarray
+        Decrypted indices array of shape (n_query, k).
     """
-    topk_indices_tensor = crypten.stack(topk_indices, dim=1)  # shape: (n_query, k)
-    topk_indices_plain = topk_indices_tensor.get_plain_text().long().cpu().numpy()
-    return topk_indices_plain
+    topk_tensor = crypten.stack(topk_indices, dim=1)
+    return topk_tensor.get_plain_text().long().cpu().numpy()
+
 
 def encrypted_present_hashes(hash_to_index, labels):
+    """
+    Encode presence of string labels as an encrypted binary vector using SHA-256 hashes.
+
+    Maps each provided label to its hashed index in the hash_to_index map,
+    setting corresponding positions to 1, others remain 0.
+
+    Parameters
+    ----------
+    hash_to_index : dict
+        Mapping from SHA-256 hex hash strings to integer indices.
+    labels : list of str
+        Sequence of label strings to encode.
+
+    Returns
+    -------
+    crypten.CrypTensor
+        Encrypted binary presence vector of length len(hash_to_index).
+    """
     hashed = [hashlib.sha256(l.encode()).hexdigest() for l in labels]
-    presence = torch.zeros(len(hash_to_index))
+    presence = torch.zeros(len(hash_to_index), dtype=torch.float32)
     for h in hashed:
         idx = hash_to_index[h]
         presence[idx] = 1
