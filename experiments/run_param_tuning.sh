@@ -12,7 +12,7 @@ datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 
 root_dir="$(dirname "$PWD")"
-INTI_WEIGHTS_DIR="${root_dir}/init_weights"
+INTI_WEIGHTS_DIR="${root_dir}/models/init"
 N_ROUNDS=20
 smpc_subdir=""
 if [ "$smpc" == "true" ]; then
@@ -27,7 +27,7 @@ for key in "${!datasets[@]}"; do
         IFS='|' read -r -a args <<< "${datasets[$key]}"
 
         # Set up directory paths
-        data_dir="${root_dir}/data/benchmark/${args[0]}"
+        data_dir="${root_dir}/data/scgpt/benchmark/${args[0]}"
         reference="${data_dir}/${args[1]}"
         query="${data_dir}/${args[2]}"
         output="${root_dir}/output/annotation/${args[0]}/param_tuning${smpc_subdir}"
@@ -43,7 +43,7 @@ for key in "${!datasets[@]}"; do
          --batch_key ${args[4]} \
          --mode federated_finetune \
          --gpu $GPU \
-         --pretrained_model_dir ${root_dir}/pretrained_models/scGPT_human \
+         --pretrained_model_dir ${root_dir}/models/pretrained_models/scGPT_human \
          --config_file ${root_dir}/experiments/configs/annotation/config.yml \
          --fed_config_file ${root_dir}/experiments/configs/annotation/fed_config.yml \
          --n_epochs $epoch \
