@@ -39,8 +39,8 @@ for key in "${!datasets[@]}"; do
          --reference_adata $reference \
          --query_adata $query \
          --output-dir $output \
-         --celltype_key \"$celltype_key\" \
-         --batch_key \"$batch_key\" \
+         --celltype_key \"${args[3]}\" \
+         --batch_key \"${args[4]}\" \
          --mode federated_finetune \
          --gpu $GPU \
          --pretrained_model_dir ${root_dir}/models/pretrained_models/scGPT_human \
