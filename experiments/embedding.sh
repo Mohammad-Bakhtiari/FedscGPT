@@ -17,9 +17,9 @@ echo "Args: mode: $mode, dataset: $dataset, reference_file: $reference_file, que
 root_dir="$(dirname "$PWD")"
 
 directory_mode="centralized"
+smpc_subdir=""
 if [[ "$mode" == *"federated"* ]]; then
   directory_mode="federated"
-  smpc_subdir=""
   if [ "$smpc" == "true" ]; then
       smpc_subdir="/smpc"
   fi
