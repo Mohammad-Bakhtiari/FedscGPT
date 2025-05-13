@@ -371,13 +371,6 @@ class FedEmbedder(FedBase):
         """
         if self.smpc:
             aggregated_votes = crypten.stack(client_votes, dim=2).sum(dim=2)
-
-            # flat_indices = aggregated_votes.view(-1).unsqueeze(1)
-            # class_range = torch.arange(self.n_classes, dtype=torch.long, device=self.device).view(1, -1)
-            # enc_one_hot = (flat_indices == class_range).view(self.n_query_samples, self.k, self.n_classes)
-            # _, arg_max = enc_one_hot.sum(dim=1).max(dim=1)
-            # pred_ind = arg_max.get_plain_text().argmax(dim=1).cpu().numpy().astype('int')
-
             class_range_enc = crypten.cryptensor(torch.arange(1, self.n_classes+1, device=self.device, dtype=torch.long))
             nq, k = aggregated_votes.size()
             labels_exp = aggregated_votes.unsqueeze(2).expand(nq, k, self.n_classes)
@@ -385,10 +378,6 @@ class FedEmbedder(FedBase):
             vote_counts = labels_exp.eq(classes_exp).sum(dim=1)
             _, argmax = vote_counts.max(dim=1)
             pred_ind = argmax.get_plain_text().argmax(dim=1).cpu().numpy().astype('int') + 1
-
-
-            # import pdb; pdb.set_trace()
-            # mode = aggregated_votes.get_plain_text().mode(dim=1).values.cpu().numpy().astype('int')
             pred_labels_plain = np.array([self.index_to_label[ind] for ind in pred_ind], dtype=object)
 
 
