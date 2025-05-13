@@ -9,21 +9,21 @@ chmod +x run_annotation.sh
 ./run_annotation.sh centralized_clients 20
 
 chmod +x run_embedding.sh
-echo "-------------------------------------"
-echo "Running embedding for all modes"
-echo "-------------------------------------"
-echo "Running embedding for centralized"
-echo "-------------------------------------"
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running embedding for all modes\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for centralized\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
 ./run_embedding.sh centralized
-echo "-------------------------------------"
-echo "Running embedding for federated without SMPC"
-echo "-------------------------------------"
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for federated without SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
 ./run_embedding.sh federated_zeroshot
-echo "-------------------------------------"
-echo "Running embedding for federated with SMPC"
-echo "-------------------------------------"
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for federated with SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
 ./run_embedding.sh federated_zeroshot true
-echo "-------------------------------------"
-echo "Running embedding for clients local training"
-echo "-------------------------------------"
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for clients local training\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
 ./run_embedding.sh centralized_clients
