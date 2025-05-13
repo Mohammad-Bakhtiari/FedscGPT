@@ -1144,13 +1144,12 @@ def top_k_ind_selection(dist_matrix, k):
         List of k one-hot mask tensors, each of shape (n_query, n_ref),
         where True (1) indicates the position of the i-th smallest value.
     """
-    masks = []
+    topk_indices = []
     for _ in range(k):
         _, argmin = dist_matrix.min(dim=1)
-        onehot = crypten.one_hot(argmin, num_classes=dist_matrix.size(1))
-        masks.append(onehot)
-        dist_matrix = suppress_argmin(dist_matrix, onehot)
-    return masks
+        topk_indices.append(argmin)
+        dist_matrix = suppress_argmin(dist_matrix, argmin)
+    return topk_indices
 
 
 def get_plain_indices(topk_indices):
