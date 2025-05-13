@@ -379,8 +379,6 @@ class FedEmbedder(FedBase):
             _, argmax = vote_counts.max(dim=1)
             pred_ind = argmax.get_plain_text().argmax(dim=1).cpu().numpy().astype('int') + 1
             pred_labels_plain = np.array([self.index_to_label[ind] for ind in pred_ind], dtype=object)
-
-
             return pred_labels_plain
 
         aggregated_votes = [{} for _ in range(self.embed_query.shape[0])]
