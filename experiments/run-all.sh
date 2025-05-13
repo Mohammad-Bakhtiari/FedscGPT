@@ -1,12 +1,38 @@
 #!/bin/bash
-
+GPU=0
 chmod +x run_param_tuning.sh
-./run_param_tuning.sh
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running parameter tuning for FedscGPT with SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_param_tuning.sh true
 
 chmod +x run_annotation.sh
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running centralized annotation with scGPT\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
 ./run_annotation.sh centralized_finetune_inference 20
 
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running local clients annotation with scGPT\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
 ./run_annotation.sh centralized_clients 20
+
+chmod +x annotation.sh
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running annotation with FedscGPT without SMPC on MS dataset for two local epochs and seven rounds\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./annotation.sh federated_finetune ms reference.h5ad query.h5ad "Factor Value[inferred cell type - authors labels]" "Factor Value[sampling site]" 2 7 $GPU false
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running annotation with FedscGPT without SMPC on HP dataset for one local epoch and three rounds\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./annotation.sh federated_finetune hp reference_refined.h5ad query.h5ad Celltype batch 1 3 $GPU false
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running annotation with FedscGPT without SMPC on Myeloid dataset for four local epochs and one round\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./annotation.sh federated_finetune myeloid reference_adata.h5ad query_adata.h5ad combined_celltypes top4+rest 4 1 $GPU false
+
 
 chmod +x run_embedding.sh
 echo -e "\e[34m-------------------------------------\e[0m"
