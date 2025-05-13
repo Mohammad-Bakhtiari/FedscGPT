@@ -2,6 +2,7 @@
 
 # Assign command-line arguments to variables
 mode="$1"
+smpc="${2-false}"
 
 # Make the annotation.sh script executable
 chmod +x embedding.sh
@@ -13,9 +14,6 @@ GPU=0
 
 # Add dataset configurations
 # format: data_folder|adata_file|test_adata_file|celltype_key|gene_col|gpu
-#datasets["COVID"]="covid|reference.h5ad|query.h5ad|celltype|batch|gene_name"
-#datasets["LUNG"]="lung|reference.h5ad|query.h5ad|cell_type|source|gene_name"
-
 datasets["COVID"]="covid|reference.h5ad|query.h5ad|celltype|str_batch|gene_name"
 datasets["LUNG"]="lung|reference.h5ad|query.h5ad|cell_type|sample|gene_name"
 
@@ -30,8 +28,8 @@ for key in "${!datasets[@]}"; do
     echo "Arguments: ${args[0]} ${args[1]} ${args[2]} ${args[3]} ${args[4]} ${args[5]}"
 
     # Call the annotation.sh script with the appropriate arguments
-    # order: mode, data_folder, adata_file, test_adata_file, celltype_key, batch_key, gpu
-    ./embedding.sh "${mode}" "${args[0]}" "${args[1]}" "${args[2]}" "${args[3]}" "${args[4]}" "${args[5]}" "${GPU}"
+    # order: mode, data_folder, adata_file, test_adata_file, celltype_key, batch_key, gpu, SMPC
+    ./embedding.sh "${mode}" "${args[0]}" "${args[1]}" "${args[2]}" "${args[3]}" "${args[4]}" "${args[5]}" "${GPU}" "${smpc}"
 
     # Check for errors in the execution of the script
     if [ $? -ne 0 ]; then
