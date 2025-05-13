@@ -3,6 +3,7 @@
 # Assign command-line arguments to variables
 mode="$1"
 smpc="${2-false}"
+GPU="${3-0}"
 
 # Make the annotation.sh script executable
 chmod +x embedding.sh
@@ -10,7 +11,7 @@ chmod +x embedding.sh
 # Declare an associative array to store dataset configurations
 declare -A datasets
 
-GPU=0
+
 
 # Add dataset configurations
 # format: data_folder|adata_file|test_adata_file|celltype_key|gene_col|gpu
