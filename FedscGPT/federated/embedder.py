@@ -384,11 +384,11 @@ class FedEmbedder(FedBase):
             classes_exp = class_range_enc.unsqueeze(0).unsqueeze(0).expand(nq, k, self.n_classes)
             vote_counts = labels_exp.eq(classes_exp).sum(dim=1)
             _, argmax = vote_counts.max(dim=1)
-            pred_ind = argmax.get_plain_text().argmax(dim=1).cpu().numpy().astype('int')
+            pred_ind = argmax.get_plain_text().argmax(dim=1).cpu().numpy().astype('int') + 1
 
 
-            import pdb; pdb.set_trace()
-            # pred_ind = aggregated_votes.get_plain_text().mode(dim=1).values.cpu().numpy().astype('int')
+            # import pdb; pdb.set_trace()
+            # mode = aggregated_votes.get_plain_text().mode(dim=1).values.cpu().numpy().astype('int')
             pred_labels_plain = np.array([self.index_to_label[ind] for ind in pred_ind], dtype=object)
 
 
