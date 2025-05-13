@@ -2,8 +2,9 @@
 
 # Assign command-line arguments to variables
 mode="$1"
-n_epochs="${2}"
-n_rounds="${3}"
+n_epochs="$2"
+n_rounds="$3"
+smpc="${4-false}"
 
 # Make the annotation.sh script executable
 chmod +x annotation.sh
@@ -23,15 +24,17 @@ echo "Running annotation for ${mode}"
 
 # Loop through each dataset configuration
 for key in "${!datasets[@]}"; do
-    echo -e "\e[34mRunning data annotation for $key\e[0m"
+    echo -e "\e[32m******************************************\e[0m"
+    echo -e "\e[32mRunning annotation for $key dataset [SMPC is ${smpc}]\e[0m"
 
     # Read dataset configuration into an array using the custom delimiter
     IFS='|' read -r -a args <<< "${datasets[$key]}"
-    echo "Arguments: ${args[0]} ${args[1]} ${args[2]} ${args[3]} ${args[4]} ${args[5]}"
+    echo -e "\e[32mArguments: ${args[0]} ${args[1]} ${args[2]} ${args[3]} ${args[4]} ${args[5]}\e[0m"
+    echo -e "\e[32m******************************************\e[0m"
 
     # Call the annotation.sh script with the appropriate arguments
     # order: mode, data_folder, adata_file, test_adata_file, celltype_key, batch_key, gpu
-    ./annotation.sh "${mode}" "${args[0]}" "${args[1]}" "${args[2]}" "${args[3]}" "${args[4]}" "${GPU}" "${n_epochs}" "${n_rounds}"
+    ./annotation.sh "${mode}" "${args[0]}" "${args[1]}" "${args[2]}" "${args[3]}" "${args[4]}" "${GPU}" "${n_epochs}" "${n_rounds}" "${smpc}"
 
     # Check for errors in the execution of the script
     if [ $? -ne 0 ]; then
@@ -39,5 +42,3 @@ for key in "${!datasets[@]}"; do
         continue
     fi
 done
-
-echo -e "\e[33Data annotation completed for all datasets.\e[0m"
