@@ -24,7 +24,6 @@ class BaseMixin:
         self.celltype_key = celltype_key
         self.batch_key = batch_key
         self.config = load_config(config_file, task, verbose)
-        print(self.config.model.embsize)
         if n_epochs:
             self.config.train.epochs = n_epochs
         self.logger = get_logger(output_dir) if logger is None else logger
