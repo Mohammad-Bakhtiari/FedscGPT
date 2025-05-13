@@ -1,7 +1,8 @@
 import __init__
+import pickle
 from FedscGPT.centralized.embedder import Embedder
 from FedscGPT.federated.embedder import FedEmbedder
-from FedscGPT.utils import plot_embedding, eval_reference_mapping, set_seed
+from FedscGPT.utils import plot_embedding, eval_reference_mapping, set_seed, dump_predictions
 from args import instantiate_args, add_observation_args, add_federated_embedding_args
 
 
@@ -16,6 +17,7 @@ def federated_zero_shot_embedding(**kwargs):
     """
     embedder = FedEmbedder(**kwargs)
     gt, preds = embedder.federated_reference_map()
+    dump_predictions(preds, kwargs['output_dir'])
     eval_reference_mapping(gt, preds, kwargs['output_dir'], embedder.logger.federated)
 
 

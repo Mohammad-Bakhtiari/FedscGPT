@@ -1196,3 +1196,17 @@ def encrypted_present_hashes(hash_to_index, labels):
         idx = hash_to_index[h]
         presence[idx] = 1
     return crypten.cryptensor(presence)
+
+def dump_predictions(preds, path):
+    """
+    Save predictions to a CSV file.
+
+    Parameters
+    ----------
+    preds : list of str
+        List of predicted labels.
+    path : str
+        Path to save the CSV file.
+    """
+    df = pd.DataFrame(preds, columns=["predictions"])
+    df.to_csv(f"{path}/preds.csv", index=False)
