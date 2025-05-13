@@ -42,8 +42,8 @@ cmd="python ${root_dir}/tasks/annotation.py \
  --reference_adata $reference \
  --query_adata $query \
  --output-dir $output \
- --celltype_key $celltype_key \
- --batch_key $batch_key \
+ --celltype_key \"$celltype_key\" \
+ --batch_key \"$batch_key\" \
  --mode $mode \
  --gpu $gpu \
  --pretrained_model_dir ${root_dir}/models/pretrained_models/scGPT_human \
