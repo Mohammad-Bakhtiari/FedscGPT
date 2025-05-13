@@ -376,7 +376,7 @@ class FedEmbedder(FedBase):
             # enc_one_hot = (flat_indices == class_range).view(self.n_query_samples, self.k, self.n_classes)
             # _, arg_max = enc_one_hot.sum(dim=1).max(dim=1)
             # pred_ind = arg_max.get_plain_text().argmax(dim=1).cpu().numpy().astype('int')
-            # import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
             pred_ind = aggregated_votes.get_plain_text().mode(dim=1).values.cpu().numpy().astype('int')
             pred_labels_plain = np.array([self.index_to_label[ind] for ind in pred_ind], dtype=object)
 
