@@ -1269,7 +1269,7 @@ def plot_umap_legend(
         palette=cmap_batches,
         show=False,
     )
-    handles, labels = plt.get_legend_handles_labels()
+    handles, labels = plt.gca().get_legend_handles_labels()
     plt.close()
 
     sorted_bt = sorted(zip(handles, labels), key=lambda x: u_batches.index(x[1]))
@@ -1289,3 +1289,4 @@ def plot_umap_legend(
     plt.savefig(bt_fp, dpi=300, format=img_format, bbox_inches='tight')
     plt.close()
     print(f"  → saved batch legend {bt_fp}")
+
