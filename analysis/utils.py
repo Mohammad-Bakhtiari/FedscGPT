@@ -998,6 +998,50 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
         # regenerate legend (assumed your helper handles all markers/lines)
         plot_legend(plots_dir, img_format)
 
+def plot_legend(plots_dir, img_format='svg'):
+    """
+    Plot a separate figure containing only the legend for:
+      – scGPT (centralized)
+      – FedscGPT (federated)
+      – FedscGPT-SMPC (federated + SMPC)
+      – Clients
+      – Other approaches
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    plt.figure(figsize=(6, 1.5))
+
+    legend_elements = [
+        Line2D([0], [0],
+               color='black', lw=2, linestyle='--',
+               label='scGPT (Centralized)'),
+        Line2D([0], [0],
+               marker='D', color='w', markersize=10,
+               markeredgecolor='black',
+               label='FedscGPT (Federated)'),
+        Line2D([0], [0],
+               marker='*', color='w', markersize=12,
+               markeredgecolor='black',
+               label='FedscGPT-SMPC'),
+        Line2D([0], [0],
+               marker='o', color='w', markersize=8,
+               markeredgecolor='black',
+               label='Clients'),
+    ]
+
+    plt.legend(handles=legend_elements,
+               loc='center', fontsize=12,
+               ncol=len(legend_elements),
+               frameon=False,
+               columnspacing=1.0)
+
+    plt.axis('off')
+    plt.savefig(f"{plots_dir}/legend.{img_format}",
+                format=img_format, dpi=300,
+                bbox_inches='tight')
+    plt.close()
 
 def plot_embedding_boxplot(df, img_format='svg'):
     """
