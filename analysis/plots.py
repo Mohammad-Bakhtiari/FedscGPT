@@ -26,7 +26,9 @@ if __name__ == '__main__':
     parser.add_argument("--format", choices=["pdf", "png", "svg"], default='svg')
     parser.add_argument("--data_dir", type=str, default='/home/bba1658/FedscGPT/data/benchmark')
     args = parser.parse_args()
-    if args.plot == 'annotation_cent_box_plt':
+    param_tuning_smpc_df = args.param_tuning_df.replace('.csv', '-smpc.csv')
+    param_tuning_smpc_pkl = args.param_tuning_pkl.replace('.pkl', '-smpc.pkl')
+    if args.plot == 'annotation_cent_box_plt': # Probably not used
         base_paths = ["/".join([args.root_dir, ds, args.mode]) for ds in ["hp", "ms", "myeloid"]]
         metrics = {}
         best = find_best_fed(args.param_tuning_df, args.metric)
@@ -39,14 +41,22 @@ if __name__ == '__main__':
         df = pd.read_csv('clients_cent.csv')
         plotter.plot_data_matplotlib(df, 'Accuracy', 'centralized_metric_plot', 'svg')
     elif args.plot == 'annotation_metric_heatmap':
+        # Old: Supplementary Figure 2, New: two figures for FedscGPT with or without SMPC
         plot_tuning_heatmap(args.param_tuning_df, plot_name="metrics_heatmap", file_format=args.format)
+        plot_tuning_heatmap(param_tuning_smpc_df, plot_name="metrics_heatmap-smpc", file_format=args.format)
     elif args.plot == 'annotation_communication':
-        analyze_communication_efficiency(args.param_tuning_df, 'clients_cent.csv' )
+        # Old: Figure 2d, New: Figure 3
+        analyze_communication_efficiency(param_tuning_smpc_df, 'clients_cent.csv' )
     elif args.plot == 'annotation_accuracy_changes':
+        # Old: Figure 2c, New: Figure 3
         plot_metric_cahnges_over_ER(args.param_tuning_df, img_format=args.format)
     elif args.plot == 'annotation_conf_matrix':
-        plot_umap_and_conf_matrix(args.root_dir, args.data_dir, args.param_tuning_pkl, args.param_tuning_df)
+        # Old: UMAPS, legends, and conf Figures 2a-b, supplementary 3 and 4
+        # New: Figure 2a-d, and Supplementary x
+        plot_umap_and_conf_matrix(args.root_dir, args.data_dir, param_tuning_smpc_pkl, param_tuning_smpc_df)
     elif args.plot == 'annotation_best_metrics':
+        # Old: Supplementary figure 5, New: Figure 3
         plot_best_metrics(args.root_dir, args.param_tuning_df, img_format=args.format)
     elif args.plot == 'reference_map_boxplot':
+        # Old: Figure 3, New: Figure 4a
         embedding_boxplot(args.root_dir, args.format)
