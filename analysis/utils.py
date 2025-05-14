@@ -924,8 +924,8 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
     # Style map for known approaches; fallback to X
     style_map = {
         'scGPT':           {'kind':'line', 'linestyle':'--', 'linewidth':2, 'color':'black'},
-        'FedscGPT':        {'marker':'*', 's':100, 'edgecolor':'black'},
-        'FedscGPT-SMPC':   {'marker':'s', 's':100, 'edgecolor':'black'}
+        'FedscGPT':        {'marker':'+', 's':100, 'edgecolor':'black'},
+        'FedscGPT-SMPC':   {'marker':'X', 's':100, 'edgecolor':'black'}
     }
     default_marker = 'X'
 
@@ -1018,11 +1018,11 @@ def plot_legend(plots_dir, img_format='svg'):
                color='black', lw=2, linestyle='--',
                label='scGPT (Centralized)'),
         Line2D([0], [0],
-               marker='*', color='w', markersize=10,
+               marker='+', color='w', markersize=10,
                markeredgecolor='black',
                label='FedscGPT (Federated)'),
         Line2D([0], [0],
-               marker='s', color='w', markersize=10,
+               marker='X', color='w', markersize=10,
                markeredgecolor='black',
                label='FedscGPT-SMPC'),
         Line2D([0], [0],
