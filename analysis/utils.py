@@ -1137,7 +1137,7 @@ def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
         print(f"Plotting UMAP for {ds}...")
         reference = anndata.read_h5ad(os.path.join(data_dir, ds, get_reference_name(ds)))
         query = anndata.read_h5ad(os.path.join(data_dir, ds, "query.h5ad"))
-        query.obs["preds"] = pd.read_csv(os.path.join(res_dir, ds, "federated/smpc/preds.csv"))["predictions"]
+        query.obs["preds"] = pd.read_csv(os.path.join(res_dir, ds, "federated/smpc/preds.csv"))["predictions"].values
         batch_key = get_batch_key(ds)
         cell_key = get_cell_key(ds)
 
