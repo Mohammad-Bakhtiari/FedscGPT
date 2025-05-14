@@ -1135,8 +1135,8 @@ def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
     palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] * 3  # Extend palette if necessary
     for ds in datasets:
         reference = anndata.read_h5ad(os.path.join(data_dir, ds, get_reference_name(ds)))
-        query = anndata.read_h5ad(os.path.join(data_dir, ds, "query.h5ad"))["predictions"]
-        query.obs["preds"] = pd.read_csv(os.path.join(res_dir, ds, "federated/smpc/preds.csv"))
+        query = anndata.read_h5ad(os.path.join(data_dir, ds, "query.h5ad"))
+        query.obs["preds"] = pd.read_csv(os.path.join(res_dir, ds, "federated/smpc/preds.csv"))["predictions"]
         batch_key = get_batch_key(ds)
         cell_key = get_cell_key(ds)
 
