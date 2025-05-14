@@ -761,80 +761,67 @@ def embedding_boxplot(data_dir, img_format='svg'):
 
 def find_federated_performance_comparison(df, federated_types=None):
     """
-    Identify worst federated vs. centralized performance for each federated type in federated_types,
-    categorize equal/higher/lower, and compute minimum percentage relative to centralized scGPT.
-
-    Returns a dict mapping each federated type to its report tuple:
-    (worst_report, higher_list, equal_list, lower_list, N)
+    For each federated type in federated_types (default: FedscGPT & FedscGPT-SMPC),
+    compare against centralized scGPT: compute Difference, Percentage, worst case,
+    and categorize higher/equal/lower.
+    Returns:
+        results: { federated_type: (worst_report, higher_list, equal_list, lower_list, N) }
     """
     if federated_types is None:
         federated_types = ['FedscGPT', 'FedscGPT-SMPC']
     results = {}
+
     for fed in federated_types:
-        # Pivot to compare centralized (scGPT) vs this federated type
-        performance_diff = (
+        perf = (
             df[df['Type'].isin(['scGPT', fed])]
             .pivot_table(index=['Dataset','Metric'], columns='Type', values='Value')
             .reset_index()
         )
-        performance_diff['scGPT'] = performance_diff['scGPT'].round(3)
-        performance_diff[fed] = performance_diff[fed].round(3)
-        performance_diff['Difference'] = (performance_diff[fed] - performance_diff['scGPT']).round(3)
-        performance_diff['Percentage'] = (performance_diff[fed] / performance_diff['scGPT'] * 100).round(2)
+        perf['scGPT'] = perf['scGPT'].round(3)
+        perf[fed]   = perf[fed].round(3)
+        perf['Difference'] = (perf[fed] - perf['scGPT']).round(3)
+        perf['Percentage'] = (perf[fed] / perf['scGPT'] * 100).round(2)
 
-        N = performance_diff['Percentage'].min()
-        worst = performance_diff.loc[performance_diff['Difference'].idxmin()]
+        N = perf['Percentage'].min()
+        worst = perf.loc[perf['Difference'].idxmin()]
         worst_report = (
-            f"Worst performance of {fed} vs scGPT is on '{worst['Dataset']}' for metric '{worst['Metric']}', "
-            f"Difference={worst['Difference']:.3f} ({fed}={worst[fed]:.3f}, scGPT={worst['scGPT']:.3f})."
+            f"Worst performance of {fed} vs scGPT is on '{worst['Dataset']}' "
+            f"for metric '{worst['Metric']}', Difference={worst['Difference']:.3f} "
+            f"({fed}={worst[fed]:.3f}, scGPT={worst['scGPT']:.3f})."
         )
 
-        higher = performance_diff[performance_diff['Difference'] > 0][['Dataset','Metric',fed,'scGPT']].values.tolist()
-        equal = performance_diff[performance_diff['Difference'] == 0][['Dataset','Metric',fed,'scGPT']].values.tolist()
-        lower = performance_diff[performance_diff['Difference'] < 0][['Dataset','Metric',fed,'scGPT']].values.tolist()
+        higher = perf[perf['Difference'] > 0][['Dataset','Metric',fed,'scGPT']].values.tolist()
+        equal  = perf[perf['Difference'] == 0][['Dataset','Metric',fed,'scGPT']].values.tolist()
+        lower  = perf[perf['Difference'] < 0][['Dataset','Metric',fed,'scGPT']].values.tolist()
 
         results[fed] = (worst_report, higher, equal, lower, N)
+
     return results
 
 
 def display_federated_performance_report(df):
     """
-    Print performance comparisons for both FedscGPT and FedscGPT-SMPC against scGPT.
+    Print side-by-side comparisons of FedscGPT vs scGPT and FedscGPT-SMPC vs scGPT.
     """
     reports = find_federated_performance_comparison(df)
-    for fed, (worst_report, higher_list, equal_list, lower_list, N) in reports.items():
+    for fed, (worst_report, higher, equal, lower, N) in reports.items():
         print(f"=== Performance Comparison: {fed} vs scGPT ===")
         print(worst_report)
-        print(f"{fed}, in a privacy-aware federated manner, consistently reached at least {N}% of scGPT's performance across all metrics and datasets.")
+        print(f"\n{fed} consistently reached at least {N}% of scGPT's performance across all metrics and datasets.\n")
 
-        if higher_list:
-            print(f"{fed} performed better than scGPT in:")
-            for ds, metric, p_fed, p_cen in higher_list:
+        if higher:
+            print(f"{fed} outperformed scGPT in:")
+            for ds, metric, p_fed, p_cen in higher:
                 print(f" - {ds} | {metric}: {fed}={p_fed:.3f} > scGPT={p_cen:.3f}")
-        if equal_list:
-            print(f"{fed} performed equally to scGPT in:")
-            for ds, metric, p_fed, p_cen in equal_list:
+        if equal:
+            print(f"\n{fed} matched scGPT in:")
+            for ds, metric, p_fed, p_cen in equal:
                 print(f" - {ds} | {metric}: {fed}={p_fed:.3f} = scGPT={p_cen:.3f}")
-        if lower_list:
-            print(f"{fed} performed worse than scGPT in:")
-            for ds, metric, p_fed, p_cen in lower_list:
+        if lower:
+            print(f"\n{fed} trailed scGPT in:")
+            for ds, metric, p_fed, p_cen in lower:
                 print(f" - {ds} | {metric}: {fed}={p_fed:.3f} < scGPT={p_cen:.3f}")
-    worst_report, higher_list, equal_list, lower_list, N = find_federated_performance_comparison(df)
-
-    print(worst_report)
-    print(f"\nFedscGPT, in a privacy-aware federated manner, consistently reached at least {N}% of scGPT's performance across all metrics and datasets.")
-    if higher_list:
-        print("\nFederated model performed better in:")
-        for ds, metric, fed, cen in higher_list:
-            print(f" - {ds} | {metric}: FedscGPT={fed:.3f} > scGPT={cen:.3f}")
-    if equal_list:
-        print("\nFederated model performed equally in:")
-        for ds, metric, fed, cen in equal_list:
-            print(f" - {ds} | {metric}: FedscGPT={fed:.3f} = scGPT={cen:.3f}")
-    if lower_list:
-        print("\nFederated model performed worse in:")
-        for ds, metric, fed, cen in lower_list:
-            print(f" - {ds} | {metric}: FedscGPT={fed:.3f} < scGPT={cen:.3f}")
+        print("\n")
 
 
 def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
