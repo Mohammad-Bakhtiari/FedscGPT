@@ -1157,8 +1157,8 @@ def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
         # Extend palette if needed and map colors
         if len(unique_celltypes) > len(palette_):
             palette_ = palette_ * (len(unique_celltypes) // len(palette_) + 1)
-        cell_color_mapping = {c: to_hex(palette_[i]) for i, c in enumerate(unique_celltypes)}
-        batch_color_mapping = {c: to_hex(palette_[i]) for i, c in enumerate(unique_batches)}
+        cell_color_mapping = {c: colors.to_hex(palette_[i]) for i, c in enumerate(unique_celltypes)}
+        batch_color_mapping = {c: colors.to_hex(palette_[i]) for i, c in enumerate(unique_batches)}
 
         # Compute UMAP if not already available
         if 'X_umap' not in reference.obsm.keys():
