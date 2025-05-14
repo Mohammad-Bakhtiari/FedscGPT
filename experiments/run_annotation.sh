@@ -5,14 +5,13 @@ mode="$1"
 n_epochs="$2"
 n_rounds="$3"
 smpc="${4-false}"
+GPU="${5-0}"
 
 # Make the annotation.sh script executable
 chmod +x annotation.sh
 
 # Declare an associative array to store dataset configurations
 declare -A datasets
-
-GPU=0
 
 # Add dataset configurations
 # format: data_folder|adata_file|test_adata_file|celltype_key|batch_key|gpu
