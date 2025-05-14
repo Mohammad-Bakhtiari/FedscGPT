@@ -755,8 +755,7 @@ def embedding_boxplot(data_dir, img_format='svg'):
                         'Value': client_metrics[metric].values[0]
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-    # plot_embedding_boxplot(df, img_format)
-    display_federated_performance_report(df)
+    # display_federated_performance_report(df)
     per_metric_annotated_scatterplot(df, "./plots/embedding", img_format)
 
 def find_federated_performance_comparison(df, federated_types=None):
@@ -826,85 +825,111 @@ def display_federated_performance_report(df):
 
 def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
     """
-    Plot data using Matplotlib from a pandas DataFrame, with each scatter point annotated by its corresponding 'Batch' value.
-    Adjusts the text to the left or right dynamically to avoid overlap for points with close y-values.
+    Plot annotated scatterplots per metric, including:
+      - Per-client points (jittered + batch labels)
+      - scGPT    as short horizontal dashed lines
+      - FedscGPT as diamond markers
+      - FedscGPT-SMPC as star markers
+      - Any other 'Type' as fallback X-markers
 
     Parameters:
-    - df: DataFrame containing the data to plot.
-    - plots_dir: Directory to save the plots.
-    - img_format: Format to save the images (e.g., 'svg').
-    - proximity_threshold: Defines the closeness of y-values to consider them overlapping (default = 0.1).
+    - df: DataFrame with columns ['Dataset','Type','Metric','Value','Batch']
+    - plots_dir: output directory for plots
+    - img_format: image format (e.g. 'svg')
+    - proximity_threshold: how close y-values must be to trigger label-offset logic
     """
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     if not os.path.exists(plots_dir):
         os.makedirs(plots_dir)
 
-    metrics = df['Metric'].unique()
     datasets = df['Dataset'].unique()
+    metrics  = df['Metric'].unique()
+
+    # Identify client vs. other approach rows
+    client_mask = df['Type'].str.contains('client', case=False)
+    client_types = df.loc[client_mask, 'Type'].unique()
+    other_types  = [t for t in df['Type'].unique() if t not in client_types]
+
+    # Style map for known approaches; fallback to X
+    style_map = {
+        'scGPT':           {'kind':'line', 'linestyle':'--', 'linewidth':2, 'color':'black'},
+        'FedscGPT':        {'marker':'D', 's':100, 'edgecolor':'black'},
+        'FedscGPT-SMPC':   {'marker':'*', 's':120, 'edgecolor':'black'}
+    }
+    default_marker = 'X'
 
     for metric in metrics:
-        plt.figure(figsize=(5, 5))
+        plt.figure(figsize=(5,5))
+        # --- Plot client points with jitter + labels ---
+        cmap = plt.get_cmap('tab10').colors
+        for i, ds in enumerate(datasets):
+            csub = df[(df['Metric']==metric)&(df['Dataset']==ds)&client_mask]
+            if csub.empty:
+                continue
+            vals    = csub['Value'].values
+            batches = csub.get('Batch', ['']*len(vals))
+            # jitter
+            jitter = 0.05
+            x_base = i+1
+            x_j    = x_base + np.random.uniform(-jitter, jitter, size=len(vals))
+            plt.scatter(x_j, vals,
+                        color=cmap[i%len(cmap)],
+                        edgecolor='black', s=50, alpha=0.7)
 
-        # Separate client data and centralized/federated data
-        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('client'))]
-        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
-        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
-
-        # Scatter plot for client data
-        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
-        for i, dataset in enumerate(datasets):
-            dataset_clients = client_data[client_data['Dataset'] == dataset]
-            client_values = dataset_clients['Value'].values
-            client_batches = dataset_clients['Batch'].values
-            # Scatter each client point with a slight horizontal offset to avoid overlap
-            jitter = 0.05  # Add some horizontal jitter to avoid overlap
-            x_jitter = np.random.uniform(-jitter, jitter, size=client_values.shape)
-            scatter = plt.scatter([i + 1 + x for x in x_jitter], client_values,
-                                  color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7)
-
-            # Determine proximity of y-values to decide label positions
-            for j, (x, y, batch) in enumerate(zip([i + 1 + x for x in x_jitter], client_values, client_batches)):
-                batch_label = shorten_batch_value(batch)
-
-                # Check if other points are "close enough" in y-value using the proximity threshold
-                annot_fontsize = 12
-                close_points = np.sum(np.abs(client_values - y) < proximity_threshold)
-                if close_points > 1:  # If there are other points within the threshold range
-                    # Alternate placement of labels for overlapping points
-                    if j % 2 == 0:
-                        plt.text(x + 0.05, y, batch_label, fontsize=annot_fontsize, ha='left',
-                                 va='center')  # Place to the right
-                    else:
-                        plt.text(x - 0.05, y, batch_label, fontsize=annot_fontsize, ha='right',
-                                 va='center')  # Place to the left
+            # annotate with batch, offsetting if many neighbors
+            for j, (x,y,b) in enumerate(zip(x_j, vals, batches)):
+                label = shorten_batch_value(b)
+                close_count = np.sum(np.abs(vals - y) < proximity_threshold)
+                if close_count>1 and (j%2)==1:
+                    ha, x_off = 'right', -0.05
                 else:
-                    plt.text(x + 0.05, y, batch_label, fontsize=annot_fontsize, ha='left',
-                             va='center')  # Place to the right by default
+                    ha, x_off = 'left', 0.05
+                plt.text(x + x_off, y, label, fontsize=10, ha=ha, va='center')
 
-        # Overlay centralized and federated data points
-        for i, dataset in enumerate(datasets):
-            # Centralized as horizontal lines only within the dataset range
-            if not centralized_data[centralized_data['Dataset'] == dataset].empty:
-                centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
-                plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
-                           color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3)
+        # --- Overlay each federated/centralized approach ---
+        for typ in other_types:
+            for i, ds in enumerate(datasets):
+                sub = df[(df['Metric']==metric)&(df['Dataset']==ds)&(df['Type']==typ)]
+                if sub.empty:
+                    continue
+                val = sub['Value'].values[0]
+                style = style_map.get(typ, {})
+                x = i+1
 
-            # Federated as scatter points
-            if not federated_data[federated_data['Dataset'] == dataset].empty:
-                federated_value = federated_data[federated_data['Dataset'] == dataset]['Value'].values[0]
-                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker='D', s=100)
+                if style.get('kind')=='line':
+                    # short horizontal line
+                    plt.hlines(val, x-0.3, x+0.3,
+                               linestyle=style['linestyle'],
+                               linewidth=style['linewidth'],
+                               color=style['color'], zorder=3)
+                else:
+                    m      = style.get('marker', default_marker)
+                    size   = style.get('s', 80)
+                    ec     = style.get('edgecolor','black')
+                    plt.scatter(x, val,
+                                marker=m,
+                                s=size,
+                                edgecolor=ec,
+                                zorder=5)
 
-        # Customize the plot
-        plt.xlabel('', fontsize=1)
-        plt.ylabel(metric.capitalize(), fontsize=20)
-        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
-        plt.yticks(fontsize=18)
-
+        # --- Final tweaks & save ---
+        plt.xlabel('')
+        plt.ylabel(metric.capitalize(), fontsize=16)
+        plt.xticks(range(1, len(datasets)+1),
+                   [handle_ds_name(d) for d in datasets],
+                   fontsize=12)
+        plt.yticks(fontsize=12)
         plt.tight_layout()
-        plt.savefig(f"{plots_dir}/{metric}_scatterplot_annotated.{img_format}", format=img_format, dpi=300,
-                    bbox_inches='tight')
+        out_path = os.path.join(plots_dir, f"{metric}_scatterplot_annotated.{img_format}")
+        plt.savefig(out_path, dpi=300, format=img_format, bbox_inches='tight')
         plt.close()
+
+        # regenerate legend (assumed your helper handles all markers/lines)
         plot_legend(plots_dir, img_format)
+
 
 def plot_embedding_boxplot(df, img_format='svg'):
     """
