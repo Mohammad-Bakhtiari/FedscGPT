@@ -923,7 +923,7 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
 
     # Style map for known approaches; fallback to X
     style_map = {
-        'scGPT':           {'kind':'line', 'linestyle':'--', 'linewidth':2, 'color':'black'},
+        'scGPT':           {'kind':'line', 'linestyle':'--', 'linewidth':2},
         'FedscGPT':        {'marker':'D', 's':100, 'edgecolor':'black'},
         'FedscGPT-SMPC':   {'marker':'*', 's':100, 'edgecolor':'black'}
     }
@@ -972,7 +972,7 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
                     plt.hlines(val, x-0.3, x+0.3,
                                linestyle=style['linestyle'],
                                linewidth=style['linewidth'],
-                               color=style['color'], zorder=3)
+                               zorder=3)
                 else:
                     m      = style.get('marker', default_marker)
                     size   = style.get('s', 80)
@@ -985,11 +985,12 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
 
         # --- Final tweaks & save ---
         plt.xlabel('')
-        plt.ylabel(metric.capitalize(), fontsize=16)
+        plt.ylim(0, 1)
+        plt.ylabel(metric.capitalize(), fontsize=18)
         plt.xticks(range(1, len(datasets)+1),
                    [handle_ds_name(d) for d in datasets],
-                   fontsize=12)
-        plt.yticks(fontsize=12)
+                   fontsize=18)
+        plt.yticks(fontsize=16)
         plt.tight_layout()
         out_path = os.path.join(plots_dir, f"{metric}_scatterplot_annotated.{img_format}")
         plt.savefig(out_path, dpi=300, format=img_format, bbox_inches='tight')
@@ -1016,11 +1017,11 @@ def plot_legend(plots_dir, img_format='svg'):
     legend_elements = [
         Line2D([0], [0],
                color='black', lw=2, linestyle='--',
-               label='scGPT (Centralized)'),
+               label='scGPT'),
         Line2D([0], [0],
                marker='D', color='w', markersize=10,
                markeredgecolor='black',
-               label='FedscGPT (Federated)'),
+               label='FedscGPT'),
         Line2D([0], [0],
                marker='*', color='w', markersize=10,
                markeredgecolor='black',
