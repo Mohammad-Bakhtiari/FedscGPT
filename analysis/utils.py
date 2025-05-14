@@ -1262,7 +1262,7 @@ def plot_umap_legend(
     plt.close()
 
     # 2) Batch legend
-    plt = plt.subplots(figsize=(5, 5))
+    fig = plt.subplots(figsize=(5, 5))
     sc.pl.umap(
         reference,
         color=batch_key,
