@@ -823,6 +823,77 @@ def display_federated_performance_report(df):
         print("\n")
 
 
+def get_clients_batch_value(h5ad_file_dir, ds_name):
+    client_batch = anndata.read_h5ad(h5ad_file_dir).obs[
+        get_batch_key(ds_name)].unique()
+    client_batch = client_batch[0] if len(client_batch) == 1 else client_batch
+    return client_batch
+
+
+def get_batch_key(ds_name):
+    if ds_name == "covid":
+        return "str_batch"
+    if ds_name == "lung":
+        return "sample"
+    if ds_name == "hp":
+        return "batch"
+    if ds_name == "ms":
+        return "Factor Value[sampling site]"
+    if ds_name == "myeloid":
+        return "top4+rest"
+    raise ValueError(f"Invalid dataset name: {ds_name}")
+
+def get_cell_key(ds_name):
+    if ds_name == "ms":
+        return "Factor Value[inferred cell type - authors labels]"
+    if ds_name == "myeloid":
+        return "combined_celltypes"
+    if ds_name == "hp":
+        return "Celltype"
+    if ds_name == "covid":
+        return "celltype"
+    if ds_name == "lung":
+        return "cell_type"
+    raise ValueError(f"Invalid dataset name: {ds_name}")
+
+
+def get_reference_name(ds_name):
+    if ds_name == "hp":
+        return "reference_refined.h5ad"
+    if ds_name == "myeloid":
+        return "reference_adata.h5ad"
+    return "reference.h5ad"
+
+def shorten_batch_value(batch_value):
+    replace = {
+        'COVID-19 (query)': 'COVID-19',
+        'Sun_sample4_TC': 'TC',
+        'Sun_sample3_TB': 'TB',
+        'HCL': 'HCL',
+        '10X': '10X',
+        'Oetjen_A': 'Oetjen',
+        'Sanger_Meyer_2019Madissoon': 'Sanger',
+        'Krasnow_distal 1a': 'Kras1a',
+        'Krasnow_distal 2': 'Kras2',
+        'Sun_sample1_CS': 'CS',
+        'Sun_sample2_KC': 'KC',
+        'Krasnow_distal 3': 'Kras3',
+        'P0034': 'P34',
+        'P0028': 'P28',
+        'P0025': 'P25',
+        'P1028': 'P1028',
+        'P0006': 'P6',
+        'P0020': 'P20',
+        'P0008': 'P8',
+        'P0018': 'P18',
+        'P0030': 'P30',
+        'P1058': 'P1058',
+        'client_cerebral cortex': "Cerebral",
+        'client_prefrontal cortex': 'Prefrontal',
+        'client_premotor cortex': 'Premotor'
+    }
+    return replace.get(batch_value, batch_value)
+
 def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
     """
     Plot annotated scatterplots per metric, including:
@@ -838,9 +909,6 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
     - img_format: image format (e.g. 'svg')
     - proximity_threshold: how close y-values must be to trigger label-offset logic
     """
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
 
     if not os.path.exists(plots_dir):
         os.makedirs(plots_dir)
