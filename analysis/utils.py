@@ -1235,19 +1235,15 @@ def plot_umap_legend(
     """
 
     # 1) Cell‐type legend
-    tmp_ct_fig, tmp_ct_ax = plt.subplots(figsize=(5, 5))
+    fig = plt.subplots(figsize=(5, 5))
     sc.pl.umap(
         reference,
         color=cell_key,
         palette=cmap_cells,
-        ax=tmp_ct_ax,
         show=False,
-        legend_loc='on data'
     )
-    handles, labels = tmp_ct_ax.get_legend_handles_labels()
-    plt.close(tmp_ct_fig)
-
-    # Sort by u_cells
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.close()
     sorted_ct = sorted(zip(handles, labels), key=lambda x: u_cells.index(x[1]))
     h_ct, l_ct = zip(*sorted_ct)
 
@@ -1262,9 +1258,8 @@ def plot_umap_legend(
     )
     ct_ax.axis('off')
     ct_fp = f"./plots/embedding/umap-celltype-legend-{ds}.{img_format}"
-    ct_fig.savefig(ct_fp, dpi=300, format=img_format, bbox_inches='tight')
-    plt.close(ct_fig)
-    print(f"  → saved cell‐type legend {ct_fp}")
+    plt.savefig(ct_fp, dpi=300, format=img_format, bbox_inches='tight')
+    plt.close()
 
     # 2) Batch legend
     tmp_bt_fig, tmp_bt_ax = plt.subplots(figsize=(5, 5))
