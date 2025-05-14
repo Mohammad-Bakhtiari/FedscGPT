@@ -1215,3 +1215,88 @@ def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
         plt.savefig(out_fp, format=img_format, dpi=300)
         plt.close(fig)
         print(f"  → saved {out_fp}")
+        for ds in datasets:
+            plot_umap_legend(reference,cell_key, batch_key, cell_color_mapping, batch_color_mapping, unique_celltypes, unique_batches, ds, img_format)
+
+
+def plot_umap_legend(
+    reference,
+    cell_key,
+    batch_key,
+    cmap_cells,
+    cmap_batches,
+    u_cells,
+    u_batches,
+    ds,
+    img_format='svg'
+):
+    """
+    reference: AnnData with UMAP already in .obsm['X_umap']
+    cell_key/batch_key: obs column names
+    cmap_cells/cmap_batches: dicts mapping labels -> hex colors
+    u_cells/u_batches: lists of labels in desired legend order
+    ds: dataset name (used for filenames)
+    """
+
+    # 1) Cell‐type legend
+    tmp_ct_fig, tmp_ct_ax = plt.subplots(figsize=(5, 5))
+    sc.pl.umap(
+        reference,
+        color=cell_key,
+        palette=cmap_cells,
+        ax=tmp_ct_ax,
+        show=False,
+        legend_loc='on data'
+    )
+    handles, labels = tmp_ct_ax.get_legend_handles_labels()
+    plt.close(tmp_ct_fig)
+
+    # Sort by u_cells
+    sorted_ct = sorted(zip(handles, labels), key=lambda x: u_cells.index(x[1]))
+    h_ct, l_ct = zip(*sorted_ct)
+
+    ct_fig, ct_ax = plt.subplots(figsize=(3, len(u_cells) * 0.3))
+    ct_ax.legend(
+        h_ct,
+        l_ct,
+        loc='center',
+        frameon=False,
+        fontsize='small',
+        ncol=1
+    )
+    ct_ax.axis('off')
+    ct_fp = f"./plots/embedding/umap-celltype-legend-{ds}.{img_format}"
+    ct_fig.savefig(ct_fp, dpi=300, format=img_format, bbox_inches='tight')
+    plt.close(ct_fig)
+    print(f"  → saved cell‐type legend {ct_fp}")
+
+    # 2) Batch legend
+    tmp_bt_fig, tmp_bt_ax = plt.subplots(figsize=(5, 5))
+    sc.pl.umap(
+        reference,
+        color=batch_key,
+        palette=cmap_batches,
+        ax=tmp_bt_ax,
+        show=False,
+        legend_loc='on data'
+    )
+    handles, labels = tmp_bt_ax.get_legend_handles_labels()
+    plt.close(tmp_bt_fig)
+
+    sorted_bt = sorted(zip(handles, labels), key=lambda x: u_batches.index(x[1]))
+    h_bt, l_bt = zip(*sorted_bt)
+
+    bt_fig, bt_ax = plt.subplots(figsize=(3, len(u_batches) * 0.3))
+    bt_ax.legend(
+        h_bt,
+        l_bt,
+        loc='center',
+        frameon=False,
+        fontsize='small',
+        ncol=1
+    )
+    bt_ax.axis('off')
+    bt_fp = f"./plots/embedding/umap-batch-legend-{ds}.{img_format}"
+    bt_fig.savefig(bt_fp, dpi=300, format=img_format, bbox_inches='tight')
+    plt.close(bt_fig)
+    print(f"  → saved batch legend {bt_fp}")
