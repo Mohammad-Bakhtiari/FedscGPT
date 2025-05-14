@@ -15,8 +15,10 @@ root_dir="$(dirname "$PWD")"
 INTI_WEIGHTS_DIR="${root_dir}/models/init"
 N_ROUNDS=20
 smpc_subdir=""
+param_tuning_res="${root_dir}/output/annotation/param-tuning-res"
 if [ "$smpc" == "true" ]; then
     smpc_subdir="/smpc"
+    param_tuning_res="${param_tuning_res}-smpc"
 fi
 
 for key in "${!datasets[@]}"; do
