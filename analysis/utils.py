@@ -599,19 +599,15 @@ def plot_umaps(adata, predictions_centralized, predictions_federated, labels, un
 
 
 def create_metrics_dataframe(root_dir, res_df_file):
-    df = pd.read_csv(res_df_file)
+    # FedscGPT without SMPC
+    fedscgpt = pd.read_csv(res_df_file)
+    fedscgpt_smpc = pd.read_csv(res_df_file.replace('.csv', '-smpc.csv'))
     results = {}
-    for ds in df.Dataset.unique():
-        results[ds] = {"federated": {}}
-        for metric in df.Metric.unique():
-            idmax = df[(df.Dataset == ds) & (df.Metric == metric)]["Value"].idxmax()
-            results[ds]["federated"][metric] = df.loc[idmax, "Value"]
-        results[ds]["centralized"] = {}
-        cent_pkl_file = os.path.join(root_dir, ds, 'centralized', 'results.pkl')
-        if os.path.exists(cent_pkl_file):
-            with open(cent_pkl_file, 'rb') as file:
-                cent_res = pickle.load(file)
-        results[ds]['centralized'] = cent_res['results']
+    for ds in fedscgpt.Dataset.unique():
+        results[ds] = {"FedscGPT": find_best_performance(ds, fedscgpt),
+                       "FedscGPT-SMPC": find_best_performance(ds, fedscgpt_smpc),
+                       "scGPT": get_cent_performance(ds, os.path.join(root_dir, ds, 'centralized', 'results.pkl'))}
+
     rows = []
 
     for dataset, modes in results.items():
@@ -630,6 +626,22 @@ def create_metrics_dataframe(root_dir, res_df_file):
     df.Metric = df.Metric.apply(lambda x: x[:-2] + "F1" if x.endswith('f1') else x)
     return df
 
+
+def get_cent_performance(ds, cent_pkl_file):
+    if os.path.exists(cent_pkl_file):
+        with open(cent_pkl_file, 'rb') as file:
+            cent_res = pickle.load(file)
+    return cent_res['results']
+
+
+def find_best_performance(ds, df):
+    results = {}
+    for metric in df.Metric.unique():
+        idmax = df[(df.Dataset == ds) & (df.Metric == metric)]["Value"].idxmax()
+        results[metric] = df.loc[idmax, "Value"]
+    return results
+
+
 def handle_metrics(metric):
     metric = metric[5:]
     if metric == "macro_f1":
@@ -639,6 +651,7 @@ def handle_metrics(metric):
 def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     handle_image_format(img_format)
     df = create_metrics_dataframe(root_dir, param_tuning_df)
+    # TODO: check it works for new approach titles
     best_metrics_report(df)
 
     # Plot metrics with subplots for each metric and different modes as curves
@@ -697,27 +710,35 @@ def embedding_boxplot(data_dir, img_format='svg'):
     # Initialize an empty DataFrame to hold all results
     df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
 
-    federated_file_path = {ds: os.path.join(data_dir, ds, "federated", "evaluation_metrics.csv") for ds in dataset}
-    centralized_file_path = {ds: os.path.join(data_dir, ds, "centralized", "evaluation_metrics.csv") for ds in dataset}
+    fedscgpt_file_path = {ds: f"{data_dir}/{ds}/federated/evaluation_metrics.csv" for ds in dataset}
+    fedscgpt_smpc_file_path = {ds: f"{data_dir}/{ds}/federated/smpc/evaluation_metrics.csv" for ds in dataset}
+    scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in dataset}
 
     for ds in dataset:
         # Load centralized and federated results
-        centralized_metrics = pd.read_csv(centralized_file_path[ds])
-        federated_metrics = pd.read_csv(federated_file_path[ds])
+        scgpt = pd.read_csv(scgpt_file_path[ds])
+        fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
+        fedscgpt_smpc = pd.read_csv(fedscgpt_smpc_file_path[ds])
         rows = []
         # Append centralized and federated results to the DataFrame
         for metric in metrics:
             rows.append({
                 'Dataset': ds,
-                'Type': 'Centralized',
+                'Type': 'scGPT',
                 'Metric': metric,
-                'Value': centralized_metrics[metric].values[0]
+                'Value': scgpt[metric].values[0]
             })
             rows.append({
                 'Dataset': ds,
-                'Type': 'Federated',
+                'Type': 'FedscGPT',
                 'Metric': metric,
-                'Value': federated_metrics[metric].values[0]
+                'Value': fedscgpt[metric].values[0]
+            })
+            rows.append({
+                'Dataset': ds,
+                'Type': 'FedscGPT-SMPC',
+                'Metric': metric,
+                'Value': fedscgpt_smpc[metric].values[0]
             })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
         # Collect and append client results
@@ -751,8 +772,9 @@ def plot_embedding_boxplot(df, img_format='svg'):
 
         # Separate client data and centralized/federated data
         client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('Client'))]
-        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
-        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+        scgpt = df[(df['Metric'] == metric) & (df['Type'] == 'scGPT')]
+        fedscgpt = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT')]
+        fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT-SMPC')]
 
         # Prepare data for boxplot
         client_values = [client_data[client_data['Dataset'] == dataset]['Value'].values for dataset in datasets]
@@ -768,11 +790,14 @@ def plot_embedding_boxplot(df, img_format='svg'):
         # Overlay centralized and federated data points
         for i, dataset in enumerate(datasets):
             # Centralized as dashed lines
-            plt.axhline(y=centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0],
+            plt.axhline(y=scgpt[scgpt['Dataset'] == dataset]['Value'].values[0],
                         color=box['boxes'][i].get_facecolor(), linestyle='--', linewidth=2, zorder=3)
-            # Federated as scatter points
-            plt.scatter(i + 1, federated_data[federated_data['Dataset'] == dataset]['Value'].values[0],
+            # FedscGPT as scatter points
+            plt.scatter(i + 1, fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0],
                         color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker='D', s=100)
+            # FedscGPT-SMPC as scatter points
+            plt.scatter(i + 1, fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0],
+                        color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker='*', s=100)
 
         # Customize the plot
         plt.xlabel('Datasets', fontsize=16)
@@ -787,12 +812,14 @@ def plot_embedding_boxplot(df, img_format='svg'):
         boxplot_image = np.array(boxplot_image_pil)
         image_placeholder_instance = ImagePlaceholder()
         legend_elements = [
-            Line2D([0], [0], color='black', lw=2, linestyle='--', label='Centralized'),
-            Line2D([0], [0], marker='*', color='w', markersize=10, label='Federated',
+            Line2D([0], [0], color='black', lw=2, linestyle='--', label='scGPT'),
+            Line2D([0], [0], marker='*', color='w', markersize=10, label='FedscGPT',
                    markeredgecolor='black'),
+            Line2D([0], [0], marker='D', color='w', markersize=10, label='FedscGPT-SMPC',
+                     markeredgecolor='black'),
             image_placeholder_instance
         ]
-        legend_labels = ['Centralized', 'Federated', 'Clients']
+        legend_labels = ['scGPT', 'FedscGPT', 'FedscGPT-SMPC', 'Clients']
 
         class HandlerImage:
             def __init__(self, image):
