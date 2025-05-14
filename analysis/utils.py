@@ -1129,9 +1129,6 @@ def plot_embedding_boxplot(df, img_format='svg'):
         plt.close()
 
 def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
-    import os, pickle, pandas as pd, matplotlib.pyplot as plt, scanpy as sc, anndata
-    from matplotlib import colors
-
     datasets = ["lung", "covid"]
     palette = plt.rcParams["axes.prop_cycle"].by_key()["color"] * 3
 
@@ -1215,8 +1212,7 @@ def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
         plt.savefig(out_fp, format=img_format, dpi=300)
         plt.close(fig)
         print(f"  → saved {out_fp}")
-        for ds in datasets:
-            plot_umap_legend(reference,cell_key, batch_key, cell_color_mapping, batch_color_mapping, unique_celltypes, unique_batches, ds, img_format)
+        plot_umap_legend(reference, cell_key, batch_key, cell_color_mapping, batch_color_mapping, unique_celltypes, unique_batches, ds, img_format)
 
 
 def plot_umap_legend(
