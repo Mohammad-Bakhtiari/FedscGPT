@@ -966,12 +966,14 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
                 val = sub['Value'].values[0]
                 style = style_map.get(typ, {})
                 x = i+1
+                color = cmap[i % len(cmap)],
 
                 if style.get('kind')=='line':
                     # short horizontal line
                     plt.hlines(val, x-0.3, x+0.3,
                                linestyle=style['linestyle'],
                                linewidth=style['linewidth'],
+                               color=color,
                                zorder=3)
                 else:
                     m      = style.get('marker', default_marker)
