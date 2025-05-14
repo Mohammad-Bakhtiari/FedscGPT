@@ -1262,17 +1262,15 @@ def plot_umap_legend(
     plt.close()
 
     # 2) Batch legend
-    tmp_bt_fig, tmp_bt_ax = plt.subplots(figsize=(5, 5))
+    plt = plt.subplots(figsize=(5, 5))
     sc.pl.umap(
         reference,
         color=batch_key,
         palette=cmap_batches,
-        ax=tmp_bt_ax,
         show=False,
-        legend_loc='on data'
     )
-    handles, labels = tmp_bt_ax.get_legend_handles_labels()
-    plt.close(tmp_bt_fig)
+    handles, labels = plt.get_legend_handles_labels()
+    plt.close()
 
     sorted_bt = sorted(zip(handles, labels), key=lambda x: u_batches.index(x[1]))
     h_bt, l_bt = zip(*sorted_bt)
@@ -1288,6 +1286,6 @@ def plot_umap_legend(
     )
     bt_ax.axis('off')
     bt_fp = f"./plots/embedding/umap-batch-legend-{ds}.{img_format}"
-    bt_fig.savefig(bt_fp, dpi=300, format=img_format, bbox_inches='tight')
-    plt.close(bt_fig)
+    plt.savefig(bt_fp, dpi=300, format=img_format, bbox_inches='tight')
+    plt.close()
     print(f"  → saved batch legend {bt_fp}")
