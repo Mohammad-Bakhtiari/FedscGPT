@@ -755,8 +755,140 @@ def embedding_boxplot(data_dir, img_format='svg'):
                         'Value': client_metrics[metric].values[0]
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-    plot_embedding_boxplot(df, img_format)
+    # plot_embedding_boxplot(df, img_format)
+    display_federated_performance_report(df)
+    # per_metric_annotated_scatterplot(df, "./plots/embedding", img_format)
 
+def find_federated_performance_comparison(df):
+    """
+    Identify worst federated vs. centralized performance, categorize equal/higher/lower,
+    and compute minimum percentage of federated performance relative to centralized.
+    """
+    # Pivot to compare centralized vs federated
+    performance_diff = (
+        df[df['Type'].isin(['scGPT', 'FedscGPT'])]
+        .pivot_table(index=['Dataset','Metric'], columns='Type', values='Value')
+        .reset_index()
+    )
+    performance_diff['scGPT'] = performance_diff['scGPT'].round(3)
+    performance_diff['FedscGPT'] = performance_diff['FedscGPT'].round(3)
+    performance_diff['Difference'] = (performance_diff['FedscGPT'] - performance_diff['scGPT']).round(3)
+    performance_diff['Percentage'] = (performance_diff['FedscGPT'] / performance_diff['scGPT'] * 100).round(2)
+
+    N = performance_diff['Percentage'].min()
+    worst = performance_diff.loc[performance_diff['Difference'].idxmin()]
+    worst_report = (
+        f"Worst federated performance is on '{worst['Dataset']}' for metric '{worst['Metric']}', "
+        f"with Difference={worst['Difference']:.3f} (FedscGPT={worst['FedscGPT']:.3f}, scGPT={worst['scGPT']:.3f})."
+    )
+
+    higher = performance_diff[performance_diff['Difference'] > 0][['Dataset','Metric','FedscGPT','scGPT']].values.tolist()
+    equal = performance_diff[performance_diff['Difference'] == 0][['Dataset','Metric','FedscGPT','scGPT']].values.tolist()
+    lower = performance_diff[performance_diff['Difference'] < 0][['Dataset','Metric','FedscGPT','scGPT']].values.tolist()
+
+    return worst_report, higher, equal, lower, N
+
+
+def display_federated_performance_report(df):
+    worst_report, higher_list, equal_list, lower_list, N = find_federated_performance_comparison(df)
+
+    print(worst_report)
+    print(f"\nFedscGPT, in a privacy-aware federated manner, consistently reached at least {N}% of scGPT's performance across all metrics and datasets.")
+
+    if higher_list:
+        print("\nFederated model performed better in:")
+        for ds, metric, fed, cen in higher_list:
+            print(f" - {ds} | {metric}: FedscGPT={fed:.3f} > scGPT={cen:.3f}")
+    if equal_list:
+        print("\nFederated model performed equally in:")
+        for ds, metric, fed, cen in equal_list:
+            print(f" - {ds} | {metric}: FedscGPT={fed:.3f} = scGPT={cen:.3f}")
+    if lower_list:
+        print("\nFederated model performed worse in:")
+        for ds, metric, fed, cen in lower_list:
+            print(f" - {ds} | {metric}: FedscGPT={fed:.3f} < scGPT={cen:.3f}")
+
+def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
+    """
+    Plot data using Matplotlib from a pandas DataFrame, with each scatter point annotated by its corresponding 'Batch' value.
+    Adjusts the text to the left or right dynamically to avoid overlap for points with close y-values.
+
+    Parameters:
+    - df: DataFrame containing the data to plot.
+    - plots_dir: Directory to save the plots.
+    - img_format: Format to save the images (e.g., 'svg').
+    - proximity_threshold: Defines the closeness of y-values to consider them overlapping (default = 0.1).
+    """
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(5, 5))
+
+        # Separate client data and centralized/federated data
+        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('client'))]
+        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
+        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+
+        # Scatter plot for client data
+        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
+        for i, dataset in enumerate(datasets):
+            dataset_clients = client_data[client_data['Dataset'] == dataset]
+            client_values = dataset_clients['Value'].values
+            client_batches = dataset_clients['Batch'].values
+            # Scatter each client point with a slight horizontal offset to avoid overlap
+            jitter = 0.05  # Add some horizontal jitter to avoid overlap
+            x_jitter = np.random.uniform(-jitter, jitter, size=client_values.shape)
+            scatter = plt.scatter([i + 1 + x for x in x_jitter], client_values,
+                                  color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7)
+
+            # Determine proximity of y-values to decide label positions
+            for j, (x, y, batch) in enumerate(zip([i + 1 + x for x in x_jitter], client_values, client_batches)):
+                batch_label = shorten_batch_value(batch)
+
+                # Check if other points are "close enough" in y-value using the proximity threshold
+                annot_fontsize = 12
+                close_points = np.sum(np.abs(client_values - y) < proximity_threshold)
+                if close_points > 1:  # If there are other points within the threshold range
+                    # Alternate placement of labels for overlapping points
+                    if j % 2 == 0:
+                        plt.text(x + 0.05, y, batch_label, fontsize=annot_fontsize, ha='left',
+                                 va='center')  # Place to the right
+                    else:
+                        plt.text(x - 0.05, y, batch_label, fontsize=annot_fontsize, ha='right',
+                                 va='center')  # Place to the left
+                else:
+                    plt.text(x + 0.05, y, batch_label, fontsize=annot_fontsize, ha='left',
+                             va='center')  # Place to the right by default
+
+        # Overlay centralized and federated data points
+        for i, dataset in enumerate(datasets):
+            # Centralized as horizontal lines only within the dataset range
+            if not centralized_data[centralized_data['Dataset'] == dataset].empty:
+                centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
+                plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
+                           color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3)
+
+            # Federated as scatter points
+            if not federated_data[federated_data['Dataset'] == dataset].empty:
+                federated_value = federated_data[federated_data['Dataset'] == dataset]['Value'].values[0]
+                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+                            zorder=5, marker='D', s=100)
+
+        # Customize the plot
+        plt.xlabel('', fontsize=1)
+        plt.ylabel(metric.capitalize(), fontsize=20)
+        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
+        plt.yticks(fontsize=18)
+
+        plt.tight_layout()
+        plt.savefig(f"{plots_dir}/{metric}_scatterplot_annotated.{img_format}", format=img_format, dpi=300,
+                    bbox_inches='tight')
+        plt.close()
+        plot_legend(plots_dir, img_format)
 
 def plot_embedding_boxplot(df, img_format='svg'):
     """
