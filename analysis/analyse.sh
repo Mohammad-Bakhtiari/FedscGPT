@@ -38,3 +38,5 @@ python3 plots.py --plot "annotation_best_metrics" --root_dir "${root_dir}/output
 
 # Plot reference mapping boxplot
 python3 plots.py --plot "reference_map_boxplot" --root_dir "${root_dir}/output/embedding" --format 'svg'
+
+python3 plots.py --plot "fed_embedding_umap" --root_dir "${root_dir}/output/embedding" --data_dir $data_dir

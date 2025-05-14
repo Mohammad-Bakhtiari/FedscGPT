@@ -4,7 +4,7 @@ import __init__
 import argparse
 from analysis.utils import (CentralizedMetricPlotter, collect_metrics, plot_tuning_heatmap, find_best_fed,
                             analyze_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
-                            plot_best_metrics, embedding_boxplot)
+                            plot_best_metrics, embedding_boxplot, fed_embedding_umap)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -16,6 +16,7 @@ if __name__ == '__main__':
                                                      'annotation_best_metrics',
                                                      'annotation_cent_box_plt',
                                                      'reference_map_boxplot',
+                                                     'fed_embedding_umap',
                                                      ], default='annotation_cent_box_plt')
     parser.add_argument("--mode", choices=['centralized', 'federated'], default='centralized')
     parser.add_argument("--root_dir", type=str, default='/home/bba1658/FedscGPT/output/annotation')
@@ -60,3 +61,5 @@ if __name__ == '__main__':
     elif args.plot == 'reference_map_boxplot':
         # Old: Figure 3, New: Figure 4a
         embedding_boxplot(args.root_dir, args.format)
+    elif args.plot == "fed_embedding_umap":
+        fed_embedding_umap(args.data_dir, args.root_dir, img_format='png')

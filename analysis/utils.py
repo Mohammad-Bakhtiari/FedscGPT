@@ -1127,3 +1127,59 @@ def plot_embedding_boxplot(df, img_format='svg'):
         plt.tight_layout()
         plt.savefig(f"./plots/embedding/{metric}_boxplot.{img_format}", format=img_format, dpi=300)
         plt.close()
+
+def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
+    datasets = ["lung", "covid"]
+    pie_fontsize = dict(zip(datasets, [14, 14]))
+    print(pie_fontsize)
+    palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"] * 3  # Extend palette if necessary
+    for ds in datasets:
+        reference = anndata.read_h5ad(os.path.join(data_dir, ds, get_reference_name(ds)))
+        query = anndata.read_h5ad(os.path.join(data_dir, ds, "query.h5ad"))["predictions"]
+        query.obs["preds"] = pd.read_csv(os.path.join(res_dir, ds, "federated/smpc/preds.csv"))
+        batch_key = get_batch_key(ds)
+        cell_key = get_cell_key(ds)
+
+        # Apply shorten_batch_value and remove unused categories in cell type
+        reference.obs[batch_key] = reference.obs[batch_key].apply(shorten_batch_value)
+        if reference.obs[cell_key].dtype.name == 'category':
+            reference.obs[cell_key] = reference.obs[cell_key].cat.remove_unused_categories()
+
+        # Get unique cell types and batches, ensuring they're sorted
+        unique_celltypes = sorted(reference.obs[cell_key].astype(str).unique())
+        unique_celltypes_query = sorted(query.obs[cell_key].astype(str).unique())
+        unique_celltypes_query_preds = sorted(query.obs["preds"].astype(str).unique())
+        assert all([ct in unique_celltypes for ct in unique_celltypes_query]), f"Cell types in query absent in reference: {unique_celltypes_query} not in {unique_celltypes}"
+        assert all([ct in unique_celltypes for ct in unique_celltypes_query_preds]), f"Cell types in query absent in reference: {unique_celltypes_query_preds} not in {unique_celltypes}"
+        unique_batches = sorted(reference.obs[batch_key].unique())
+
+        # Extend palette if needed and map colors
+        if len(unique_celltypes) > len(palette_):
+            palette_ = palette_ * (len(unique_celltypes) // len(palette_) + 1)
+        cell_color_mapping = {c: to_hex(palette_[i]) for i, c in enumerate(unique_celltypes)}
+        batch_color_mapping = {c: to_hex(palette_[i]) for i, c in enumerate(unique_batches)}
+
+        # Compute UMAP if not already available
+        if 'X_umap' not in reference.obsm.keys():
+            sc.pp.neighbors(reference, n_neighbors=30, use_rep='X')
+            sc.tl.umap(reference)
+        if 'X_umap' not in query.obsm.keys():
+            sc.pp.neighbors(query, n_neighbors=30, use_rep='X')
+            sc.tl.umap(query)
+
+        # Plot UMAPs for batches and cell types
+        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+        sc.pl.umap(reference, color=batch_key, palette=batch_color_mapping, ax=axes[0][0], show=False, legend_loc=None)
+        axes[0][0].axis('off')
+        sc.pl.umap(reference, color=cell_key, palette=cell_color_mapping, ax=axes[0][1], show=False, legend_loc=None)
+        axes[0][1].axis('off')
+        sc.pl.umap(query, color=cell_key, palette=cell_color_mapping, ax=axes[1][0], show=False, legend_loc=None)
+        axes[1][0].axis('off')
+        sc.pl.umap(query, color="preds", palette=cell_color_mapping, ax=axes[1][1], show=False, legend_loc=None)
+        axes[1][1].axis('off')
+
+
+        # Save UMAP plots
+        file_path = f"./plots/batch_dist/{ds}.{img_format}"
+        plt.savefig(file_path, format=img_format, dpi=300)
+        plt.close(fig)
