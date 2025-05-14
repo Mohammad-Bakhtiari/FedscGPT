@@ -1149,8 +1149,8 @@ def fed_embedding_umap(data_dir, res_dir, img_format='svg'):
         unique_celltypes = sorted(reference.obs[cell_key].astype(str).unique())
         unique_celltypes_query = sorted(query.obs[cell_key].astype(str).unique())
         unique_celltypes_query_preds = sorted(query.obs["preds"].astype(str).unique())
-        assert all([ct in unique_celltypes for ct in unique_celltypes_query]), f"Cell types in query absent in reference: {unique_celltypes_query} not in {unique_celltypes}"
-        assert all([ct in unique_celltypes for ct in unique_celltypes_query_preds]), f"Cell types in query absent in reference: {unique_celltypes_query_preds} not in {unique_celltypes}"
+        assert len([ct for ct in unique_celltypes_query if ct not in unique_celltypes]) == 0, f"Cell types in query absent in reference: {unique_celltypes_query} not in {unique_celltypes}"
+        assert len([ct for ct in unique_celltypes_query_preds if ct not in unique_celltypes]) == 0, f"Cell types in predictions absent in reference: {unique_celltypes_query_preds} not in {unique_celltypes}"
         unique_batches = sorted(reference.obs[batch_key].unique())
 
         # Extend palette if needed and map colors
