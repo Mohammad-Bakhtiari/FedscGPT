@@ -245,6 +245,14 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.{file_format}", dpi=300)
 
 
+def plo_communication_efficiency(fedscgpt_param_tuning, fedscgpt_smpc_param_tuning):
+    fedscgpt_tabel = analyze_communication_efficiency(fedscgpt_param_tuning, 'clients_cent.csv')
+    fedscgpt_smpc_tabel = analyze_communication_efficiency(fedscgpt_smpc_param_tuning, 'clients_cent.csv', smpc=True)
+    plot_communication_comparison(
+        fedscgpt_table,
+        fedscgpt_smpc_table,
+        out_path=f"{ANNOTATION_PLOTS_DIR}/communication_comparison.svg"
+    )
 
 
 def analyze_communication_efficiency(results_file_path, centralized_file_path,
@@ -302,33 +310,67 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path,
                 row.append("NR")
 
         table_data.append(row)
+    return table_data
 
-    # Calculate column widths based on the longest text in each column
+def plot_communication_comparison(fedscgpt_table, fedscgpt_smpc_table, out_path, cell_fontsize=12):
+    """
+    Plot two vertically stacked tables comparing FedscGPT and FedscGPT-SMPC.
+
+    Parameters
+    ----------
+    fedscgpt_table : List[List[str]]
+        Table data for FedscGPT (with header row as first element).
+    fedscgpt_smpc_table : List[List[str]]
+        Table data for FedscGPT-SMPC (same shape as fedscgpt_table).
+    out_path : str
+        File path (including filename) to save the figure.
+    cell_fontsize : int
+        Font size for table cells.
+    """
+    # Internal to prepend a label column
+    def _label_block(tbl, lbl):
+        header = ["Approach"] + tbl[0]
+        rows   = [[lbl] + row for row in tbl[1:]]
+        return [header] + rows
+
+    block1 = _label_block(fedscgpt_table,        "FedscGPT")
+    block2 = _label_block(fedscgpt_smpc_table, "FedscGPT-SMPC")
+
+    # Combine (skip second header)
+    combined = block1 + block2[1:]
+
+    # Compute column widths
+    n_cols = len(combined[0])
     col_widths = []
-    for col_idx in range(len(table_data[0])):
-        max_len = max(len(str(table_data[row_idx][col_idx])) for row_idx in range(len(table_data)))
-        col_widths.append(max_len * 0.2)  # Adjust this multiplier as needed for text size
+    for c in range(n_cols):
+        max_len = max(len(str(r[c])) for r in combined)
+        col_widths.append(max_len * 0.2)
 
-    # Plotting the table
-    fig, ax = plt.subplots(figsize=(sum(col_widths) + 0.7, len(table_data) * 0.5))
-    ax.axis('tight')
+    # Plot
+    fig, ax = plt.subplots(
+        figsize=(sum(col_widths) + 1, len(combined) * 0.5)
+    )
     ax.axis('off')
+    tbl = ax.table(
+        cellText=combined,
+        cellLoc='center',
+        loc='center'
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(cell_fontsize)
 
-    # Create the table
-    table = ax.table(cellText=table_data, cellLoc='center', loc='center')
-    table.auto_set_font_size(False)
-    table.set_fontsize(12)
+    # Set column widths & row heights
+    for col_idx, w in enumerate(col_widths):
+        for row_idx in range(len(combined)):
+            tbl[(row_idx, col_idx)].set_width(w + 0.5)
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_height(0.3)
 
-    # Set column widths based on calculated values
-    for col_idx, width in enumerate(col_widths):
-        table.auto_set_column_width(col=col_idx)  # Ensure the column auto width is set
-        for row_idx in range(len(table_data)):
-            table[(row_idx, col_idx)].set_width(width + 0.5)
-    for key, cell in table.get_celld().items():
-        cell.set_height(0.2)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
-    out_fname = f"communication{'-smpc' if smpc else ''}.svg"
-    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{out_fname}", dpi=300, format="svg")
+
 
 
 def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy', img_format='svg'):
