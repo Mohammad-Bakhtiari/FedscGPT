@@ -31,11 +31,13 @@ if __name__ == '__main__':
     param_tuning_smpc_pkl = args.param_tuning_pkl.replace('.pkl', '-smpc.pkl')
     if args.plot == 'annotation_cent_box_plt': # Probably not used
         metrics = {}
-        best = find_best_fed(param_tuning_smpc_df, args.metric)
+        fedscgpt = find_best_fed(args.param_tuning_df, args.metric)
+        fedscgpt_smpc = find_best_fed(param_tuning_smpc_df, args.metric)
         for dataset in ["hp", "ms", "myeloid"]:
             metrics[dataset] = collect_cent_metrics("/".join([args.root_dir, "output", "annotation", dataset, 'centralized']),
                                                     args.data_dir, args.metric)
-            metrics[dataset]['FedscGPT-SMPC'] = best[dataset]
+            metrics[dataset]['FedscGPT-SMPC'] = fedscgpt_smpc[dataset]
+            metrics[dataset]['FedscGPT'] = fedscgpt[dataset]
         plotter = CentralizedMetricPlotter()
         df = plotter.collect_data(metrics)
         df.to_csv('clients_cent.csv')

@@ -61,6 +61,7 @@ class CentralizedMetricPlotter:
         data = []
         for dataset, values in metrics.items():
             scgpt_acc = values.pop('scGPT')
+            fedscgpt_acc = values.pop('FedscGPT')
             fedscgpt_smpc_acc = values.pop('FedscGPT-SMPC')
             # Append each client's data
             for client, acc in values.items():
@@ -71,6 +72,8 @@ class CentralizedMetricPlotter:
 
             # Append federated accuracy
             data.append({'Dataset': dataset, 'Type': 'FedscGPT-SMPC', 'Accuracy': fedscgpt_smpc_acc})
+
+            data.append({'Dataset': dataset, 'Type': 'FedscGPT', 'Accuracy': fedscgpt_acc})
 
         df = pd.DataFrame(data)
         return df
@@ -1380,7 +1383,8 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         df_metric = df[df['Metric'] == metric]
         scgpt = df_metric[df_metric['Type'] == 'scGPT']
         fedscgpt_smpc = df_metric[df_metric['Type'] == 'FedscGPT-SMPC']
-        client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'FedscGPT-SMPC'])]
+        fedscgpt = df_metric[df_metric['Type'] == 'FedscGPT']
+        client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'FedscGPT-SMPC', 'FedscGPT'])]
 
         # Scatter plot for client data
         colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
@@ -1426,7 +1430,12 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
             if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
                 federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker='D', s=100, label=f"FedscGPT-SMPC")
+                            zorder=5, marker='*', s=100, label=f"FedscGPT-SMPC")
+
+            if not fedscgpt[fedscgpt['Dataset'] == dataset].empty:
+                federated_value = fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0]
+                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+                            zorder=5, marker='D', s=100, label=f"FedscGPT")
 
         # Customize the plot
         plt.xlabel('', fontsize=1)
@@ -1440,8 +1449,10 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
             plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white', markersize=8, linestyle='None',
                         label='Clients'),
             plt.Line2D([0], [0], marker='D', color='black', markerfacecolor='white', markersize=10, linestyle='None',
-                        label='Federated'),
-            plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='Centralized')
+                        label='FedscGPT'),
+            plt.Line2D([0], [0], marker='*', color='black', markerfacecolor='white', markersize=10, linestyle='None',
+                       label='FedscGPT-SMPC'),
+            plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='scGPT')
         ]
         legend = plt.legend(handles=custom_handles, loc='lower left', fontsize=14, frameon=True)
         legend.get_frame().set_edgecolor('black')
