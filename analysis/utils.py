@@ -48,7 +48,6 @@ def collect_metrics(base_path, data_dir, metric):
             else:
                 batch = "centralized"
             accuracies[batch] = accuracy
-    import pdb; pdb.set_trace()
     return accuracies
 
 
@@ -66,8 +65,8 @@ class CentralizedMetricPlotter:
             fedscgpt_smpc_acc = values['FedscGPT-SMPC']
 
             # Append each client's data
-            for acc in client_acc:
-                data.append({'Dataset': dataset, 'Type': 'Client', 'Accuracy': acc})
+            for client, acc in values.items():
+                data.append({'Dataset': dataset, 'Type': client, 'Accuracy': acc})
 
             # Append centralized accuracy
             data.append({'Dataset': dataset, 'Type': 'scGPT', 'Accuracy': scgpt_acc})
@@ -1379,7 +1378,7 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         plt.figure(figsize=(5, 5))
 
         # Separate client data and centralized/federated data
-        client_data = df[(df['Metric'] == metric) & (df['Type'] == 'Client')]
+        client_data = df[(df['Metric'] == metric) & (df['Type'].startswith('client'))]
         scgpt = df[(df['Metric'] == metric) & (df['Type'] == 'scGPT')]
         fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT-SMPC')]
 
@@ -1389,7 +1388,6 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         for i, dataset in enumerate(datasets):
             dataset_clients = client_data[client_data['Dataset'] == dataset]
             client_values = dataset_clients['Value'].values
-            import pdb; pdb.set_trace()
             client_batches = dataset_clients['Batch'].values
             # Scatter each client point with a slight horizontal offset to avoid overlap
             jitter = 0.05  # Add some horizontal jitter to avoid overlap
