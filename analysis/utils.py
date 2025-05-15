@@ -710,13 +710,15 @@ def annotate_bars(ax, df):
         nr = int(row['Round'])
         print(f"Annotating {ds} {approach} with ({ep}, {nr})")
         ax.text(
-            x_center, height,
+            x_center, height / 2,
             f"{ep},{nr}",
             ha='center', va='center',
             rotation=90,
-            color='black',
-            fontsize=20,
-            fontweight='bold'
+            color='white',
+            fontsize=12,
+            fontweight='bold',
+            zorder=10,  # draw on top of bars
+            clip_on=False  # don’t clip within the bar patch
         )
 
 
