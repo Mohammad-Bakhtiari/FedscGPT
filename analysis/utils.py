@@ -185,6 +185,7 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     """
     # Load the results DataFrame
     df = pd.read_csv(file_path)
+    df.dropna(inplace=True)
     df = df[~(df.Round == 0)]
     # Determine unique datasets and metrics
     dataset_keys = df['Dataset'].unique()
