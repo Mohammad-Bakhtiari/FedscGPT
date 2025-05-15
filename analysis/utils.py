@@ -597,6 +597,7 @@ def plot_umaps(adata, predictions_centralized, predictions_federated, labels, un
 def create_metrics_dataframe(root_dir, res_df_file):
     # FedscGPT without SMPC
     fedscgpt = pd.read_csv(res_df_file)
+    fedscgpt.dropna(inplace=True)
     fedscgpt_smpc = pd.read_csv(res_df_file.replace('.csv', '-smpc.csv'))
     results = {}
     for ds in fedscgpt.Dataset.unique():
@@ -617,7 +618,6 @@ def create_metrics_dataframe(root_dir, res_df_file):
                     'n_epochs': value[1] if approach in ['FedscGPT', 'scGPT-SMPC'] else None,
                     'Round': value[2] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
                 })
-    import pdb; pdb.set_trace()
     # Creating the DataFrame
     df = pd.DataFrame(rows)
     df.Metric = df.Metric.apply(lambda x: x[5:].title() if x.startswith('test/') else x)
@@ -691,20 +691,16 @@ def annotate_bars(ax, df):
 
         # map x -> dataset (assuming x positions 0,1,2,... → datasets[0], datasets[1], ...)
         ds_idx = int(round(x_center))
-        print(f"ds_idx: {ds_idx}, x_center: {x_center}, height: {height}")
         if ds_idx < 0 or ds_idx >= len(datasets):
             continue
         ds = datasets[ds_idx]
-        print(ds)
 
         # patch label is the hue (Approach)
         approach = p.get_label()
         if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
             continue
-        print(df)
         # look up the single row matching this bar
         row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
-        print(row)
         if row.empty:
             continue
         row = row.iloc[0]
