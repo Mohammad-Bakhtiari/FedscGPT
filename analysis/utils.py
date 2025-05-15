@@ -539,8 +539,9 @@ def plot_umap_and_conf_matrix(root_dir, data_dir, res_pkl_file, res_df_file):
     df = pd.read_csv(res_df_file)
     best_fed = {ds: df.loc[df[(df.Dataset==ds) & (df.Metric == 'Accuracy')]["Value"].idxmax()] for ds in df.Dataset.unique()}
     results = load_results_pkl(root_dir, res_pkl_file, best_fed)
-    query_datasets = load_query_datasets(data_dir)
     import pdb; pdb.set_trace()
+    query_datasets = load_query_datasets(data_dir)
+
 
     for dataset in results.keys():
         # plot_confusion_matrices(dataset, results)
