@@ -1386,6 +1386,7 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         scatter_plots = []
         for i, dataset in enumerate(datasets):
             dataset_clients = client_data[client_data['Dataset'] == dataset]
+            import pdb; pdb.set_trace()
             client_values = dataset_clients['Accuracy'].values
             client_batches = dataset_clients['Type'].values
             # Scatter each client point with a slight horizontal offset to avoid overlap
