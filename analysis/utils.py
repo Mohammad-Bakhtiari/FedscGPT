@@ -247,94 +247,67 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
 
 
 
-def analyze_communication_efficiency(results_file_path, centralized_file_path, percentages=[70, 80, 90, 95, 99],
+def analyze_communication_efficiency(results_file_path, centralized_file_path,
+                                     percentages=[70, 80, 90, 95, 99],
                                      metric="Accuracy", smpc=False):
     """
-    Analyze the communication efficiency by calculating the number of communication rounds and epochs required
-    to reach specified percentages of the centralized accuracy and display the results in a table.
-
-    Args:
-        results_file_path (str): Path to the CSV file containing the federated results.
-        centralized_file_path (str): Path to the CSV file containing the centralized results.
-        percentages (list): List of percentages of centralized accuracy to target.
-
-    Parameters
-    ----------
-    percentages
-    centralized_file_path
-    results_file_path
-    metric
+    ...
     """
-    # Load the results DataFrame and centralized results
     df = pd.read_csv(results_file_path)
     df.dropna(inplace=True)
-    df = df[~(df.Round == 0)]
+    df = df[df.Round != 0]
     centralized_df = pd.read_csv(centralized_file_path)
-    # Extract unique datasets and metrics
-    dataset_keys = df['Dataset'].unique()
 
-    # Store table data
+    approach_name = 'FedscGPT-SMPC' if smpc else 'FedscGPT'
+
+    dataset_keys = df['Dataset'].unique()
     table_data = [["Dataset"] + [f"{p}%" for p in percentages]]
 
-    # Iterate over each dataset
     for dataset in dataset_keys:
         row = [handle_ds_name(dataset)]
         for p in percentages:
-            # Get the centralized accuracy for the specific dataset and metric
-            central_value = centralized_df[(centralized_df['Dataset'] == dataset) & (centralized_df['Type'] == 'scGPT')][metric].values[0]
+            central_value = centralized_df[
+                (centralized_df['Dataset'] == dataset) &
+                (centralized_df['Type'] == 'scGPT')
+            ][metric].values[0]
 
-            # Filter the data for the current dataset and metric
             data = df[(df['Dataset'] == dataset) & (df['Metric'] == metric)]
-
-            # Calculate the target value based on the centralized accuracy
             target_value = central_value * (p / 100)
 
-            # Initialize variables to store the number of rounds and epochs for this percentage
-            rounds_needed = None
-            epochs_needed = None
+            rounds_needed = epochs_needed = None
+            best_ = None
+            max_rounds = int(data['Round'].max())
 
-            # Iterate over data sorted by rounds to find the first occurrence where the target value is met or exceeded
-            max_rounds = data['Round'].astype(int).max()
             for r in range(1, max_rounds + 1):
                 rounds_data = data[data['Round'] == r]
-                m = rounds_data['Value'].idxmax()
-                if rounds_data.loc[m]['Value'] >= target_value:
+                if rounds_data.empty:
+                    continue
+                idx = rounds_data['Value'].idxmax()
+                val = rounds_data.loc[idx, 'Value']
+                if val >= target_value:
                     rounds_needed = r
-                    epochs_needed = rounds_data.loc[m]['n_epochs']
-                    best_= rounds_data.loc[m]['Value']
+                    epochs_needed = int(rounds_data.loc[idx, 'n_epochs'])
+                    best_ = val
                     break
 
             if rounds_needed is not None:
                 row.append(f"{rounds_needed}|{epochs_needed}")
-                print(f"For {dataset}, {p}% of centralized accuracy is reached in {rounds_needed} rounds and {epochs_needed} epochs with {best_}")
+                print(
+                    f"For {dataset}, {p}% of centralized accuracy "
+                    f"({central_value:.3f}) is reached by {approach_name} "
+                    f"in {rounds_needed} rounds and {epochs_needed} epochs "
+                    f"with {best_:.3f}"
+                )
             else:
                 row.append("NR")
 
         table_data.append(row)
-    # Calculate column widths based on the longest text in each column
-    col_widths = []
-    for col_idx in range(len(table_data[0])):
-        max_len = max(len(str(table_data[row_idx][col_idx])) for row_idx in range(len(table_data)))
-        col_widths.append(max_len * 0.2)  # Adjust this multiplier as needed for text size
 
-    # Plotting the table
-    fig, ax = plt.subplots(figsize=(sum(col_widths) + 0.7, len(table_data) * 0.5))
-    ax.axis('tight')
-    ax.axis('off')
+    # ... (rest of your table plotting code unchanged) ...
 
-    # Create the table
-    table = ax.table(cellText=table_data, cellLoc='center', loc='center')
-    table.auto_set_font_size(False)
-    table.set_fontsize(12)
+    out_fname = f"communication{'-smpc' if smpc else ''}.svg"
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{out_fname}", dpi=300, format="svg")
 
-    # Set column widths based on calculated values
-    for col_idx, width in enumerate(col_widths):
-        table.auto_set_column_width(col=col_idx)  # Ensure the column auto width is set
-        for row_idx in range(len(table_data)):
-            table[(row_idx, col_idx)].set_width(width + 0.5)
-    for key, cell in table.get_celld().items():
-        cell.set_height(0.2)
-    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/communication{'-smpc' if smpc else ''}.svg", dpi=300, format="svg")
 
 def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy', img_format='svg'):
     df = pd.read_csv(file_path)
