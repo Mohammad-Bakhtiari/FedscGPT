@@ -726,11 +726,11 @@ def annotate_bars(ax, df):
 
                 ax.text(
                     x_center, y_text,
-                    f"{ep} epochs, {nr} rounds",
+                    f"E:{ep}, R: {nr}",
                     ha='center', va='center',
                     rotation=90,
                     color='white',
-                    fontsize=10,
+                    fontsize=11,
                     zorder=10,
                     clip_on=False
                 )
