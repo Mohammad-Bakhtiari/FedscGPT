@@ -599,7 +599,7 @@ def create_metrics_dataframe(root_dir, res_df_file):
     fedscgpt = pd.read_csv(res_df_file)
     fedscgpt.dropna(inplace=True)
     fedscgpt_smpc = pd.read_csv(res_df_file.replace('.csv', '-smpc.csv'))
-    fedscgpt.dropna(inplace=True)
+    fedscgpt_smpc.dropna(inplace=True)
     assert fedscgpt.shape[0] == fedscgpt_smpc.shape[0], "FedscGPT and FedscGPT-SMPC have different number of rows"
     results = {}
     for ds in fedscgpt.Dataset.unique():
@@ -624,7 +624,6 @@ def create_metrics_dataframe(root_dir, res_df_file):
     df = pd.DataFrame(rows)
     df.Metric = df.Metric.apply(lambda x: x[5:].title() if x.startswith('test/') else x)
     df.Metric = df.Metric.apply(lambda x: x[:-2] + "F1" if x.endswith('f1') else x)
-    import pdb; pdb.set_trace()
     return df
 
 
