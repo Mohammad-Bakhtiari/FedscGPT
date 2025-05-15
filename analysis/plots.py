@@ -53,7 +53,7 @@ if __name__ == '__main__':
         analyze_communication_efficiency(param_tuning_smpc_df, 'clients_cent.csv' )
     elif args.plot == 'annotation_accuracy_changes':
         # Old: Figure 2c, New: Figure 3
-        plot_metric_cahnges_over_ER(args.param_tuning_df, img_format=args.format)
+        plot_metric_cahnges_over_ER(param_tuning_smpc_df, img_format=args.format)
     elif args.plot == 'annotation_conf_matrix':
         # Old: UMAPS, legends, and conf Figures 2a-b, supplementary 3 and 4
         # New: Figure 2a-d, and Supplementary x
