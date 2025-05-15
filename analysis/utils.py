@@ -710,7 +710,7 @@ def annotate_bars(ax, df):
         nr = int(row['Round'])
         print(f"Annotating {ds} {approach} with ({ep}, {nr})")
         ax.text(
-            x_center, height / 2,
+            x_center, height,
             f"{ep},{nr}",
             ha='center', va='center',
             rotation=90,
