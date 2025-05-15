@@ -14,6 +14,8 @@ import anndata
 import scanpy as sc
 import random
 
+from FedscGPT.utils import print_config
+
 SEED = 42
 def set_seed(seed=SEED):
     random.seed(seed)
@@ -699,9 +701,10 @@ def annotate_bars(ax, df):
         approach = p.get_label()
         if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
             continue
-
+        print(df)
         # look up the single row matching this bar
         row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
+        print(row)
         if row.empty:
             continue
         row = row.iloc[0]
