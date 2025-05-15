@@ -267,6 +267,7 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
     """
     # Load the results DataFrame and centralized results
     df = pd.read_csv(results_file_path)
+    df.dropna(inplace=True)
     df = df[~(df.Round == 0)]
     centralized_df = pd.read_csv(centralized_file_path)
     # Extract unique datasets and metrics

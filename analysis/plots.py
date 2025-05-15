@@ -52,7 +52,7 @@ if __name__ == '__main__':
         plot_tuning_heatmap(param_tuning_smpc_df, plot_name="metrics_heatmap-smpc", file_format=args.format)
     elif args.plot == 'annotation_communication':
         # Old: Figure 2d, New: Figure 3
-        # analyze_communication_efficiency(args.param_tuning_df, 'clients_cent.csv')
+        analyze_communication_efficiency(args.param_tuning_df, 'clients_cent.csv')
         analyze_communication_efficiency(param_tuning_smpc_df, 'clients_cent.csv', smpc=True)
     elif args.plot == 'annotation_accuracy_changes':
         # Old: Figure 2c, New: Figure 3
