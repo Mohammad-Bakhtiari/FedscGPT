@@ -32,7 +32,6 @@ def load_metric(filepath, metric):
 
 def collect_cent_metrics(base_path, data_dir, metric):
     accuracies = {}
-    import pdb; pdb.set_trace()
     for root, dirs, files in os.walk(base_path):
         if 'results.pkl' in files:
             client_name = os.path.basename(root)
@@ -47,7 +46,7 @@ def collect_cent_metrics(base_path, data_dir, metric):
                 else:
                     raise ValueError(f'Dataset {ds} does not exist')
             else:
-                batch = "centralized"
+                batch = "scGPT"
             accuracies[batch] = accuracy
     return accuracies
 
@@ -61,10 +60,8 @@ class CentralizedMetricPlotter:
         """
         data = []
         for dataset, values in metrics.items():
-            client_acc = [acc for key, acc in values.items() if key not in ['scGPT', 'FedscGPT-SMPC']]
-            scgpt_acc = values['centralized']
-            fedscgpt_smpc_acc = values['FedscGPT-SMPC']
-
+            scgpt_acc = values.pop('scGPT')
+            fedscgpt_smpc_acc = values.pop('FedscGPT-SMPC')
             # Append each client's data
             for client, acc in values.items():
                 data.append({'Dataset': dataset, 'Type': client, 'Accuracy': acc})
@@ -1389,7 +1386,7 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         scatter_plots = []
         for i, dataset in enumerate(datasets):
             dataset_clients = client_data[client_data['Dataset'] == dataset]
-            client_values = dataset_clients['Value'].values
+            client_values = dataset_clients['Accuracy'].values
             client_batches = dataset_clients['Type'].values
             # Scatter each client point with a slight horizontal offset to avoid overlap
             jitter = 0.05  # Add some horizontal jitter to avoid overlap

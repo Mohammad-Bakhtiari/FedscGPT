@@ -36,7 +36,6 @@ if __name__ == '__main__':
             metrics[dataset] = collect_cent_metrics("/".join([args.root_dir, "output", "annotation", dataset, 'centralized']),
                                                     args.data_dir, args.metric)
             metrics[dataset]['FedscGPT-SMPC'] = best[dataset]
-        import pdb; pdb.set_trace()
         plotter = CentralizedMetricPlotter()
         df = plotter.collect_data(metrics)
         df.to_csv('clients_cent.csv')
