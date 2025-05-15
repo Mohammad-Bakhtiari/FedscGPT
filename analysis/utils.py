@@ -612,7 +612,7 @@ def create_metrics_dataframe(root_dir, res_df_file):
                     'Approach': approach,
                     'Metric': metric,
                     'Value': value[0] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else value,
-                    'n_epochs': value[1] if approach in ['scGPT', 'scGPT-SMPC'] else None,
+                    'n_epochs': value[1] if approach in ['FedscGPT', 'scGPT-SMPC'] else None,
                     'Round': value[2] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
                 })
 
