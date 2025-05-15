@@ -4,7 +4,7 @@ import __init__
 import argparse
 from analysis.utils import (CentralizedMetricPlotter, collect_metrics, plot_tuning_heatmap, find_best_fed,
                             analyze_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
-                            plot_best_metrics, embedding_boxplot, fed_embedding_umap)
+                            plot_best_metrics, embedding_boxplot, fed_embedding_umap, accuracy_annotated_scatterplot)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         df = plotter.collect_data(metrics)
         df.to_csv('clients_cent.csv')
         df = pd.read_csv('clients_cent.csv')
-        plotter.plot_data_matplotlib(df, 'Accuracy', 'centralized_metric_plot', 'svg')
+        accuracy_annotated_scatterplot(df, "./plots/annotation", args.format)
     elif args.plot == 'annotation_metric_heatmap':
         # Old: Supplementary Figure 2, New: two figures for FedscGPT with or without SMPC
         plot_tuning_heatmap(args.param_tuning_df, plot_name="metrics_heatmap", file_format=args.format)
