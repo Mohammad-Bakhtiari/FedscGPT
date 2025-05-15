@@ -324,48 +324,27 @@ def plot_communication_comparison(fedscgpt_table, fedscgpt_smpc_table, out_path)
         rows   = [[lbl] + row for row in tbl[1:]]
         return [header] + rows
 
-    block1 = _label_block(fedscgpt_table,       "FedscGPT")
+    block1 = _label_block(fedscgpt_table,"FedscGPT")
     block2 = _label_block(fedscgpt_smpc_table, "FedscGPT-SMPC")
     combined = block1 + block2[1:]  # skip second header
-
-    # compute column widths in inches (approx)
     n_cols = len(combined[0])
     col_widths = []
     for c in range(n_cols):
         max_len = max(len(str(r[c])) for r in combined)
-        col_widths.append(max_len * 0.2)
+        col_widths.append(max_len * 0.06)
 
-    # figure size: width=sum widths, height=rows*0.4
-    fig, ax = plt.subplots(
-        figsize=(sum(col_widths) + 1, len(combined) * 0.4)
-    )
+    fig, ax = plt.subplots(figsize=(sum(col_widths) + 1, len(combined) * 0.4))
     ax.axis('off')
-
-    tbl = ax.table(
-        cellText=combined,
-        cellLoc='center',
-        loc='center'
-    )
-    # disable auto font size, set a larger font
+    tbl = ax.table(cellText=combined, cellLoc='center', loc='center')
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(14)
-
-    # zero padding & set widths/heights
     for (row, col), cell in tbl.get_celld().items():
-        cell.PAD = 0        # zero internal padding
-        cell.set_width(col_widths[col] + 0.5)
+        cell.PAD = 0
+        cell.set_width(col_widths[col] + 0.1)
         cell.set_height(0.3)
 
-    # scale overall table for compactness
-    tbl.scale(1, 1.1)
-
-    plt.tight_layout(pad=0)
-    fig.savefig(out_path, dpi=300, bbox_inches='tight')
-    plt.close(fig)
-
-
-
-
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.close()
 
 def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy', img_format='svg'):
     df = pd.read_csv(file_path)
