@@ -32,7 +32,6 @@ def collect_metrics(base_path, metric):
     accuracies = {}
     for root, dirs, files in os.walk(base_path):
         if 'results.pkl' in files:
-            import pdb; pdb.set_trace()
             client_name = os.path.basename(root)
             accuracy = load_metric(os.path.join(root, 'results.pkl'), metric)
             accuracies[client_name] = accuracy
