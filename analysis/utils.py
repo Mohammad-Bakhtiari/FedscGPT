@@ -664,9 +664,9 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     for i, metric in enumerate(metrics):
         ax = axes[i] if num_metrics > 1 else axes
         metric_df = df[df['Metric'] == metric]
-        sns.barplot(data=metric_df, x='Dataset', y='Value', hue='Approach', ax=ax, width=0.4)
+        sns.barplot(data=metric_df, x='Dataset', y='Value', hue='Approach', ax=ax, width=0.6)
         ax.set_ylabel(metric, fontsize=16)
-        ax.set_ylim(0, 1)
+        ax.set_ylim(0.5, 1)
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
@@ -706,15 +706,18 @@ def annotate_bars(ax, df):
         row = row.iloc[0]
 
         # annotate with (epoch, n_rounds)
-        ep = row['n_epochs']
-        nr = row['Round']
+        ep = int(row['n_epochs'])
+        nr = int(row['Round'])
         print(f"Annotating {ds} {approach} with ({ep}, {nr})")
         ax.text(
-            x_center, height + 0.02,
-            f"({ep},{nr})",
-            ha='center', va='bottom', fontsize=12
+            x_center, height / 2,
+            f"{ep},{nr}",
+            ha='center', va='center',
+            rotation=90,
+            color='white',
+            fontsize=12,
+            fontweight='bold'
         )
-
 
 
 def best_metrics_report(df):
