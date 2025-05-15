@@ -30,13 +30,24 @@ def load_metric(filepath, metric):
         data = pickle.load(file)
     return data['results'][f'test/{metric}']
 
-def collect_metrics(base_path, metric):
+def collect_metrics(base_path, data_dir, metric):
     accuracies = {}
     for root, dirs, files in os.walk(base_path):
         if 'results.pkl' in files:
             client_name = os.path.basename(root)
             accuracy = load_metric(os.path.join(root, 'results.pkl'), metric)
-            accuracies[client_name] = accuracy
+            if client_name.startswith('client'):
+                ds = root.split('/')[-3]
+                h5ad_file_dir = os.path.join(data_dir, ds,client_name, 'adata.h5ad')
+                if os.path.exists(h5ad_file_dir):
+                    batch = get_clients_batch_value(h5ad_file_dir, ds)
+                elif ds == "ms":
+                    batch = client_name
+                else:
+                    raise ValueError(f'Dataset {ds} does not exist')
+            else:
+                batch = "centralized"
+            accuracies[batch] = accuracy
     return accuracies
 
 
@@ -1367,9 +1378,9 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         plt.figure(figsize=(5, 5))
 
         # Separate client data and centralized/federated data
-        client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('client'))]
-        centralized_data = df[(df['Metric'] == metric) & (df['Type'] == 'Centralized')]
-        federated_data = df[(df['Metric'] == metric) & (df['Type'] == 'Federated')]
+        client_data = df[(df['Metric'] == metric) & (df['Type'] == 'Client')]
+        scgpt = df[(df['Metric'] == metric) & (df['Type'] == 'scGPT')]
+        fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT-SMPC')]
 
         # Scatter plot for client data
         colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
@@ -1406,15 +1417,15 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         # Overlay centralized and federated data points
         for i, dataset in enumerate(datasets):
             # Centralized as horizontal lines only within the dataset range
-            if not centralized_data[centralized_data['Dataset'] == dataset].empty:
-                centralized_value = centralized_data[centralized_data['Dataset'] == dataset]['Value'].values[0]
+            if not scgpt[scgpt['Dataset'] == dataset].empty:
+                centralized_value = scgpt[scgpt['Dataset'] == dataset]['Value'].values[0]
                 plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
                            color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3,
                            label=f"Centralized - {dataset}")
 
             # Federated as scatter points
-            if not federated_data[federated_data['Dataset'] == dataset].empty:
-                federated_value = federated_data[federated_data['Dataset'] == dataset]['Value'].values[0]
+            if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
+                federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
                             zorder=5, marker='D', s=100, label=f"Federated - {dataset}")
 

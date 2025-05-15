@@ -34,7 +34,8 @@ if __name__ == '__main__':
         metrics = {}
         best = find_best_fed(param_tuning_smpc_df, args.metric)
         for dataset in ["hp", "ms", "myeloid"]:
-            metrics[dataset] = collect_metrics("/".join([args.root_dir, "output", "annotation", dataset, args.mode]), args.metric)
+            metrics[dataset] = collect_metrics("/".join([args.root_dir, "output", "annotation", dataset, args.mode]),
+                                               args.data_dir, args.metric)
             metrics[dataset]['FedscGPT-SMPC'] = best[dataset]
         plotter = CentralizedMetricPlotter()
         df = plotter.collect_data(metrics)
