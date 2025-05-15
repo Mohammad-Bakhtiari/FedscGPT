@@ -686,29 +686,44 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
 
 def annotate_bars(ax, df):
+    """
+    Annotate only FedscGPT / FedscGPT-SMPC bars by matching bar heights
+    and dataset index (on the x-axis).
+    """
+    # The datasets in plotting order
     datasets = list(df['Dataset'].unique())
-    for p in ax.patches:
-        x_center = p.get_x() + p.get_width() / 2
-        bottom   = p.get_y()
-        height   = p.get_height()
-        y_text   = bottom + height * 0.9
+    # Only annotate these approaches
+    targets = {'FedscGPT', 'FedscGPT-SMPC'}
 
-        # Print for debugging
-        print(f"Bar for x={x_center:.3f}: bottom={bottom:.3f}, height={height:.3f}, y_text={y_text:.3f}")
+    # Width used in seaborn.barplot
+    bar_width = 0.6
 
-        ds_idx = int(round(x_center))
-        if ds_idx < 0 or ds_idx >= len(datasets):
-            print("  → x_center out of dataset range, skipping")
+    # Tolerance for matching heights
+    tol = 1e-6
+
+    for _, row in df.iterrows():
+        ds = row['Dataset']
+        approach = row['Approach']
+        if approach not in targets:
             continue
-        ds = datasets[ds_idx]
-        approach = p.get_label()
 
-        if approach in ('FedscGPT', 'FedscGPT-SMPC'):
-            row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
-            if not row.empty:
-                ep = int(row.iloc[0]['n_epochs'])
-                nr = int(row.iloc[0].get('n_rounds', row.iloc[0].get('Round', 0)))
-                print(f"  → Annotating {ds} {approach} at ({x_center:.3f}, {y_text:.3f}) with ({ep},{nr})")
+        val = float(row['Value'])
+        ds_idx = datasets.index(ds)
+
+        # Look for the matching patch
+        for p in ax.patches:
+            # center of this bar
+            x_center = p.get_x() + p.get_width() / 2
+            height = p.get_height()
+
+            # check dataset position and height match
+            if (abs(x_center - ds_idx) < bar_width/2 + 0.01
+                and abs(height - val) < tol):
+                # annotate at 90% of bar height
+                y_text = height * 0.9
+                ep = int(row.get('n_epochs', row.get('epoch', 0)))
+                nr = int(row.get('n_rounds', row.get('Round', 0)))
+
                 ax.text(
                     x_center, y_text,
                     f"{ep},{nr}",
@@ -720,6 +735,7 @@ def annotate_bars(ax, df):
                     zorder=10,
                     clip_on=False
                 )
+                break
 
 
 
