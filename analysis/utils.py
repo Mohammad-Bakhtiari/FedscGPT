@@ -281,8 +281,7 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
         row = [handle_ds_name(dataset)]
         for p in percentages:
             # Get the centralized accuracy for the specific dataset and metric
-            import pdb; pdb.set_trace()
-            central_value = centralized_df[(centralized_df['Dataset'] == dataset) & (centralized_df['Type'] == 'Centralized')][metric].values[0]
+            central_value = centralized_df[(centralized_df['Dataset'] == dataset) & (centralized_df['Type'] == 'scGPT')][metric].values[0]
 
             # Filter the data for the current dataset and metric
             data = df[(df['Dataset'] == dataset) & (df['Metric'] == metric)]
