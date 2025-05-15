@@ -708,6 +708,7 @@ def annotate_bars(ax, df):
         # annotate with (epoch, n_rounds)
         ep = int(row['n_epochs'])
         nr = int(row['Round'])
+        p.set_zorder(1)
         print(f"Annotating {ds} {approach} with ({ep}, {nr})")
         ax.text(
             x_center, height / 2,
