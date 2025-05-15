@@ -617,7 +617,7 @@ def create_metrics_dataframe(root_dir, res_df_file):
                     'n_epochs': value[1] if approach in ['FedscGPT', 'scGPT-SMPC'] else None,
                     'Round': value[2] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
                 })
-
+    import pdb; pdb.set_trace()
     # Creating the DataFrame
     df = pd.DataFrame(rows)
     df.Metric = df.Metric.apply(lambda x: x[5:].title() if x.startswith('test/') else x)
