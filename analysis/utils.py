@@ -611,7 +611,9 @@ def create_metrics_dataframe(root_dir, res_df_file):
                     'Dataset': dataset,
                     'Approach': approach,
                     'Metric': metric,
-                    'Value': value
+                    'Value': value[0] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else value,
+                    'n_epochs': value[1] if approach in ['scGPT', 'scGPT-SMPC'] else None,
+                    'Round': value[2] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
                 })
 
     # Creating the DataFrame
@@ -632,7 +634,7 @@ def find_best_performance(ds, df):
     results = {}
     for metric in df.Metric.unique():
         idmax = df[(df.Dataset == ds) & (df.Metric == metric)]["Value"].idxmax()
-        results[metric] = df.loc[idmax, "Value"]
+        results[metric] = df.loc[idmax, ["Value", "n_epochs", "Round"]].values
     return results
 
 
@@ -656,13 +658,14 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
     for i, metric in enumerate(metrics):
         ax = axes[i] if num_metrics > 1 else axes
-        sns.barplot(data=df[df['Metric'] == metric], x='Dataset', y='Value', hue='Approach', ax=ax, width=0.4)
+        metric_df = df[df['Metric'] == metric]
+        sns.barplot(data=metric_df, x='Dataset', y='Value', hue='Approach', ax=ax, width=0.4)
         ax.set_ylabel(metric, fontsize=16)
         ax.set_ylim(0, 1)
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
-
+        annotate_bars(ax, metric_df)
     # Get the handles and labels from the last axis
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.05, 0.98), fontsize=16, ncol=3)
@@ -675,6 +678,41 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     plt.savefig(f"{ANNOTATION_PLOTS_DIR}/best_metrics.{img_format}", dpi=300, format=img_format)
     plt.close()
     handle_image_format(start=False)
+
+
+def annotate_bars(ax, df):
+    datasets  = list(df['Dataset'].unique())
+
+    for p in ax.patches:
+        x_center = p.get_x() + p.get_width() / 2
+        height   = p.get_height()
+
+        # map x -> dataset (assuming x positions 0,1,2,... → datasets[0], datasets[1], ...)
+        ds_idx = int(round(x_center))
+        if ds_idx < 0 or ds_idx >= len(datasets):
+            continue
+        ds = datasets[ds_idx]
+
+        # patch label is the hue (Approach)
+        approach = p.get_label()
+        if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
+            continue
+
+        # look up the single row matching this bar
+        row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
+        if row.empty:
+            continue
+        row = row.iloc[0]
+
+        # annotate with (epoch, n_rounds)
+        ep = int(row['n_epochs'])
+        nr = int(row['n_rounds'])
+        ax.text(
+            x_center, height + 0.02,
+            f"({ep},{nr})",
+            ha='center', va='bottom', fontsize=12
+        )
+
 
 
 def best_metrics_report(df):
