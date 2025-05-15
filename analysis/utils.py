@@ -669,7 +669,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
-        annotate_bars(ax, metric_df[metric_df['Approach'] in ['FedscGPT', 'FedscGPT-SMPC']])
+        annotate_bars(ax, metric_df[metric_df['Approach'].isin(['FedscGPT', 'FedscGPT-SMPC'])])
     # Get the handles and labels from the last axis
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.05, 0.98), fontsize=16, ncol=3)
