@@ -714,8 +714,8 @@ def annotate_bars(ax, df):
             f"{ep},{nr}",
             ha='center', va='center',
             rotation=90,
-            color='white',
-            fontsize=12,
+            color='black',
+            fontsize=20,
             fontweight='bold'
         )
 
