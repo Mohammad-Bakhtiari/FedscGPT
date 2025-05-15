@@ -689,6 +689,7 @@ def annotate_bars(ax, df):
 
         # map x -> dataset (assuming x positions 0,1,2,... → datasets[0], datasets[1], ...)
         ds_idx = int(round(x_center))
+        print(f"ds_idx: {ds_idx}, x_center: {x_center}, height: {height}")
         if ds_idx < 0 or ds_idx >= len(datasets):
             continue
         ds = datasets[ds_idx]
