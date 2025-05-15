@@ -604,12 +604,12 @@ def create_metrics_dataframe(root_dir, res_df_file):
 
     rows = []
 
-    for dataset, modes in results.items():
-        for mode, metrics in modes.items():
+    for dataset, approaches in results.items():
+        for approach, metrics in approaches.items():
             for metric, value in metrics.items():
                 rows.append({
                     'Dataset': dataset,
-                    'Mode': mode,
+                    'Approach': approach,
                     'Metric': metric,
                     'Value': value
                 })
@@ -645,7 +645,7 @@ def handle_metrics(metric):
 def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     handle_image_format(img_format)
     df = create_metrics_dataframe(root_dir, param_tuning_df)
-    # TODO: check it works for new approach titles
+    print(f"Approaches: {df.Approach.unique()}")
     best_metrics_report(df)
 
     # Plot metrics with subplots for each metric and different modes as curves
@@ -656,7 +656,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
     for i, metric in enumerate(metrics):
         ax = axes[i] if num_metrics > 1 else axes
-        sns.barplot(data=df[df['Metric'] == metric], x='Dataset', y='Value', hue='Mode', ax=ax, width=0.4)
+        sns.barplot(data=df[df['Metric'] == metric], x='Dataset', y='Value', hue='Approach', ax=ax, width=0.4)
         ax.set_ylabel(metric, fontsize=16)
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
@@ -678,7 +678,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
 def best_metrics_report(df):
     # Calculate the differences between federated and centralized
-    df_pivot = df.pivot_table(index=['Dataset', 'Metric'], columns='Mode', values='Value').reset_index()
+    df_pivot = df.pivot_table(index=['Dataset', 'Metric'], columns='Approach', values='Value').reset_index()
     df_pivot['Difference'] = df_pivot['FedscGPT-SMPC'] - df_pivot['scGPT']
     # Calculate the percentage of centralized performance achieved by federated learning
     df_pivot['Percentage Achieved'] = (df_pivot['FedscGPT-SMPC'] / df_pivot['scGPT']) * 100
