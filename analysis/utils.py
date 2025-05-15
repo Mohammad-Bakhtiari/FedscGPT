@@ -50,19 +50,18 @@ class CentralizedMetricPlotter:
         data = []
         for dataset, values in metrics.items():
             client_acc = [acc for key, acc in values.items() if key not in ['scGPT', 'FedscGPT-SMPC']]
-            import pdb; pdb.set_trace()
-            centralized_acc = values['scGPT']
-            federated_acc = values['FedscGPT-SMPC']
+            scgpt_acc = values['centralized']
+            fedscgpt_smpc_acc = values['FedscGPT-SMPC']
 
             # Append each client's data
             for acc in client_acc:
                 data.append({'Dataset': dataset, 'Type': 'Client', 'Accuracy': acc})
 
             # Append centralized accuracy
-            data.append({'Dataset': dataset, 'Type': 'scGPT', 'Accuracy': centralized_acc})
+            data.append({'Dataset': dataset, 'Type': 'scGPT', 'Accuracy': scgpt_acc})
 
             # Append federated accuracy
-            data.append({'Dataset': dataset, 'Type': 'FedscGPT-SMPC', 'Accuracy': federated_acc})
+            data.append({'Dataset': dataset, 'Type': 'FedscGPT-SMPC', 'Accuracy': fedscgpt_smpc_acc})
 
         df = pd.DataFrame(data)
         return df
