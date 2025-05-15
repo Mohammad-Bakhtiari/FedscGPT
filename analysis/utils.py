@@ -234,8 +234,8 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
 
 
 
-def analyze_communication_efficiency(results_file_path, centralized_file_path, percentages=[70, 80, 90, 92, 95, 99],
-                                     metric="Accuracy"):
+def analyze_communication_efficiency(results_file_path, centralized_file_path, percentages=[70, 80, 90, 95, 99],
+                                     metric="Accuracy", smpc=False):
     """
     Analyze the communication efficiency by calculating the number of communication rounds and epochs required
     to reach specified percentages of the centralized accuracy and display the results in a table.
@@ -320,7 +320,7 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
             table[(row_idx, col_idx)].set_width(width + 0.5)
     for key, cell in table.get_celld().items():
         cell.set_height(0.2)
-    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/communication.svg", dpi=300, format="svg")
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/communication{'-smpc' if smpc else ''}.svg", dpi=300, format="svg")
 
 def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy', img_format='svg'):
     df = pd.read_csv(file_path)
