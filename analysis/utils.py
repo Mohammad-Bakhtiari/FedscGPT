@@ -1378,7 +1378,7 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         plt.figure(figsize=(5, 5))
 
         # Separate client data and centralized/federated data
-        client_data = df[(df['Metric'] == metric) & (df['Type'].startswith('client'))]
+        client_data = df[(df['Metric'] == metric) & (df['Type'].str.startswith('client'))]
         scgpt = df[(df['Metric'] == metric) & (df['Type'] == 'scGPT')]
         fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT-SMPC')]
 
