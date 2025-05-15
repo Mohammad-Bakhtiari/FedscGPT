@@ -32,14 +32,17 @@ if __name__ == '__main__':
     if args.plot == 'annotation_cent_box_plt': # Probably not used
         base_paths = ["/".join([args.root_dir, ds, args.mode]) for ds in ["hp", "ms", "myeloid"]]
         metrics = {}
-        best = find_best_fed(args.param_tuning_df, args.metric)
+        best = find_best_fed(param_tuning_smpc_df, args.metric)
         for dataset in ["hp", "ms", "myeloid"]:
             metrics[dataset] = collect_metrics("/".join([args.root_dir, "output", "annotation", dataset, args.mode]), args.metric)
-            metrics[dataset]['federated'] = best[dataset]
+            metrics[dataset]['FedscGen-SMPC'] = best[dataset]
         plotter = CentralizedMetricPlotter()
         df = plotter.collect_data(metrics)
         df.to_csv('clients_cent.csv')
         df = pd.read_csv('clients_cent.csv')
+        df["Metric"] = "Accuracy"
+        df["Value"] = df["Accuracy"]
+        df.drop(columns=["Accuracy"], inplace=True)
         accuracy_annotated_scatterplot(df, "./plots/annotation", args.format)
     elif args.plot == 'annotation_metric_heatmap':
         # Old: Supplementary Figure 2, New: two figures for FedscGPT with or without SMPC
