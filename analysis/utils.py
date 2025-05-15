@@ -294,7 +294,7 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path, p
             epochs_needed = None
 
             # Iterate over data sorted by rounds to find the first occurrence where the target value is met or exceeded
-            max_rounds = data['Round'].max()
+            max_rounds = data['Round'].astype(int).max()
             for r in range(1, max_rounds + 1):
                 rounds_data = data[data['Round'] == r]
                 m = rounds_data['Value'].idxmax()
