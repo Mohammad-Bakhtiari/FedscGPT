@@ -624,7 +624,6 @@ def create_metrics_dataframe(root_dir, res_df_file):
     df = pd.DataFrame(rows)
     df.Metric = df.Metric.apply(lambda x: x[5:].title() if x.startswith('test/') else x)
     df.Metric = df.Metric.apply(lambda x: x[:-2] + "F1" if x.endswith('f1') else x)
-    # import pdb; pdb.set_trace()
     return df
 
 
@@ -652,7 +651,6 @@ def handle_metrics(metric):
 def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     handle_image_format(img_format)
     df = create_metrics_dataframe(root_dir, param_tuning_df)
-    print(f"Approaches: {df.Approach.unique()}")
     best_metrics_report(df)
 
     # Plot metrics with subplots for each metric and different modes as curves
@@ -723,7 +721,7 @@ def annotate_bars(ax, df):
                 y_text = height * 0.9
                 ep = int(row.get('n_epochs', row.get('epoch', 0)))
                 nr = int(row.get('n_rounds', row.get('Round', 0)))
-
+                print(f"Annotating {approach} for {ds} at {x_center}, {y_text}")
                 ax.text(
                     x_center, y_text -0.05,
                     f"E:{ep}, R: {nr}",
