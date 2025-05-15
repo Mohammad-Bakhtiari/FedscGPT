@@ -2,7 +2,7 @@ import pandas as pd
 
 import __init__
 import argparse
-from analysis.utils import (CentralizedMetricPlotter, collect_metrics, plot_tuning_heatmap, find_best_fed,
+from analysis.utils import (CentralizedMetricPlotter, collect_cent_metrics, plot_tuning_heatmap, find_best_fed,
                             analyze_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
                             plot_best_metrics, embedding_boxplot, fed_embedding_umap, accuracy_annotated_scatterplot)
 
@@ -30,13 +30,13 @@ if __name__ == '__main__':
     param_tuning_smpc_df = args.param_tuning_df.replace('.csv', '-smpc.csv')
     param_tuning_smpc_pkl = args.param_tuning_pkl.replace('.pkl', '-smpc.pkl')
     if args.plot == 'annotation_cent_box_plt': # Probably not used
-        base_paths = ["/".join([args.root_dir, ds, args.mode]) for ds in ["hp", "ms", "myeloid"]]
         metrics = {}
         best = find_best_fed(param_tuning_smpc_df, args.metric)
         for dataset in ["hp", "ms", "myeloid"]:
-            metrics[dataset] = collect_metrics("/".join([args.root_dir, "output", "annotation", dataset, args.mode]),
-                                               args.data_dir, args.metric)
+            metrics[dataset] = collect_cent_metrics("/".join([args.root_dir, "output", "annotation", dataset, 'centralized']),
+                                                    args.data_dir, args.metric)
             metrics[dataset]['FedscGPT-SMPC'] = best[dataset]
+        import pdb; pdb.set_trace()
         plotter = CentralizedMetricPlotter()
         df = plotter.collect_data(metrics)
         df.to_csv('clients_cent.csv')
