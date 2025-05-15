@@ -617,14 +617,14 @@ def create_metrics_dataframe(root_dir, res_df_file):
                     'Approach': approach,
                     'Metric': metric,
                     'Value': value[0] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else value,
-                    'n_epochs': value[1] if approach in ['FedscGPT', 'scGPT-SMPC'] else None,
+                    'n_epochs': value[1] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
                     'Round': value[2] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
                 })
     # Creating the DataFrame
     df = pd.DataFrame(rows)
     df.Metric = df.Metric.apply(lambda x: x[5:].title() if x.startswith('test/') else x)
     df.Metric = df.Metric.apply(lambda x: x[:-2] + "F1" if x.endswith('f1') else x)
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     return df
 
 
