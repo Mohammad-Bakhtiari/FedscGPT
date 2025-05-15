@@ -679,11 +679,11 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 def best_metrics_report(df):
     # Calculate the differences between federated and centralized
     df_pivot = df.pivot_table(index=['Dataset', 'Metric'], columns='Mode', values='Value').reset_index()
-    df_pivot['Difference'] = df_pivot['federated'] - df_pivot['centralized']
+    df_pivot['Difference'] = df_pivot['FedscGPT-SMPC'] - df_pivot['scGPT']
     # Calculate the percentage of centralized performance achieved by federated learning
-    df_pivot['Percentage Achieved'] = (df_pivot['federated'] / df_pivot['centralized']) * 100
+    df_pivot['Percentage Achieved'] = (df_pivot['FedscGPT-SMPC'] / df_pivot['scGPT']) * 100
     # Print the difference and percentage for each metric
-    print("Differences and Percentage Achieved between Federated and Centralized for each metric:")
+    print("Differences and Percentage Achieved between FedscGPT-SMPC and scGPT for each metric:")
     print(df_pivot[['Dataset', 'Metric', 'Difference', 'Percentage Achieved']])
     # Identify and print the maximum difference
     max_diff_row = df_pivot.loc[df_pivot['Difference'].abs().idxmax()]
