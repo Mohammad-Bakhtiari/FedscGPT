@@ -694,33 +694,32 @@ def annotate_bars(ax, df):
         if ds_idx < 0 or ds_idx >= len(datasets):
             continue
         ds = datasets[ds_idx]
-
         approach = p.get_label()
         if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
             continue
-
         row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
         if row.empty:
             continue
-        row = row.iloc[0]
         ep = int(row['n_epochs'])
         nr = int(row.get('n_rounds', row.get('Round', 0)))
 
-        # ensure bar is underneath
+        # draw bar underneath
         p.set_zorder(1)
 
-        # annotate inside bar, rotated, on top
+        # annotate at 90% of bar height
+        y_text = height * 0.9
         ax.text(
-            x_center, height / 2,
+            x_center, y_text,
             f"{ep},{nr}",
             ha='center', va='center',
             rotation=90,
             color='white',
             fontsize=12,
             fontweight='bold',
-            zorder=10,       # draw on top of bars
-            clip_on=False    # don’t clip within the bar patch
+            zorder=10,
+            clip_on=False
         )
+
 
 
 
