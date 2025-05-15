@@ -658,7 +658,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
     # Plot metrics with subplots for each metric and different modes as curves
     metrics = df['Metric'].unique()
     num_metrics = len(metrics)
-    fig, axes = plt.subplots(1, num_metrics, figsize=(4 * num_metrics, 4))
+    fig, axes = plt.subplots(1, num_metrics, figsize=(5.5 * num_metrics, 4))
 
 
     for i, metric in enumerate(metrics):
