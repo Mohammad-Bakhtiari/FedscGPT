@@ -48,6 +48,7 @@ def collect_metrics(base_path, data_dir, metric):
             else:
                 batch = "centralized"
             accuracies[batch] = accuracy
+    import pdb; pdb.set_trace()
     return accuracies
 
 
