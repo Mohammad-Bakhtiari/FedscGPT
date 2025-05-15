@@ -693,6 +693,7 @@ def annotate_bars(ax, df):
         if ds_idx < 0 or ds_idx >= len(datasets):
             continue
         ds = datasets[ds_idx]
+        print(ds)
 
         # patch label is the hue (Approach)
         approach = p.get_label()
