@@ -666,7 +666,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
         metric_df = df[df['Metric'] == metric]
         sns.barplot(data=metric_df, x='Dataset', y='Value', hue='Approach', ax=ax, width=0.6)
         ax.set_ylabel(metric, fontsize=16)
-        ax.set_ylim(0.5, 1)
+        ax.set_ylim(0.4, 1)
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
