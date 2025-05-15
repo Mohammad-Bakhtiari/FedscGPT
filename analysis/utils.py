@@ -725,7 +725,7 @@ def annotate_bars(ax, df):
                 nr = int(row.get('n_rounds', row.get('Round', 0)))
 
                 ax.text(
-                    x_center, y_text,
+                    x_center, y_text -0.05,
                     f"E:{ep}, R: {nr}",
                     ha='center', va='center',
                     rotation=90,
