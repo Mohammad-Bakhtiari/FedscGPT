@@ -688,44 +688,38 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 def annotate_bars(ax, df):
     datasets = list(df['Dataset'].unique())
     for p in ax.patches:
-        # bar geometry
         x_center = p.get_x() + p.get_width() / 2
         bottom   = p.get_y()
         height   = p.get_height()
+        y_text   = bottom + height * 0.9
 
-        # find which dataset this is
+        # Print for debugging
+        print(f"Bar for x={x_center:.3f}: bottom={bottom:.3f}, height={height:.3f}, y_text={y_text:.3f}")
+
         ds_idx = int(round(x_center))
         if ds_idx < 0 or ds_idx >= len(datasets):
+            print("  → x_center out of dataset range, skipping")
             continue
         ds = datasets[ds_idx]
-
         approach = p.get_label()
-        if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
-            continue
 
-        row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
-        if row.empty:
-            continue
-        row = row.iloc[0]
-        ep = int(row['n_epochs'])
-        nr = int(row.get('n_rounds', row.get('Round', 0)))
-
-        # make sure bar is underneath
-        p.set_zorder(1)
-
-        # annotate at 90% up the bar
-        y_text = bottom + height * 0.9
-        ax.text(
-            x_center, y_text,
-            f"{ep},{nr}",
-            ha='center', va='center',
-            rotation=90,
-            color='white',
-            fontsize=12,
-            fontweight='bold',
-            zorder=10,
-            clip_on=False
-        )
+        if approach in ('FedscGPT', 'FedscGPT-SMPC'):
+            row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
+            if not row.empty:
+                ep = int(row.iloc[0]['n_epochs'])
+                nr = int(row.iloc[0].get('n_rounds', row.iloc[0].get('Round', 0)))
+                print(f"  → Annotating {ds} {approach} at ({x_center:.3f}, {y_text:.3f}) with ({ep},{nr})")
+                ax.text(
+                    x_center, y_text,
+                    f"{ep},{nr}",
+                    ha='center', va='center',
+                    rotation=90,
+                    color='white',
+                    fontsize=12,
+                    fontweight='bold',
+                    zorder=10,
+                    clip_on=False
+                )
 
 
 
