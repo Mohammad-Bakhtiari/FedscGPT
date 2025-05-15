@@ -47,19 +47,19 @@ class CentralizedMetricPlotter:
         """
         data = []
         for dataset, values in metrics.items():
-            client_acc = [acc for key, acc in values.items() if key not in ['centralized', 'federated']]
-            centralized_acc = values['centralized']
-            federated_acc = values['federated']
+            client_acc = [acc for key, acc in values.items() if key not in ['scGPT', 'FedscGPT-SMPC']]
+            centralized_acc = values['scGPT']
+            federated_acc = values['FedscGPT-SMPC']
 
             # Append each client's data
             for acc in client_acc:
                 data.append({'Dataset': dataset, 'Type': 'Client', 'Accuracy': acc})
 
             # Append centralized accuracy
-            data.append({'Dataset': dataset, 'Type': 'Centralized', 'Accuracy': centralized_acc})
+            data.append({'Dataset': dataset, 'Type': 'scGPT', 'Accuracy': centralized_acc})
 
             # Append federated accuracy
-            data.append({'Dataset': dataset, 'Type': 'Federated', 'Accuracy': federated_acc})
+            data.append({'Dataset': dataset, 'Type': 'FedscGPT-SMPC', 'Accuracy': federated_acc})
 
         df = pd.DataFrame(data)
         return df
