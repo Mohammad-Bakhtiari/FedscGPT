@@ -32,6 +32,7 @@ def collect_metrics(base_path, metric):
     accuracies = {}
     for root, dirs, files in os.walk(base_path):
         if 'results.pkl' in files:
+            import pdb; pdb.set_trace()
             client_name = os.path.basename(root)
             accuracy = load_metric(os.path.join(root, 'results.pkl'), metric)
             accuracies[client_name] = accuracy
@@ -47,7 +48,6 @@ class CentralizedMetricPlotter:
         """
         data = []
         for dataset, values in metrics.items():
-            import pdb; pdb.set_trace()
             client_acc = [acc for key, acc in values.items() if key not in ['scGPT', 'FedscGPT-SMPC']]
             centralized_acc = values['scGPT']
             federated_acc = values['FedscGPT-SMPC']
