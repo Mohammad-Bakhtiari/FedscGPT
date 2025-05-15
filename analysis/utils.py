@@ -669,7 +669,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
-        annotate_bars(ax, metric_df)
+        annotate_bars(ax, metric_df[metric_df['Approach'] in ['FedscGPT', 'FedscGPT-SMPC']])
     # Get the handles and labels from the last axis
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.05, 0.98), fontsize=16, ncol=3)
@@ -686,7 +686,6 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
 def annotate_bars(ax, df):
     datasets  = list(df['Dataset'].unique())
-
     for p in ax.patches:
         x_center = p.get_x() + p.get_width() / 2
         height   = p.get_height()
@@ -699,8 +698,6 @@ def annotate_bars(ax, df):
 
         # patch label is the hue (Approach)
         approach = p.get_label()
-        if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
-            continue
         # look up the single row matching this bar
         row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
         if row.empty:
@@ -710,6 +707,7 @@ def annotate_bars(ax, df):
         # annotate with (epoch, n_rounds)
         ep = row['n_epochs']
         nr = row['Round']
+        print(f"Annotating {ds} {approach} with ({ep}, {nr})")
         ax.text(
             x_center, height + 0.02,
             f"({ep},{nr})",
