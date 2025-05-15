@@ -303,7 +303,29 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path,
 
         table_data.append(row)
 
-    # ... (rest of your table plotting code unchanged) ...
+    # Calculate column widths based on the longest text in each column
+    col_widths = []
+    for col_idx in range(len(table_data[0])):
+        max_len = max(len(str(table_data[row_idx][col_idx])) for row_idx in range(len(table_data)))
+        col_widths.append(max_len * 0.2)  # Adjust this multiplier as needed for text size
+
+    # Plotting the table
+    fig, ax = plt.subplots(figsize=(sum(col_widths) + 0.7, len(table_data) * 0.5))
+    ax.axis('tight')
+    ax.axis('off')
+
+    # Create the table
+    table = ax.table(cellText=table_data, cellLoc='center', loc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)
+
+    # Set column widths based on calculated values
+    for col_idx, width in enumerate(col_widths):
+        table.auto_set_column_width(col=col_idx)  # Ensure the column auto width is set
+        for row_idx in range(len(table_data)):
+            table[(row_idx, col_idx)].set_width(width + 0.5)
+    for key, cell in table.get_celld().items():
+        cell.set_height(0.2)
 
     out_fname = f"communication{'-smpc' if smpc else ''}.svg"
     plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{out_fname}", dpi=300, format="svg")
