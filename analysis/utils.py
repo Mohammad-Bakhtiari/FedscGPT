@@ -30,8 +30,9 @@ def load_metric(filepath, metric):
         data = pickle.load(file)
     return data['results'][f'test/{metric}']
 
-def collect_metrics(base_path, data_dir, metric):
+def collect_cent_metrics(base_path, data_dir, metric):
     accuracies = {}
+    import pdb; pdb.set_trace()
     for root, dirs, files in os.walk(base_path):
         if 'results.pkl' in files:
             client_name = os.path.basename(root)
@@ -1373,6 +1374,7 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
 
     metrics = df['Metric'].unique()
     datasets = df['Dataset'].unique()
+    print(datasets)
 
     for metric in metrics:
         plt.figure(figsize=(5, 5))
@@ -1417,20 +1419,21 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         for i, dataset in enumerate(datasets):
             # Centralized as horizontal lines only within the dataset range
             if not scgpt[scgpt['Dataset'] == dataset].empty:
-                centralized_value = scgpt[scgpt['Dataset'] == dataset]['Value'].values[0]
-                plt.hlines(y=centralized_value, xmin=i + 0.7, xmax=i + 1.3,
+                scgpt_value = scgpt[scgpt['Dataset'] == dataset]['Value'].values[0]
+                plt.hlines(y=scgpt_value, xmin=i + 0.7, xmax=i + 1.3,
                            color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3,
-                           label=f"Centralized - {dataset}")
+                           label=f"scGPT")
 
             # Federated as scatter points
             if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
                 federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker='D', s=100, label=f"Federated - {dataset}")
+                            zorder=5, marker='D', s=100, label=f"FedscGPT-SMPC")
 
         # Customize the plot
         plt.xlabel('', fontsize=1)
         plt.ylabel(metric.capitalize(), fontsize=20)
+        plt.ylim(0, 1)
         plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
         plt.yticks(fontsize=18)
 
