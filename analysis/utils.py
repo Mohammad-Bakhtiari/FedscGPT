@@ -686,30 +686,30 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
 
 def annotate_bars(ax, df):
-    datasets  = list(df['Dataset'].unique())
+    datasets = list(df['Dataset'].unique())
     for p in ax.patches:
         x_center = p.get_x() + p.get_width() / 2
         height   = p.get_height()
-
-        # map x -> dataset (assuming x positions 0,1,2,... → datasets[0], datasets[1], ...)
-        ds_idx = int(round(x_center))
+        ds_idx   = int(round(x_center))
         if ds_idx < 0 or ds_idx >= len(datasets):
             continue
         ds = datasets[ds_idx]
 
-        # patch label is the hue (Approach)
         approach = p.get_label()
-        # look up the single row matching this bar
+        if approach not in ('FedscGPT', 'FedscGPT-SMPC'):
+            continue
+
         row = df[(df['Dataset'] == ds) & (df['Approach'] == approach)]
         if row.empty:
             continue
         row = row.iloc[0]
-
-        # annotate with (epoch, n_rounds)
         ep = int(row['n_epochs'])
-        nr = int(row['Round'])
+        nr = int(row.get('n_rounds', row.get('Round', 0)))
+
+        # ensure bar is underneath
         p.set_zorder(1)
-        print(f"Annotating {ds} {approach} with ({ep}, {nr})")
+
+        # annotate inside bar, rotated, on top
         ax.text(
             x_center, height / 2,
             f"{ep},{nr}",
@@ -718,9 +718,10 @@ def annotate_bars(ax, df):
             color='white',
             fontsize=12,
             fontweight='bold',
-            zorder=10,  # draw on top of bars
-            clip_on=False  # don’t clip within the bar patch
+            zorder=10,       # draw on top of bars
+            clip_on=False    # don’t clip within the bar patch
         )
+
 
 
 def best_metrics_report(df):
