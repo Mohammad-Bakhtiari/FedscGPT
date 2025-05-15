@@ -1377,17 +1377,17 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         plt.figure(figsize=(5, 5))
 
         # Separate client data and centralized/federated data
-        client_data = df[(df['Metric'] == metric) & (df['Type'].str.startswith('client'))]
-        scgpt = df[(df['Metric'] == metric) & (df['Type'] == 'scGPT')]
-        fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT-SMPC')]
+        df_metric = df[df['Metric'] == metric]
+        scgpt = df_metric[df_metric['Type'] == 'scGPT']
+        fedscgpt_smpc = df_metric[df_metric['Type'] == 'FedscGPT-SMPC']
+        client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'FedscGPT-SMPC'])]
 
         # Scatter plot for client data
         colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
         scatter_plots = []
         for i, dataset in enumerate(datasets):
             dataset_clients = client_data[client_data['Dataset'] == dataset]
-            import pdb; pdb.set_trace()
-            client_values = dataset_clients['Accuracy'].values
+            client_values = dataset_clients['Value'].values
             client_batches = dataset_clients['Type'].values
             # Scatter each client point with a slight horizontal offset to avoid overlap
             jitter = 0.05  # Add some horizontal jitter to avoid overlap
