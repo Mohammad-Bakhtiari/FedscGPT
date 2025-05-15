@@ -459,15 +459,11 @@ def load_results_pkl(root_dir, pkl_file, best_fed):
     #             print(f"results.pkl not found in {dataset} {mode}")
     # return results
 
-def load_query_datasets(data_dir):
-    datasets = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
-    query_datasets = {}
-    for dataset in datasets:
-        candidates = [q for q in os.listdir(os.path.join(data_dir, dataset)) if q.startswith('query')]
-        if len(candidates) > 1:
-            raise ValueError(f"There are {len(candidates)} candidates for {dataset}")
-        query_datasets[dataset] = anndata.read_h5ad(os.path.join(data_dir, dataset, candidates[0]))
-    return query_datasets
+def load_query_datasets(data_dir, dataset):
+    candidates = [q for q in os.listdir(os.path.join(data_dir, dataset)) if q.startswith('query')]
+    assert len(candidates) == 1, f"There are {len(candidates)} candidates for {dataset}"
+    return anndata.read_h5ad(os.path.join(data_dir, dataset, candidates[0]))
+
 
 
 
@@ -539,13 +535,9 @@ def plot_umap_and_conf_matrix(root_dir, data_dir, res_pkl_file, res_df_file):
     df = pd.read_csv(res_df_file)
     best_fed = {ds: df.loc[df[(df.Dataset==ds) & (df.Metric == 'Accuracy')]["Value"].idxmax()] for ds in df.Dataset.unique()}
     results = load_results_pkl(root_dir, res_pkl_file, best_fed)
-    import pdb; pdb.set_trace()
-    query_datasets = load_query_datasets(data_dir)
-
 
     for dataset in results.keys():
-        # plot_confusion_matrices(dataset, results)
-        adata = query_datasets[dataset]
+        adata = load_query_datasets(data_dir, dataset)
         predictions_centralized = results[dataset]['centralized']['predictions']
         predictions_federated = results[dataset]['federated']['predictions']
         labels = results[dataset]['centralized']['labels']  # Assuming the labels are the same for all modes
