@@ -23,7 +23,7 @@ if [ ! -d "${results_dir}/embedding" ]; then
 fi
 
 # Plot centralized box-plots for accuracy
-python3 plots.py --plot "annotation_cent_box_plt" --mode "centralized" --root_dir $root_dir  --param_tuning_df  $param_tuning_df_file \
+python3 plots.py --plot "annotation_cent_box_plt" --mode "centralized" --root_dir $root_dir --data_dir $data_dir --param_tuning_df  $param_tuning_df_file \
 --metric "accuracy"
 
 
@@ -36,10 +36,10 @@ python3 plots.py --plot "annotation_communication" --param_tuning_df $param_tuni
 ## Plot metric(Accuracy) changes over rounds and epochs
 python3 plots.py --plot "annotation_accuracy_changes" --param_tuning_df $param_tuning_df_file --format 'svg'
 
-# Plot confusion matrices federated vs centralized for different datasets
+# Plot confusion matrices FedscGPT-SMPC (best params based on accuracy) vs scGPT for different datasets
 python3 plots.py --plot "annotation_conf_matrix" --root_dir $root_dir --param_tuning_pkl $param_tuning_pkl_file --data_dir $data_dir --param_tuning_df $param_tuning_df_file
 
-# Plot best metrics
+# Plot best metrics based on each metric
 python3 plots.py --plot "annotation_best_metrics" --root_dir "${root_dir}/output/annotation" --param_tuning_df $param_tuning_df_file --format 'png'
 
 # Plot reference mapping boxplot
