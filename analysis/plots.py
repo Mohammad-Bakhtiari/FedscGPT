@@ -3,7 +3,7 @@ import pandas as pd
 import __init__
 import argparse
 from analysis.utils import (CentralizedMetricPlotter, collect_cent_metrics, plot_tuning_heatmap, find_best_fed,
-                            plo_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
+                            plot_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
                             plot_best_metrics, embedding_boxplot, fed_embedding_umap, accuracy_annotated_scatterplot)
 
 if __name__ == '__main__':
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         plot_tuning_heatmap(param_tuning_smpc_df, plot_name="metrics_heatmap-smpc", file_format=args.format)
     elif args.plot == 'annotation_communication':
         # Old: Figure 2d, New: Figure 3
-        plo_communication_efficiency(args.param_tuning_df, param_tuning_smpc_df)
+        plot_communication_efficiency(args.param_tuning_df, param_tuning_smpc_df)
     elif args.plot == 'annotation_accuracy_changes':
         # Old: Figure 2c, New: Figure 3
         plot_metric_cahnges_over_ER(param_tuning_smpc_df, img_format=args.format)

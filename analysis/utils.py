@@ -245,9 +245,9 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.{file_format}", dpi=300)
 
 
-def plo_communication_efficiency(fedscgpt_param_tuning, fedscgpt_smpc_param_tuning):
-    fedscgpt_tabel = analyze_communication_efficiency(fedscgpt_param_tuning, 'clients_cent.csv')
-    fedscgpt_smpc_tabel = analyze_communication_efficiency(fedscgpt_smpc_param_tuning, 'clients_cent.csv', smpc=True)
+def plot_communication_efficiency(fedscgpt_param_tuning, fedscgpt_smpc_param_tuning):
+    fedscgpt_table = analyze_communication_efficiency(fedscgpt_param_tuning, 'clients_cent.csv')
+    fedscgpt_smpc_table = analyze_communication_efficiency(fedscgpt_smpc_param_tuning, 'clients_cent.csv', smpc=True)
     plot_communication_comparison(
         fedscgpt_table,
         fedscgpt_smpc_table,
