@@ -599,6 +599,8 @@ def create_metrics_dataframe(root_dir, res_df_file):
     fedscgpt = pd.read_csv(res_df_file)
     fedscgpt.dropna(inplace=True)
     fedscgpt_smpc = pd.read_csv(res_df_file.replace('.csv', '-smpc.csv'))
+    fedscgpt.dropna(inplace=True)
+    assert fedscgpt.shape[0] == fedscgpt_smpc.shape[0], "FedscGPT and FedscGPT-SMPC have different number of rows"
     results = {}
     for ds in fedscgpt.Dataset.unique():
         results[ds] = {"FedscGPT": find_best_performance(ds, fedscgpt),
@@ -706,8 +708,8 @@ def annotate_bars(ax, df):
         row = row.iloc[0]
 
         # annotate with (epoch, n_rounds)
-        ep = int(row['n_epochs'])
-        nr = int(row['Round'])
+        ep = row['n_epochs']
+        nr = row['Round']
         ax.text(
             x_center, height + 0.02,
             f"({ep},{nr})",
