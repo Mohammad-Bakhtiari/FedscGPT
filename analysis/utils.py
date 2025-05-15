@@ -706,7 +706,7 @@ def annotate_bars(ax, df):
 
         # annotate with (epoch, n_rounds)
         ep = int(row['n_epochs'])
-        nr = int(row['n_rounds'])
+        nr = int(row['Round'])
         ax.text(
             x_center, height + 0.02,
             f"({ep},{nr})",
