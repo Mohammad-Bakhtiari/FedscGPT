@@ -658,13 +658,14 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
         ax = axes[i] if num_metrics > 1 else axes
         sns.barplot(data=df[df['Metric'] == metric], x='Dataset', y='Value', hue='Approach', ax=ax, width=0.4)
         ax.set_ylabel(metric, fontsize=16)
+        ax.set_ylim(0, 1)
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
 
     # Get the handles and labels from the last axis
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, [l.title() for l in labels], loc='upper left', bbox_to_anchor=(0.05, 0.98), fontsize=16, ncol=2)
+    fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.05, 0.98), fontsize=16, ncol=3)
 
     # Remove legends from all axes
     for ax in axes:
