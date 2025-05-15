@@ -319,9 +319,15 @@ def plot_communication_comparison(fedscgpt_table, fedscgpt_smpc_table, out_path)
     Plot two vertically stacked tables comparing FedscGPT and FedscGPT-SMPC,
     with zero cell padding, larger font, and a compact layout.
     """
+
     def _label_block(tbl, lbl):
+        # prepend header
         header = ["Approach"] + tbl[0]
-        rows   = [[lbl] + row for row in tbl[1:]]
+        rows = []
+        for i, row in enumerate(tbl[1:]):
+            # only the first data row gets the label; the rest are blank
+            prefix = lbl if i == 0 else ""
+            rows.append([prefix] + row)
         return [header] + rows
 
     block1 = _label_block(fedscgpt_table,"FedscGPT")
