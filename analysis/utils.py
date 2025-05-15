@@ -326,7 +326,7 @@ def plot_communication_comparison(fedscgpt_table, fedscgpt_smpc_table, out_path)
         rows = []
         for i, row in enumerate(tbl[1:]):
             # only the first data row gets the label; the rest are blank
-            prefix = lbl if i == 0 else ""
+            prefix = lbl if i == 1 else ""
             rows.append([prefix] + row)
         return [header] + rows
 
@@ -348,7 +348,12 @@ def plot_communication_comparison(fedscgpt_table, fedscgpt_smpc_table, out_path)
         cell.PAD = 0
         cell.set_width(col_widths[col] + 0.1)
         cell.set_height(0.3)
-
+    tbl[(1, 0)].visible_edges = 'TLR'
+    tbl[(2, 0)].visible_edges = 'LR'
+    tbl[(3, 0)].visible_edges = 'LRB'
+    tbl[(4, 0)].visible_edges = 'TLR'
+    tbl[(5, 0)].visible_edges = 'LR'
+    tbl[(6, 0)].visible_edges = 'LRB'
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
 
