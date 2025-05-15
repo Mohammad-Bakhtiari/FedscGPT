@@ -50,6 +50,7 @@ class CentralizedMetricPlotter:
         data = []
         for dataset, values in metrics.items():
             client_acc = [acc for key, acc in values.items() if key not in ['scGPT', 'FedscGPT-SMPC']]
+            import pdb; pdb.set_trace()
             centralized_acc = values['scGPT']
             federated_acc = values['FedscGPT-SMPC']
 
