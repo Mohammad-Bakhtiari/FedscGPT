@@ -721,7 +721,7 @@ def annotate_bars(ax, df):
                 y_text = height * 0.9
                 ep = int(row.get('n_epochs', row.get('epoch', 0)))
                 nr = int(row.get('n_rounds', row.get('Round', 0)))
-                print(f"Annotating {approach} for {ds} at {x_center}, {y_text}")
+                print(f"Annotating {approach} for {ds} with Epoch: {ep}, Round: {nr}")
                 ax.text(
                     x_center, y_text -0.05,
                     f"E:{ep}, R: {nr}",
