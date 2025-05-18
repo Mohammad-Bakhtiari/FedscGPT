@@ -475,5 +475,4 @@ class FedEmbedder(FedBase):
         total = encrypted_counts[0]
         for count in encrypted_counts[1:]:
             total = total + count
-        import pdb; pdb.set_trace()
         self.total_n_samples = int(total.get_plain_text().item())
