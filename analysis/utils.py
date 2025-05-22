@@ -194,7 +194,7 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     fig, axs = plt.subplots(len(metric_keys), len(dataset_keys),
                             figsize=(len(dataset_keys) *7, len(df['n_epochs'].unique()) + 1),
                             squeeze=True)
-    fig.subplots_adjust(left=0.08, right=0.8, top=0.9, bottom=0.05, wspace=0.01, hspace=0.01)
+    fig.subplots_adjust(left=0.08, right=0.8, top=0.9, bottom=0.15, wspace=0.01, hspace=0.01)
 
     norm = colors.Normalize(vmin=0, vmax=1)
     cmap = cm.get_cmap('Reds_r')
