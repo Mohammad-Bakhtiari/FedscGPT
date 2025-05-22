@@ -417,6 +417,7 @@ def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_m
 
 def find_best_fed(file_path, metric):
     df = pd.read_csv(file_path)
+    df.dropna(inplace=True)
     df = df[df['Metric'] == metric.title()]
     dataset_keys = df['Dataset'].unique()
     best = {}

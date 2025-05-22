@@ -31,7 +31,9 @@ if __name__ == '__main__':
     param_tuning_smpc_pkl = args.param_tuning_pkl.replace('.pkl', '-smpc.pkl')
     if args.plot == 'annotation_cent_box_plt': # Probably not used
         metrics = {}
+        print("[FedscGPT]: Best results found ")
         fedscgpt = find_best_fed(args.param_tuning_df, args.metric)
+        print("[FedscGPT-SMPC]: Best results found ")
         fedscgpt_smpc = find_best_fed(param_tuning_smpc_df, args.metric)
         for dataset in ["hp", "ms", "myeloid"]:
             metrics[dataset] = collect_cent_metrics("/".join([args.root_dir, "output", "annotation", dataset, 'centralized']),
