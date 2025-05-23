@@ -24,8 +24,8 @@ def set_seed(seed=SEED):
 set_seed(SEED)
 image_format = 'svg'
 ANNOTATION_PLOTS_DIR = 'plots/annotation'
-FEDSCGPT_MARKER = '*'
-FEDSCGPT_SMPC_MARKER = 'D'
+FEDSCGPT_MARKER = 'D'
+FEDSCGPT_SMPC_MARKER = '*'
 
 
 def load_metric(filepath, metric):
