@@ -24,6 +24,9 @@ def set_seed(seed=SEED):
 set_seed(SEED)
 image_format = 'svg'
 ANNOTATION_PLOTS_DIR = 'plots/annotation'
+FEDSCGPT_MARKER = '*'
+FEDSCGPT_SMPC_MARKER = 'D'
+
 
 def load_metric(filepath, metric):
     with open(filepath, 'rb') as file:
@@ -103,47 +106,6 @@ class CentralizedMetricPlotter:
 
         # Show the plot
         fig.show()
-
-    @staticmethod
-    def plot_data_matplotlib(df, metric_name, plot_name, img_format='svg'):
-        """
-        Plot data using Matplotlib from a pandas DataFrame.
-        """
-        datasets = df['Dataset'].unique()
-        client_accuracies = [df[(df['Dataset'] == dataset) & (df['Type'] == 'Client')]['Accuracy'].values for dataset in
-                             datasets]
-        centralized_accuracies = df[df['Type'] == 'Centralized'].set_index('Dataset')['Accuracy']
-        federated_accuracies = df[df['Type'] == 'Federated'].set_index('Dataset')['Accuracy']
-
-        plt.figure(figsize=(5, 5))
-        # Create boxplots
-        box = plt.boxplot(client_accuracies, patch_artist=True, positions=range(1, len(datasets) + 1))
-        # Colors for boxplots
-        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
-        for patch, color in zip(box['boxes'], colors[:len(box['boxes'])]):
-            patch.set_facecolor(color)
-
-        # Add centralized accuracies as horizontal dashed lines
-        for i, dataset in enumerate(datasets):
-            plt.axhline(y=centralized_accuracies[dataset], color=box['boxes'][i].get_facecolor(), linestyle='--',
-                        linewidth=2, zorder=3)
-            plt.scatter(i + 1, federated_accuracies[dataset], color=box['boxes'][i].get_facecolor(), edgecolor='black',
-                        zorder=5, marker='*', s=100)
-
-        boxplot_image_path = 'boxplot.png'
-        boxplot_image_pil = Image.open(boxplot_image_path).convert("RGBA")  # Ensure it is RGBA
-        # Convert to an array suitable for Matplotlib
-        boxplot_image = np.array(boxplot_image_pil)
-        image_placeholder_instance = ImagePlaceholder()
-        legend_elements = [
-            Line2D([0], [0], color='black', lw=2, linestyle='--', label='Centralized'),
-            Line2D([0], [0], marker='o', color='w', markersize=10, label='outlier',
-                   markeredgecolor='black'),
-            Line2D([0], [0], marker='*', color='w', markersize=10, label='Federated',
-                   markeredgecolor='black'),
-            image_placeholder_instance
-        ]
-        legend_labels = ['Centralized', 'Outlier', 'Federated', 'Clients']
 
         class HandlerImage:
             def __init__(self, image):
@@ -1015,8 +977,8 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
     # Style map for known approaches; fallback to X
     style_map = {
         'scGPT':           {'kind':'line', 'linestyle':'--', 'linewidth':2},
-        'FedscGPT':        {'marker':'D', 's':100, 'edgecolor':'black'},
-        'FedscGPT-SMPC':   {'marker':'*', 's':100, 'edgecolor':'black'}
+        'FedscGPT':        {'marker':FEDSCGPT_MARKER, 's':100, 'edgecolor':'black'},
+        'FedscGPT-SMPC':   {'marker':FEDSCGPT_SMPC_MARKER, 's':100, 'edgecolor':'black'}
     }
     default_marker = 'X'
 
@@ -1112,11 +1074,11 @@ def plot_legend(plots_dir, img_format='svg'):
                color='black', lw=2, linestyle='--',
                label='scGPT'),
         Line2D([0], [0],
-               marker='D', color='w', markersize=10,
+               marker=FEDSCGPT_MARKER, color='w', markersize=10,
                markeredgecolor='black',
                label='FedscGPT'),
         Line2D([0], [0],
-               marker='*', color='w', markersize=10,
+               marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10,
                markeredgecolor='black',
                label='FedscGPT-SMPC'),
         Line2D([0], [0],
@@ -1173,10 +1135,10 @@ def plot_embedding_boxplot(df, img_format='svg'):
                         color=box['boxes'][i].get_facecolor(), linestyle='--', linewidth=2, zorder=3)
             # FedscGPT as scatter points
             plt.scatter(i + 1, fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0],
-                        color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker='D', s=100)
+                        color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker=FEDSCGPT_MARKER, s=100)
             # FedscGPT-SMPC as scatter points
             plt.scatter(i + 1, fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0],
-                        color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker='*', s=100)
+                        color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100)
 
         # Customize the plot
         plt.xlabel('Datasets', fontsize=16)
@@ -1192,9 +1154,9 @@ def plot_embedding_boxplot(df, img_format='svg'):
         image_placeholder_instance = ImagePlaceholder()
         legend_elements = [
             Line2D([0], [0], color='black', lw=2, linestyle='--', label='scGPT'),
-            Line2D([0], [0], marker='*', color='w', markersize=10, label='FedscGPT',
+            Line2D([0], [0], marker=FEDSCGPT_MARKER, color='w', markersize=10, label='FedscGPT',
                    markeredgecolor='black'),
-            Line2D([0], [0], marker='D', color='w', markersize=10, label='FedscGPT-SMPC',
+            Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10, label='FedscGPT-SMPC',
                      markeredgecolor='black'),
             image_placeholder_instance
         ]
@@ -1451,15 +1413,17 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
                            label=f"scGPT")
 
             # Federated as scatter points
-            if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
-                federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
-                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker='*', s=100, label=f"FedscGPT-SMPC")
-
             if not fedscgpt[fedscgpt['Dataset'] == dataset].empty:
                 federated_value = fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0]
                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker='D', s=100, label=f"FedscGPT")
+                            zorder=5, marker=FEDSCGPT_MARKER, s=100, label=f"FedscGPT")
+
+            if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
+                federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
+                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+                            zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100, label=f"FedscGPT-SMPC")
+
+
 
         # Customize the plot
         plt.xlabel('', fontsize=1)
@@ -1472,9 +1436,9 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         custom_handles = [
             plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white', markersize=8, linestyle='None',
                         label='Clients'),
-            plt.Line2D([0], [0], marker='D', color='black', markerfacecolor='white', markersize=10, linestyle='None',
+            plt.Line2D([0], [0], marker=FEDSCGPT_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
                         label='FedscGPT'),
-            plt.Line2D([0], [0], marker='*', color='black', markerfacecolor='white', markersize=10, linestyle='None',
+            plt.Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
                        label='FedscGPT-SMPC'),
             plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='scGPT')
         ]
