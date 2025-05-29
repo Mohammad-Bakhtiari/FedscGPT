@@ -826,7 +826,7 @@ class ResultsRecorder:
         entry = {'predictions': predictions, 'labels': labels}
         if mu is not None:
             entry['mu'] = mu
-        self.all_results[dataset][epoch][round_number] = results
+        self.all_results[dataset][epoch][round_number] = entry
 
     def save_pickle(self):
         """Save the detailed results dictionary to the pickle file."""
