@@ -214,8 +214,8 @@ class Inference(Base):
             worker_init_fn=seed_worker
         )
 
-    def inference(self, plot_results=True, save=True, round_num=None, n_epochs=None):
-        predictions, labels, results = self.test(round_num, n_epochs)
+    def inference(self, plot_results=True, save=True, round_num=None, n_epochs=None, mu=None):
+        predictions, labels, results = self.test(round_num, n_epochs, mu)
         self.adata_test_raw.obs["predictions"] = [self.cell_id2type[p] for p in predictions]
         if plot_results:
             plot(self.adata_test_raw, self.unique_cell_types, self.celltype_key, self.plot_dir)

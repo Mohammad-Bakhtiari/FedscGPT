@@ -82,7 +82,11 @@ def centralized_inference(annotator=None,
         else:
             annotator.best_model.load_state_dict(weights)
     if kwargs['param_tuning'] or save_results:
-        predictions, labels = annotator.inference(plot_results=save_results, save=save_results, round_num=round_number, n_epochs=kwargs['n_epochs'])
+        predictions, labels = annotator.inference(plot_results=save_results,
+                                                  save=save_results,
+                                                  round_num=round_number,
+                                                  n_epochs=kwargs['n_epochs'],
+                                                  mu=kwargs['mu'] if kwargs['use_fedprox'] else None)
     if save_results:
         eval_annotation(annotator.unique_cell_types,
                         predictions,
