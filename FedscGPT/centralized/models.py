@@ -240,7 +240,7 @@ class ScGPT(BaseMixin):
         if self.use_fedprox and self.global_model:
             prox_term = 0
             for param, global_param in zip(self.model.parameters(), self.global_model.values()):
-                prox_term += ((param - global_param) ** 2).sum()
+                prox_term += ((param - global_param.to(self.device)) ** 2).sum()
             self.loss_meter.batch_loss += (self.mu / 2) * prox_term
 
     def unwrap_batch_data(self, batch_data):
