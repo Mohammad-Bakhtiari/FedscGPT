@@ -173,7 +173,7 @@ class Inference(Base):
         self.preprocessor(self.adata_test, batch_key=None)
         self.set_layer_key()
 
-    def test(self, round_num, n_epochs) -> (np.ndarray, np.ndarray, Dict[str, float]):
+    def test(self, round_num, n_epochs, mu=None) -> (np.ndarray, np.ndarray, Dict[str, float]):
         if self.test_loader is None or self.celltypes_labels is None:
             self.load_test_loader()
         predictions = self.evaluate(self.best_model, loader=self.test_loader, return_raw=True)
@@ -181,7 +181,7 @@ class Inference(Base):
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
         macro_f1 = f1_score(self.celltypes_labels, predictions, average="macro")
-        self.update_records(accuracy=accuracy, precision=precision, recall=recall, macro_f1=macro_f1, round_number=round_num, n_epochs=n_epochs, predictions=predictions)
+        self.update_records(accuracy=accuracy, precision=precision, recall=recall, macro_f1=macro_f1, round_number=round_num, n_epochs=n_epochs, predictions=predictions, mu=mu)
         results = {
             "test/accuracy": accuracy,
             "test/precision": precision,

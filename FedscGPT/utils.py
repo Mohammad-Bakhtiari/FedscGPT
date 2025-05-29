@@ -751,7 +751,7 @@ class ResultsRecorder:
     def __init__(self, dataset, file_name='param_tuning', logger=None, verbose=False):
         self.results_file = file_name + '.csv'
         self.pickle_file = file_name + '.pkl'
-        self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs']
+        self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs', 'mu']
         self.dataset = dataset
         self.results_df = self.load_or_create_dataframe()
         self.all_results = self.load_or_create_pickle()
@@ -773,7 +773,7 @@ class ResultsRecorder:
         else:
             return {}
 
-    def update_dataframe(self, accuracy, precision, recall, macro_f1, round_number=None, n_epochs=None, dataset=None):
+    def update_dataframe(self, accuracy, precision, recall, macro_f1, round_number=None, n_epochs=None, dataset=None, mu=None):
         """Update the DataFrame with new round results."""
         if dataset is None:
             dataset = self.dataset
@@ -790,7 +790,8 @@ class ResultsRecorder:
             'Metric': metric,
             'Value': value,
             'n_epochs': n_epochs,
-            'Dataset': dataset
+            'Dataset': dataset,
+            'mu': mu,
         } for metric, value in metrics.items()])
         self.results_df = pd.concat([self.results_df, new_rows], ignore_index=True)
 
@@ -800,7 +801,7 @@ class ResultsRecorder:
         if self.verbose:
             self.logger(f"Data successfully saved to {self.results_file}")
 
-    def update_pickle(self, predictions, labels, id_maps, epoch, round_number, dataset=None):
+    def update_pickle(self, predictions, labels, id_maps, epoch, round_number, dataset=None, mu=None):
         """Update the pickle file with detailed results for each epoch and round."""
         if dataset is None:
             dataset = self.dataset
@@ -818,11 +819,14 @@ class ResultsRecorder:
         if epoch not in self.all_results[dataset]:
             self.all_results[dataset][epoch] = {}
 
+
         # Ensure round_number is not overwritten
         if round_number in self.all_results[dataset][epoch]:
             self.logger(f"Warning: Round {round_number} already exists for epoch {epoch} in dataset {dataset}.")
-
-        self.all_results[dataset][epoch][round_number] = {'predictions': predictions, 'labels': labels}
+        entry = {'predictions': predictions, 'labels': labels}
+        if mu is not None:
+            entry['mu'] = mu
+        self.all_results[dataset][epoch][round_number] = results
 
     def save_pickle(self):
         """Save the detailed results dictionary to the pickle file."""
@@ -842,11 +846,11 @@ class ResultsRecorder:
         self.save_pickle()
 
     def update(self, accuracy, precision, recall, macro_f1, predictions, labels, id_maps, round_number, n_epochs,
-               dataset=None):
+               dataset=None, mu=None):
         if dataset is None:
             dataset = self.dataset
-        self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs, dataset)
-        self.update_pickle(predictions, labels, id_maps, n_epochs, round_number, dataset)
+        self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs, dataset, mu)
+        self.update_pickle(predictions, labels, id_maps, n_epochs, round_number, dataset, mu)
         self.save()
 
     def save(self):
