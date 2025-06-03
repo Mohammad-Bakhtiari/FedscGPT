@@ -42,7 +42,7 @@ run_job() {
     output="${root_dir}/output/annotation/${args[0]}/${subdir}${smpc_subdir}"
     mkdir -p "$output"
 
-    # 3) Build the base Python command (everything up through --param_tuning)
+    export CUBLAS_WORKSPACE_CONFIG=:4096:8
     base_cmd="python \"${root_dir}/tasks/annotation.py\" \
   --dataset_name \"${args[0]}\" \
   --data-dir \"$data_dir\" \
