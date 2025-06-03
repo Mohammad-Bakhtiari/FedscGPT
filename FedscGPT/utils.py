@@ -748,15 +748,16 @@ def verify_tokenization_consistency(client_tokenized_data_list):
 
 
 class ResultsRecorder:
-    def __init__(self, dataset, file_name='param_tuning', logger=None, verbose=False):
+    def __init__(self, dataset, file_name='param_tuning', logger=None, verbose=False, agg_method="FedAvg"):
         self.results_file = file_name + '.csv'
         self.pickle_file = file_name + '.pkl'
-        self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs', 'mu']
+        self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs', 'mu', 'Aggregation']
         self.dataset = dataset
         self.results_df = self.load_or_create_dataframe()
         self.all_results = self.load_or_create_pickle()
         self.logger = logger if logger else print
         self.verbose = verbose
+        self.agg_method = agg_method
 
     def load_or_create_dataframe(self):
         """Load the DataFrame from a CSV file or create a new one if the file doesn't exist."""
@@ -792,6 +793,7 @@ class ResultsRecorder:
             'n_epochs': n_epochs,
             'Dataset': dataset,
             'mu': mu,
+            'Aggregation': self.agg_method
         } for metric, value in metrics.items()])
         self.results_df = pd.concat([self.results_df, new_rows], ignore_index=True)
 

@@ -163,7 +163,10 @@ class Inference(Base):
             os.makedirs(self.plot_dir, exist_ok=True)
         self.test_loader = None
         self.param_tuning = param_tuning
-        self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=param_tuning_res, logger=self.log)
+        agg_method = "FedProx" if self.use_fedprox else "FedAvg"
+        agg_method = f"weighted-{agg_method}" if kwargs["weighted"] else agg_method
+        agg_method = f"SMPC-{agg_method}" if kwargs['smpc'] else agg_method
+        self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=param_tuning_res, logger=self.log, agg_method=agg_method)
 
     def read_query(self, query_adata):
         self.adata_test_raw = read_h5ad(self.data_dir, query_adata)
