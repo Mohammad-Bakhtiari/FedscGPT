@@ -21,8 +21,6 @@ def calc_umap(adata):
     Compute (if needed) and display basic info about UMAP.
     Stores UMAP in adata.obsm['X_umap'].
     """
-    print(f"    n_obs = {adata.n_obs}, n_vars = {adata.n_vars}")
-    print("Batch value counts:\n", adata.obs["batch"].value_counts(), "\n")
 
     # 1) Compute PCA if missing
     if "X_pca" not in adata.obsm_keys():
