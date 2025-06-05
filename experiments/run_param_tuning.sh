@@ -1,9 +1,11 @@
 #!/bin/bash
 
-agg_method="${1-fedavg}"
-weighted="${2-true}"
-smpc="${3-true}"
-GPU=${4-0}
+datasetname="${1-all}"
+agg_method="${2-fedavg}"
+weighted="${3-true}"
+smpc="${4-true}"
+N_ROUNDS="${5-20}"
+GPU=${6-0}
 
 if [[ "$agg_method" != "fedavg" && "$agg_method" != "fedprox" ]]; then
     echo "Invalid aggregation method. Use 'fedavg' or 'fedprox'."
@@ -14,10 +16,23 @@ declare -A datasets
 datasets["MS"]="ms|reference.h5ad|query.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]"
 datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
+datasets["COVID"]="covid|reference.h5ad|query.h5ad|celltype|str_batch"
+datasets["LUNG"]="lung|reference.h5ad|query.h5ad|cell_type|sample"
+datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch"
+
+if [[ "$datasetname" != "all" ]]; then
+    if [[ -z "${datasets[$datasetname]}" ]]; then
+        echo "Dataset \"$datasetname\" not found. Available keys: ${!datasets[@]}"
+        exit 1
+    fi
+    keys=("$datasetname")
+else
+    keys=("${!datasets[@]}")
+fi
+
 
 root_dir="$(dirname "$PWD")"
 INTI_WEIGHTS_DIR="${root_dir}/models/init"
-N_ROUNDS=20
 
 smpc_subdir=""
 if [ "$smpc" == "true" ]; then
@@ -76,7 +91,7 @@ run_job() {
     eval "$base_cmd"
 }
 
-for key in "${!datasets[@]}"; do
+for key in "${keys[@]}"; do
     # Split the pipe‐separated fields into args[0..4]
     IFS='|' read -r -a args <<< "${datasets[$key]}"
     data_dir="${root_dir}/data/scgpt/benchmark/${args[0]}"
