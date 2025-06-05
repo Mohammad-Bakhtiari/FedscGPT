@@ -3,7 +3,9 @@
 data_dir="$1"
 
 declare -A datasets
-datasets["CellLine"]="cl|CellLine.h5ad|reference.h5ad|query.h5ad|cell_type|batch|2|true|min_max"
+#datasets["CellLine"]="cl|CellLine.h5ad|reference.h5ad|query.h5ad|cell_type|batch|2|true|min_max"
+datasets["COVID"]="covid|Covid_annot.h5ad|reference_annot.h5ad|query_annot.h5ad|celltype|rfe-query-split|q|true|min_max"
+#datasets["LUNG"]="lung|reference.h5ad|query.h5ad|cell_type|sample"
 
 for key in "${!datasets[@]}"; do
     echo -e "\e[32m******************************************\e[0m"
