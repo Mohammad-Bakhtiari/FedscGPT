@@ -148,13 +148,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reference_file",
         type=str,
-        default="reference_with_umap.h5ad",
+        default="reference.h5ad",
         help="Filename for the reference subset (saved under --output_dir).",
     )
     parser.add_argument(
         "--query_file",
         type=str,
-        default="query_with_umap.h5ad",
+        default="query.h5ad",
         help="Filename for the query subset (saved under --output_dir).",
     )
     parser.add_argument(

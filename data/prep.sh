@@ -28,6 +28,8 @@ for key in "${!datasets[@]}"; do
     # Build the command to run prep.py
     cmd="python prep.py \
       --orig_path \"$orig_path\" \
+      --reference_file \"$reference_filename\" \
+      --query_file \"$query_filename\" \
       --output_dir \"$output_dir\" \
       --celltype_key \"$celltype_key\" \
       --batch_key \"$batch_key\" \
