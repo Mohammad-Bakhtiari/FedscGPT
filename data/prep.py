@@ -16,7 +16,7 @@ from sklearn.preprocessing import (
 from scipy import sparse
 
 
-def calc_umap(adata):
+def calc_umap(adata, celltype_key: str):
     """
     Compute (if needed) and display basic info about UMAP.
     Stores UMAP in adata.obsm['X_umap'].
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         adata.X = normalize_data(adata.X, args.norm_method)
         print("Normalization complete.\n")
 
-    calc_umap(adata)
+    calc_umap(adata, args.celltype_key)
     reference_out = os.path.join(args.output_dir, args.reference_file)
     query_out = os.path.join(args.output_dir, args.query_file)
 
