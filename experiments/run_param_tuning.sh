@@ -16,8 +16,8 @@ declare -A datasets
 datasets["MS"]="ms|reference.h5ad|query.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]"
 datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
-datasets["COVID"]="covid|reference.h5ad|query.h5ad|celltype|str_batch"
-datasets["LUNG"]="lung|reference.h5ad|query.h5ad|cell_type|sample"
+datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|str_batch"
+datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
 datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch"
 
 if [[ "$datasetname" != "all" ]]; then
@@ -97,21 +97,22 @@ for key in "${keys[@]}"; do
     data_dir="${root_dir}/data/scgpt/benchmark/${args[0]}"
     reference="${data_dir}/${args[1]}"
     query="${data_dir}/${args[2]}"
+    epochs=( $(seq 1 5) )
+    if [[ "$key" == "CellLine" || "$key" == "LUNG" || "$key" == "COVID" ]]; then
+        epochs=( $(seq 1 3) )
+        N_ROUNDS=3
+    fi
 
-    for epoch in 1 2 3 4 5; do
+    for epoch in "${epochs[@]}"; do
         if [ "$agg_method" == "fedavg" ]; then
             # FedAvg: no extra flags, subdir="param_tuning", description includes epoch
             desc="FEDAVG, epoch=${epoch}"
             run_job "$desc" "param_tuning" ""
-            # Note: if run_job fails, it already printed an error. We can choose to continue/end.
-            # if [ $? -ne 0 ]; then continue; fi
-
         else
             # FedProx: loop over all mu values
             for mu in 0.001 0.01 0.05 0.1 0.2 0.5; do
                 desc="FEDPROX, epoch=${epoch}, mu=${mu}"
                 run_job "$desc" "mu_tuning" "--mu $mu --use_fedprox"
-                # if [ $? -ne 0 ]; then continue; fi
             done
         fi
     done
