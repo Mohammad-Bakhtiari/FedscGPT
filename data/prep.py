@@ -67,6 +67,9 @@ def ref_query_split(
             reference.obsm[layer_key] = arr[(~query_mask.values), :].copy()
     query.var = adata.var.copy()
     reference.var = adata.var.copy()
+    unique_cts = adata.obs[celltype_key].cat.categories.tolist()
+    query.obs[celltype_key] = query.obs[celltype_key].cat.set_categories(unique_cts)
+    reference.obs[celltype_key] = reference.obs[celltype_key].cat.set_categories(unique_cts)
     if query.n_obs == 0:
         sys.stderr.write(f"⚠️ Warning: query is empty (no cells with {batch_key} == {query_batch}).\n")
     if reference.n_obs == 0:
@@ -110,28 +113,6 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
         return scaler.fit_transform(data)
     else:
         raise ValueError(f"Unknown normalization method: {method}")
-
-
-def consistent_cell_types(adata: anndata.AnnData, celltype_key: str):
-    """
-    Ensure that `adata.obs[celltype_key]` is categorical and that all categories
-    present in the dataset are explicitly set as categories.
-
-    Args:
-        adata: AnnData object.
-        celltype_key: column in adata.obs that holds cell‐type labels.
-    """
-    if celltype_key not in adata.obs_keys():
-        raise KeyError(f"Cell type key '{celltype_key}' not found in adata.obs.")
-
-    # Convert to string first, then to categorical
-    adata.obs[celltype_key] = adata.obs[celltype_key].astype(str).astype("category")
-
-    # Explicitly set categories to all unique values by reassigning the result
-    unique_cts = adata.obs[celltype_key].cat.categories.tolist()
-    adata.obs[celltype_key] = adata.obs[celltype_key].cat.set_categories(unique_cts)
-
-    print(f"'{celltype_key}' set as categorical with categories: {unique_cts}\n")
 
 
 if __name__ == "__main__":
@@ -203,20 +184,12 @@ if __name__ == "__main__":
     print(f"Loading AnnData from: {args.orig_path}")
     adata = anndata.read_h5ad(args.orig_path)
     print(f"    n_obs = {adata.n_obs}, n_vars = {adata.n_vars}\n")
-
-    # 2) Ensure cell types are categorical (consistent across all cells)
-    consistent_cell_types(adata, args.celltype_key)
-
-    # 3) If requested, normalize the data matrix
     if args.normalize:
         print(f"Normalizing adata.X using method '{args.norm_method}'.")
         adata.X = normalize_data(adata.X, args.norm_method)
         print("Normalization complete.\n")
 
-    # 4) Compute PCA + neighbors + UMAP
     plot_umap(adata)
-
-    # 5) Split into reference / query and save to disk
     reference_out = os.path.join(args.output_dir, args.reference_file)
     query_out = os.path.join(args.output_dir, args.query_file)
 
