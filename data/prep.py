@@ -13,6 +13,7 @@ from sklearn.preprocessing import (
     StandardScaler,
     MinMaxScaler,
 )
+from scipy import sparse
 
 
 def plot_umap(adata):
@@ -92,6 +93,7 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
     Returns:
         A numpy array of the normalized data.
     """
+    data = data.A if sparse.issparse(data) else data
     if isinstance(data, pd.Series):
         data = data.to_numpy().reshape(-1, 1)
 
