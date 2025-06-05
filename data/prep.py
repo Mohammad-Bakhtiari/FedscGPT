@@ -199,7 +199,7 @@ if __name__ == "__main__":
     print(f"    n_obs = {adata.n_obs}, n_vars = {adata.n_vars}\n")
 
     # 2) Ensure cell types are categorical (consistent across all cells)
-    consistent_cell_types(adata, args.celltype_key, args.batch_key)
+    consistent_cell_types(adata, args.celltype_key)
 
     # 3) If requested, normalize the data matrix
     if args.normalize:
