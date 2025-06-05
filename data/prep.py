@@ -62,8 +62,8 @@ def ref_query_split(
     reference = adata[~query_mask].copy()
     for layer_key, arr in adata.obsm.items():
         if arr.shape[0] == adata.n_obs:
-            query.obsm[layer_key] = arr[mask.values, :].copy()
-            reference.obsm[layer_key] = arr[(~mask.values), :].copy()
+            query.obsm[layer_key] = arr[query_mask.values, :].copy()
+            reference.obsm[layer_key] = arr[(~query_mask.values), :].copy()
     if query.n_obs == 0:
         sys.stderr.write(f"⚠️ Warning: query is empty (no cells with {batch_key} == {query_batch}).\n")
     if reference.n_obs == 0:
