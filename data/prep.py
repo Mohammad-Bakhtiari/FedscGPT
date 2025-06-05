@@ -173,8 +173,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--query_batch",
-        type=int,
-        default=2,
+        type=str,
+        default='2',
         help="Which batch value to use for the query subset.",
     )
     parser.add_argument(
@@ -191,6 +191,8 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    if type(args.query_batch) != str:
+        args.query_batch = str(args.query_batch)
 
     # Ensure output directory exists
     os.makedirs(args.output_dir, exist_ok=True)
