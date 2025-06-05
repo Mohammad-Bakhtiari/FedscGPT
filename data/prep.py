@@ -108,15 +108,14 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
         raise ValueError(f"Unknown normalization method: {method}")
 
 
-def consistent_cell_types(adata: anndata.AnnData, celltype_key: str, batch_key: str):
+def consistent_cell_types(adata: anndata.AnnData, celltype_key: str):
     """
     Ensure that `adata.obs[celltype_key]` is categorical and that all categories
-    present in the dataset are explicitly set as categories (across all batches).
+    present in the dataset are explicitly set as categories.
 
     Args:
         adata: AnnData object.
         celltype_key: column in adata.obs that holds cell‐type labels.
-        batch_key: column in adata.obs that holds batch labels (not directly used here).
     """
     if celltype_key not in adata.obs_keys():
         raise KeyError(f"Cell type key '{celltype_key}' not found in adata.obs.")
@@ -124,9 +123,10 @@ def consistent_cell_types(adata: anndata.AnnData, celltype_key: str, batch_key: 
     # Convert to string first, then to categorical
     adata.obs[celltype_key] = adata.obs[celltype_key].astype(str).astype("category")
 
-    # Explicitly set categories to all unique values (to ensure consistency)
+    # Explicitly set categories to all unique values by reassigning the result
     unique_cts = adata.obs[celltype_key].cat.categories.tolist()
-    adata.obs[celltype_key].cat.set_categories(unique_cts, inplace=True)
+    adata.obs[celltype_key] = adata.obs[celltype_key].cat.set_categories(unique_cts)
+
     print(f"'{celltype_key}' set as categorical with categories: {unique_cts}\n")
 
 
