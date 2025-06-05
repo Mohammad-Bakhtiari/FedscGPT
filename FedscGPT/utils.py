@@ -441,38 +441,38 @@ def model_config_adj(config):
         config['model']['pad_value'] = -2
         config['model']['n_input_bins'] = config["preprocess"]["n_bins"]
 
-def generate_pallette(unique_celltypes):
+def generate_palette(unique_celltypes):
     """
     Build a large palette:
      - First 20 colors from 'tab20'
-     - If we need > 20, sample equally from 'tab20b' (another 20 colors)
-     - If still > 40, fall back to evenly spaced samples from 'gist_ncar'
+     - If > 20, next up to 20 from 'tab20b'
+     - If > 40, sample the remainder from 'gist_ncar'
     Args:
-        unique_celltypes:
-
+        unique_celltypes: list of category names
     Returns:
-
+        dict mapping each category to an (r, g, b, a) tuple
     """
     n_cats = len(unique_celltypes)
     palette_ = {}
+
     if n_cats <= 20:
-        base = plt.cm.get_cmap("tab20", 20)
+        base = plt.get_cmap("tab20", 20)
         for i, cat in enumerate(unique_celltypes):
             palette_[cat] = base(i)
     elif n_cats <= 40:
-        # Use tab20 for first 20, tab20b for next
-        base1 = plt.cm.get_cmap("tab20", 20)
-        base2 = plt.cm.get_cmap("tab20b", 20)
+        base1 = plt.get_cmap("tab20", 20)
+        base2 = plt.get_cmap("tab20b", 20)
         for i, cat in enumerate(unique_celltypes):
             if i < 20:
                 palette_[cat] = base1(i)
             else:
                 palette_[cat] = base2(i - 20)
     else:
-        # If more than 40, combine tab20 + tab20b and then sample from gist_ncar
-        base1 = plt.cm.get_cmap("tab20", 20)
-        base2 = plt.cm.get_cmap("tab20b", 20)
-        base3 = plt.cm.get_cmap("gist_ncar", n_cats - 40)
+        base1 = plt.get_cmap("tab20", 20)
+        base2 = plt.get_cmap("tab20b", 20)
+        # For the remainder, sample evenly from gist_ncar
+        n_extra = n_cats - 40
+        base3 = plt.get_cmap("gist_ncar", n_extra)
         for i, cat in enumerate(unique_celltypes):
             if i < 20:
                 palette_[cat] = base1(i)
@@ -483,7 +483,7 @@ def generate_pallette(unique_celltypes):
     return palette_
 
 def plot_umap(adata, cell_type_key, unique_celltypes, file_name, legend='no_legend'):
-    palette_ = generate_pallette(unique_celltypes)
+    palette_ = generate_palette(unique_celltypes)
     fig = plt.figure(figsize=(10, 4))
     gs = fig.add_gridspec(1, 10)  # Create a grid spec with 1 row and 10 columns
 
