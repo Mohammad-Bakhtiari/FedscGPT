@@ -323,7 +323,7 @@ class ScGPT(BaseMixin):
                 predictions.append(preds)
         if return_raw:
             return np.concatenate(predictions, axis=0)
-
+        import pdb; pdb.set_trace()
         return total_loss / total_num, total_error / total_num
 
     def random_mask_value(self, tokenized_values):
