@@ -123,15 +123,17 @@ class ScGPT(BaseMixin):
     def tokenize(self):
         self.gene_ids = np.array(self.vocab(self.adata.var["gene_name"].tolist()), dtype=int)
         self.tokenized_train = self.tokenize_and_pad_batch(self.train_data)
-        self.tokenized_valid = self.tokenize_and_pad_batch(self.valid_data)
         self.log(
             f"train set number of samples: {self.tokenized_train['genes'].shape[0]}, "
             f"\n\t feature length: {self.tokenized_train['genes'].shape[1]}"
         )
-        self.log(
-            f"valid set number of samples: {self.tokenized_valid['genes'].shape[0]}, "
-            f"\n\t feature length: {self.tokenized_valid['genes'].shape[1]}"
-        )
+        if self.valid_data:
+            self.tokenized_valid = self.tokenize_and_pad_batch(self.valid_data)
+
+            self.log(
+                f"valid set number of samples: {self.tokenized_valid['genes'].shape[0]}, "
+                f"\n\t feature length: {self.tokenized_valid['genes'].shape[1]}"
+            )
 
     def instantiate_transformer_model(self):
         kwargs = copy.deepcopy(self.config.model.__dict__)
