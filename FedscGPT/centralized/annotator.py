@@ -115,27 +115,36 @@ class Training(Base):
     def __init__(self, reference_adata, **kwargs):
         super().__init__(**kwargs)
         self.read_reference(reference_adata)
+        self.train_data = None
+        self.train_celltype_labels = None
+        self.train_batch_labels = None
+        self.valid_data = None
+        self.valid_celltype_labels = None
+        self.valid_batch_labels = None
 
     def preprocess_reference(self):
         self.preprocessor(self.adata, batch_key=None)
 
-    def post_prep(self):
+    def post_prep(self, test_size=0.1):
         self.set_layer_key()
         all_counts = self.get_all_counts(self.adata)
         celltypes_labels = self.adata.obs["celltype_id"].tolist()
         celltypes_labels = np.array(celltypes_labels)
         batch_ids = self.adata.obs["batch_id"].tolist()
-        batch_ids = np.array(batch_ids)
-        (
-            self.train_data,
-            self.valid_data,
-            self.train_celltype_labels,
-            self.valid_celltype_labels,
-            self.train_batch_labels,
-            self.valid_batch_labels,
-        ) = train_test_split(
-            all_counts, celltypes_labels, batch_ids, test_size=0.1, shuffle=True
-        )
+        if test_size > 0:
+            batch_ids = np.array(batch_ids)
+            (
+                self.train_data,
+                self.valid_data,
+                self.train_celltype_labels,
+                self.valid_celltype_labels,
+                self.train_batch_labels,
+                self.valid_batch_labels,
+            ) = train_test_split(all_counts, celltypes_labels, batch_ids, test_size=test_size, shuffle=True)
+        else:
+            self.train_data = all_counts
+            self.train_celltype_labels = celltypes_labels
+            self.train_batch_labels = batch_ids
 
 
 class Inference(Base):

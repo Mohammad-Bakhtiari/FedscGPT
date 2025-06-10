@@ -130,7 +130,7 @@ class FedAnnotator(FedBase, FedAvg):
                                      n_total_samples=n_total_samples,
                                      **kwargs)
             self.clients.append(client)
-        self.retain_best_model_retain(False)
+        self.retain_best_model(False)
         # TODO: Support post-finetune federated zeroshot
 
     def aggregate_gene_sets(self):
@@ -189,7 +189,7 @@ class FedAnnotator(FedBase, FedAvg):
     def post_prep_setup(self):
         for client in self.clients:
             self.logger.federated(f"Setting up client {client.log_id} ...")
-            client.post_prep()
+            client.post_prep(test_size=0)
             client.tokenize()
             client.instantiate_transformer_model()
             client.load_pretrained_model()

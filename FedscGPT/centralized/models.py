@@ -446,35 +446,33 @@ class ScGPT(BaseMixin):
                                                      shuffle=False,
                                                      intra_domain_shuffle=True,
                                                      drop_last=False)
-            num_eval_data = len(valid_data_pt["gene_ids"])
-            if self.config.train.eval_batch_size <= num_eval_data:
-                batch_size = self.config.train.eval_batch_size
-            else:
-                batch_size = num_eval_data
-            valid_loader = self.per_epoch_dataloader(valid_data_pt,
-                                                     batch_size=batch_size,
-                                                     shuffle=False,
-                                                     intra_domain_shuffle=False,
-                                                     drop_last=False)
+
 
             self.train_for_epoch(train_loader, epoch)
-            val_loss, val_err = self.evaluate(self.model, valid_loader)
-            elapsed = time.time() - epoch_start_time
-            self.log("-" * 89)
-            self.log(
-                f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
-                f"valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
-            )
-            self.log("-" * 89)
-            if val_loss < best_val_loss:
-                self.update_best_model(val_loss, epoch)
+            if self.config.retain.best_model:
+                num_eval_data = len(valid_data_pt["gene_ids"])
+                if self.config.train.eval_batch_size <= num_eval_data:
+                    batch_size = self.config.train.eval_batch_size
+                else:
+                    batch_size = num_eval_data
+                valid_loader = self.per_epoch_dataloader(valid_data_pt,
+                                                         batch_size=batch_size,
+                                                         shuffle=False,
+                                                         intra_domain_shuffle=False,
+                                                         drop_last=False)
+                val_loss, val_err = self.evaluate(self.model, valid_loader)
+                elapsed = time.time() - epoch_start_time
+                self.log("-" * 89)
+                self.log(
+                    f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
+                    f"valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
+                )
+                self.log("-" * 89)
+                if val_loss < best_val_loss:
+                    self.update_best_model(val_loss, epoch)
             self.lr_schedulers_step()
 
     def update_best_model(self, val_loss, epoch):
-        if self.config.log.retain_best_model:
-            self.best_model = copy.deepcopy(self.model)
-            self.best_model_epoch = epoch
-            self.log(f"Best model with score {val_loss:5.4f}")
-        else:
-            self.log(f"New best model score {val_loss:5.4f}")
-            self.best_model = copy.deepcopy(self.model)
+        self.best_model = copy.deepcopy(self.model)
+        self.best_model_epoch = epoch
+        self.log(f"Best model with score {val_loss:5.4f}")

@@ -399,7 +399,7 @@ class FedBase:
         for client in self.clients:
             client.adata.write_h5ad(f"{self.clients_data_dir[client]}/fed_prep_adata.h5ad")
     
-    def retain_best_model_retain(self, on=True):
+    def retain_best_model(self, on=True):
         self.logger.federated(f"Retain best model: {on}")
         for client in self.clients:
             client.config.log.retain_best_model = on
