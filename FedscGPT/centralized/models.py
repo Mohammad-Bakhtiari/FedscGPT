@@ -42,6 +42,7 @@ class ScGPT(BaseMixin):
 
     def __init__(self, data_dir, pretrained_model_dir, **kwargs):
         super().__init__(**kwargs)
+        self.tokenized_valid = None
         self.data_dir = data_dir
         self.pretrained_model_dir = pretrained_model_dir
 
