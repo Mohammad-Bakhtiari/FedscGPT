@@ -323,7 +323,6 @@ class ScGPT(BaseMixin):
                 predictions.append(preds)
         if return_raw:
             return np.concatenate(predictions, axis=0)
-        import pdb; pdb.set_trace()
         return total_loss / total_num, total_error / total_num
 
     def random_mask_value(self, tokenized_values):
@@ -447,9 +446,13 @@ class ScGPT(BaseMixin):
                                                      shuffle=False,
                                                      intra_domain_shuffle=True,
                                                      drop_last=False)
-
+            num_eval_data = len(valid_data_pt["gene_ids"])
+            if self.config.train.eval_batch_size <= num_eval_data:
+                batch_size = self.config.train.eval_batch_size
+            else:
+                batch_size = num_eval_data
             valid_loader = self.per_epoch_dataloader(valid_data_pt,
-                                                     batch_size=self.config.train.eval_batch_size,
+                                                     batch_size=batch_size,
                                                      shuffle=False,
                                                      intra_domain_shuffle=False,
                                                      drop_last=False)
