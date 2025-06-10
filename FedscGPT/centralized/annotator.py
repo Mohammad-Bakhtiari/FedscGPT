@@ -142,9 +142,9 @@ class Training(Base):
                 self.valid_batch_labels,
             ) = train_test_split(all_counts, celltypes_labels, batch_ids, test_size=test_size, shuffle=True)
         else:
-            self.train_data = all_counts
-            self.train_celltype_labels = celltypes_labels
-            self.train_batch_labels = batch_ids
+            self.train_data = np.array(all_counts)
+            self.train_celltype_labels = np.array(celltypes_labels)
+            self.train_batch_labels = np.array(batch_ids)
 
 
 class Inference(Base):
