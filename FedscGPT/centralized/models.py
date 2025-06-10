@@ -335,60 +335,49 @@ class ScGPT(BaseMixin):
             pad_value=self.config.preprocess.pad_value,
         )
 
-    def per_epoch_data_prep(self, epoch):
-        masked_values_train = self.random_mask_value(self.tokenized_train["values"])
+    def _prepare_split(self, tokenized_split, batch_labels, celltype_labels, epoch, train_split=True):
+        masked_values = self.random_mask_value(tokenized_split["values"])
+        if train_split:
+            self.log(
+                f"random masking at epoch {epoch:3d}, ratio of masked values in train:"
+                f" {(masked_values == self.config.preprocess.mask_value).sum() / (masked_values - self.config.preprocess.pad_value).count_nonzero():.4f}",
+            )
 
-        masked_values_valid = self.random_mask_value(self.tokenized_valid["values"])
-        self.log(
-            f"random masking at epoch {epoch:3d}, ratio of masked values in train: {(masked_values_train == self.config.preprocess.mask_value).sum() / (masked_values_train - self.config.preprocess.pad_value).count_nonzero():.4f}",
-        )
-
-        input_gene_ids_train, input_gene_ids_valid = (
-            self.tokenized_train["genes"],
-            self.tokenized_valid["genes"],
-        )
-        input_values_train, input_values_valid = masked_values_train, masked_values_valid
-        target_values_train, target_values_valid = (
-            self.tokenized_train["values"],
-            self.tokenized_valid["values"],
-        )
-
-        tensor_batch_labels_train = torch.from_numpy(self.train_batch_labels).long()
-        tensor_batch_labels_valid = torch.from_numpy(self.valid_batch_labels).long()
-
-        tensor_celltype_labels_train = torch.from_numpy(self.train_celltype_labels).long()
-        tensor_celltype_labels_valid = torch.from_numpy(self.valid_celltype_labels).long()
-
+        tensor_batch_labels = torch.from_numpy(batch_labels).long()
+        tensor_celltype_labels = torch.from_numpy(celltype_labels).long()
+        input_gene_ids = tokenized_split["genes"]
+        target_values = tokenized_split["values"]
+        input_values = masked_values
         if self.config.preprocess.per_seq_batch_sample:  # TODO: update to random pick seq source in each traning batch
-            train_sort_ids = np.argsort(self.train_batch_labels)
-            input_gene_ids_train = input_gene_ids_train[train_sort_ids]
-            input_values_train = input_values_train[train_sort_ids]
-            target_values_train = target_values_train[train_sort_ids]
-            tensor_batch_labels_train = tensor_batch_labels_train[train_sort_ids]
-            tensor_celltype_labels_train = tensor_celltype_labels_train[train_sort_ids]
+            sort_ids = np.argsort(batch_labels)
+            input_gene_ids = input_gene_ids[sort_ids]
+            input_values = input_values[sort_ids]
+            target_values = target_values[sort_ids]
+            tensor_batch_labels = tensor_batch_labels[sort_ids]
+            tensor_celltype_labels = tensor_celltype_labels[sort_ids]
 
-            valid_sort_ids = np.argsort(self.valid_batch_labels)
-            input_gene_ids_valid = input_gene_ids_valid[valid_sort_ids]
-            input_values_valid = input_values_valid[valid_sort_ids]
-            target_values_valid = target_values_valid[valid_sort_ids]
-            tensor_batch_labels_valid = tensor_batch_labels_valid[valid_sort_ids]
-            tensor_celltype_labels_valid = tensor_celltype_labels_valid[valid_sort_ids]
 
-        train_data_pt = {
-            "gene_ids": input_gene_ids_train,
-            "values": input_values_train,
-            "target_values": target_values_train,
-            "batch_labels": tensor_batch_labels_train,
-            "celltype_labels": tensor_celltype_labels_train,
-        }
-        valid_data_pt = {
-            "gene_ids": input_gene_ids_valid,
-            "values": input_values_valid,
-            "target_values": target_values_valid,
-            "batch_labels": tensor_batch_labels_valid,
-            "celltype_labels": tensor_celltype_labels_valid,
+        return {
+            "gene_ids": input_gene_ids,
+            "values": input_values,
+            "target_values": target_values,
+            "batch_labels": tensor_batch_labels,
+            "celltype_labels": tensor_celltype_labels,
         }
 
+    def per_epoch_data_prep(self, epoch):
+        train_data_pt = self._prepare_split(self.tokenized_train,
+                                            self.train_batch_labels,
+                                            self.train_celltype_labels,
+                                            epoch)
+        if self.tokenized_valid:
+            valid_data_pt = self._prepare_split(self.tokenized_valid,
+                                                self.valid_batch_labels,
+                                                self.valid_celltype_labels,
+                                                epoch,
+                                                train_split=False)
+        else:
+            valid_data_pt = None
         return train_data_pt, valid_data_pt
 
     def per_epoch_dataloader(self,
