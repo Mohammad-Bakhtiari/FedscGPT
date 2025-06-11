@@ -154,7 +154,7 @@ def combine_covid_batches(adata):
     }
     adata.obs[new_batch_column_name] = adata.obs[batch_key].replace(mapping)
     unique_batches = adata.obs[new_batch_column_name].unique()
-    query.obs[new_batch_column_name] = query.obs[new_batch_column_name].cat.set_categories(unique_batches)
+    adata.obs[new_batch_column_name] = adata.obs[new_batch_column_name].cat.set_categories(unique_batches)
 
 
 if __name__ == "__main__":
