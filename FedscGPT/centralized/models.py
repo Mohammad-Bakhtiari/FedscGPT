@@ -128,7 +128,7 @@ class ScGPT(BaseMixin):
             f"train set number of samples: {self.tokenized_train['genes'].shape[0]}, "
             f"\n\t feature length: {self.tokenized_train['genes'].shape[1]}"
         )
-        if self.valid_data:
+        if self.valid_data is not None:
             self.tokenized_valid = self.tokenize_and_pad_batch(self.valid_data)
 
             self.log(
