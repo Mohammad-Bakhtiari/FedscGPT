@@ -1545,7 +1545,7 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, 
                bbox_to_anchor=(1, 0.05),
                title=batch_key,
                ncol=1, fontsize='small', title_fontsize='medium')
-
+    fig.subplots_adjust(left=0.01, right=0.8)
     plt.tight_layout()
     plt.savefig(f"{out_prefix}.png", dpi=300)
     plt.close(fig)
