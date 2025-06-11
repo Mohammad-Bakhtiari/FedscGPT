@@ -5,7 +5,9 @@ data_dir="$1"
 declare -A datasets
 #datasets["CellLine"]="cl|CellLine.h5ad|reference.h5ad|query.h5ad|cell_type|batch|2|true|min_max"
 #datasets["COVID"]="covid|Covid_annot.h5ad|reference_annot.h5ad|query_annot.h5ad|celltype|ref-query-split|q|true|min_max"
-datasets["COVID"]="covid|Covid_annot.h5ad|not-used|not-used|celltype|not-used|not-used|true|log"
+#datasets["COVID"]="covid|Covid_annot.h5ad|not-used|not-used|celltype|not-used|not-used|true|log"
+# corrected centralized
+datasets["COVID"]="covid|corrected.h5ad|reference_corrected.h5ad|query_corrected.h5ad|celltype|ref-query-split|q|true|min_max"
 #datasets["LUNG"]="lung|Lung_annot.h5ad|reference_annot.h5ad|query_annot.h5ad|cell_type|ref-query-split|q|true|min_max"
 
 for key in "${!datasets[@]}"; do

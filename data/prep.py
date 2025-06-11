@@ -260,6 +260,11 @@ if __name__ == "__main__":
         choices=["log", "quantile", "z_score", "min_max"],
         help="Normalization method to apply if --normalize is set.",
     )
+    parser.add_argument("--no-split", action="store_true",
+                        help="If set, do not split the data into reference/query subsets; just compute UMAP.",
+                        default=False
+    )
+
 
     args = parser.parse_args()
     if type(args.query_batch) != str:
@@ -281,11 +286,12 @@ if __name__ == "__main__":
     reference_out = os.path.join(args.output_dir, args.reference_file)
     query_out = os.path.join(args.output_dir, args.query_file)
 
-    if "covid" in args.orig_path.lower():
+    if "covid" in args.orig_path.lower() and args.no_split:
         adata = combine_covid_batches(adata, batch_key='study', new_batch_column_name='batch_group')
         adata = detect_standalone_celltypes(adata, args.celltype_key, 'batch_group')
         adata.write_h5ad(args.orig_path.replace(".h5ad", "-uncorrected.h5ad"))
-    else:
+
+    if not args.no_split:
 
         ref_query_split(
             adata,
