@@ -1536,13 +1536,13 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, 
     # Cell‐type on upper right
     fig.legend(handles=ct_handles,
                loc="upper right",
-               bbox_to_anchor=(0.98, 0.98),
+               bbox_to_anchor=(1, 0.98),
                title=cell_key,
                ncol=1, fontsize='small', title_fontsize='medium')
     # Batch on lower right
     fig.legend(handles=bt_handles,
                loc="lower right",
-               bbox_to_anchor=(0.98, 0.05),
+               bbox_to_anchor=(1, 0.05),
                title=batch_key,
                ncol=1, fontsize='small', title_fontsize='medium')
 
