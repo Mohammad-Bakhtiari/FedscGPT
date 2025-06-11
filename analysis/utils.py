@@ -14,7 +14,7 @@ import anndata
 import scanpy as sc
 import random
 
-from FedscGPT.utils import print_config
+from FedscGPT.utils import print_config, generate_palette
 
 SEED = 42
 def set_seed(seed=SEED):
@@ -1452,8 +1452,7 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
         plt.close()
 
 
-def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected,
-                            batch_key, cell_key, out_prefix):
+def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, cell_key, out_prefix, standalone=False):
     """
     Plot a 2×3 grid of UMAPs:
       Top row: Raw, Centralized, Federated colored by cell type.
@@ -1487,22 +1486,65 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected,
             sc.tl.umap(adata)
             adata.write(path)  # overwrite file with UMAP stored
         adatas[name] = adata
+    # drop standalone cell types
+    if not standalone:
+        stand_alone_celltypes = ["CCR7+ T", "CD8 T", "CD10+ B cells", "Ciliated", "DC_activated", "Erythrocytes",
+                                "Erythroid progenitors", "IGSF21+ Dendritic", "M2 Macrophage", "Megakaryocytes",
+                                "Monocyte progenitors", "Proliferating T", "Signaling Alveolar Epithelial Type 2",
+                                "Treg", "Tregs", "innate T"]
+        for name, adata in adatas.items():
+            adatas[name] = adata[~adata.obs[cell_key].isin(stand_alone_celltypes)]
+    uniq_ct = list(adatas["Centralized"].obs[cell_key].cat.categories)
+    cell_palette = generate_palette(uniq_ct)
+    # batches come from the raw data
+    uniq_batch = list(adatas["Raw"].obs[batch_key].cat.categories)
+    batch_palette = generate_palette(uniq_batch)
 
-    # Set up 2x3 figure
-    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    # 3) Set up 2x3 grid + space for legends on right
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12),
+                             gridspec_kw={"right": 0.75})
 
+    # 4) Plotting
     for col, name in enumerate(names):
-        adata = adatas[name]
+        ad = adatas[name]
+        # Top: cell type
+        ax_ct = axes[0, col]
+        sc.pl.umap(ad, color=cell_key, ax=ax_ct, show=False,
+                   palette=cell_palette, legend_loc=None)
+        ax_ct.set_title(f"{name} (cell type)")
+        ax_ct.axis("off")
+        # Bottom: batch
+        ax_bt = axes[1, col]
+        sc.pl.umap(ad, color=batch_key, ax=ax_bt, show=False,
+                   palette=batch_palette, legend_loc=None)
+        ax_bt.set_title(f"{name} (batch)")
+        ax_bt.axis("off")
 
-        # Top row: cell type
-        ax = axes[0, col]
-        sc.pl.umap(adata, color=cell_key, ax=ax, show=False,
-                   legend_loc='right margin', title=f"{name} (cell type)")
+    # 5) Create external legends
+    # Cell‐type legend
+    ct_handles = [
+        plt.Line2D([0], [0], marker='o', color=cell_palette[ct], linestyle='', label=ct)
+        for ct in uniq_ct
+    ]
+    # Batch legend
+    bt_handles = [
+        plt.Line2D([0], [0], marker='o', color=batch_palette[b], linestyle='', label=b)
+        for b in uniq_batch
+    ]
 
-        # Bottom row: batch
-        ax = axes[1, col]
-        sc.pl.umap(adata, color=batch_key, ax=ax, show=False,
-                   legend_loc='right margin', title=f"{name} (batch)")
+    # Place legends
+    # Cell‐type on upper right
+    fig.legend(handles=ct_handles,
+               loc="upper right",
+               bbox_to_anchor=(0.98, 0.75),
+               title=cell_key,
+               ncol=1, fontsize='small', title_fontsize='medium')
+    # Batch on lower right
+    fig.legend(handles=bt_handles,
+               loc="lower right",
+               bbox_to_anchor=(0.98, 0.25),
+               title=batch_key,
+               ncol=1, fontsize='small', title_fontsize='medium')
 
     plt.tight_layout()
     plt.savefig(f"{out_prefix}.png", dpi=300)
