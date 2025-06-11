@@ -114,6 +114,49 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
         raise ValueError(f"Unknown normalization method: {method}")
 
 
+def combine_covid_batches(adata):
+    """
+    Combine fine‐grained study labels into broader batch groups.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data object containing per‐cell metadata in `adata.obs`.
+
+    Returns
+    -------
+    None
+        Adds a new categorical column `adata.obs['batch_group']` in place.
+
+    Notes
+    -----
+    - Merges multiple small sub‐studies from the same lab/protocol (e.g. Krasnow slices,
+      Sun donors, Oetjen lobes) into single labels (“Krasnow”, “Sun”, “Oetjen”) to:
+        * Increase sample size per batch for more stable batch‐effect estimation.
+        * Avoid overfitting correction parameters on tiny batches.
+        * Preserve major technical differences across labs/platforms.
+    """
+    batch_key = "study"
+    new_batch_column_name = 'batch_group'
+    mapping = {
+        "Krasnow_distal 1a": "Krasnow",
+        "Krasnow_distal 2": "Krasnow",
+        "Krasnow_distal 3": "Krasnow",
+        "Krasnow_medial 2": "Krasnow",
+        "Krasnow_proximal 3": "Krasnow",
+        "Sun_sample1_CS": "Sun",
+        "Sun_sample2_KC": "Sun",
+        "Sun_sample3_TB": "Sun",
+        "Sun_sample4_TC": "Sun",
+        "Oetjen_U": "Oetjen",
+        "Oetjen_P": "Oetjen",
+        "Oetjen_A": "Oetjen",
+    }
+    adata.obs[new_batch_column_name] = adata.obs[batch_key].replace(mapping)
+    unique_batches = adata.obs[new_batch_column_name].unique()
+    query.obs[new_batch_column_name] = query.obs[new_batch_column_name].cat.set_categories(unique_batches)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare CellLine dataset for benchmarking.")
 
@@ -191,6 +234,9 @@ if __name__ == "__main__":
     calc_umap(adata)
     reference_out = os.path.join(args.output_dir, args.reference_file)
     query_out = os.path.join(args.output_dir, args.query_file)
+
+    if "covid" in args.orig_path.lower():
+        combine_covid_batches(adata)
 
     ref_query_split(
         adata,
