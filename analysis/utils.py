@@ -1451,3 +1451,59 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
                     bbox_inches='tight')
         plt.close()
 
+
+def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected,
+                            batch_key, cell_key, out_prefix):
+    """
+    Plot a 2×3 grid of UMAPs:
+      Top row: Raw, Centralized, Federated colored by cell type.
+      Bottom row: Raw, Centralized, Federated colored by batch.
+    After computing UMAP (if missing), save it back to the original file.
+
+    Parameters
+    ----------
+    raw_h5ad : str
+        Path to raw (uncorrected) AnnData file.
+    cent_corrected : str
+        Path to centralized-corrected AnnData file.
+    fed_corrected : str
+        Path to federated-corrected AnnData file.
+    batch_key : str
+        Key in adata.obs for batch labels.
+    cell_key : str
+        Key in adata.obs for cell type labels.
+    out_prefix : str
+        Prefix for the saved plot file (without extension).
+    """
+    # Load AnnData objects
+    names = ["Raw", "Centralized", "Federated"]
+    paths = [raw_h5ad, cent_corrected, fed_corrected]
+    adatas = {}
+    for name, path in zip(names, paths):
+        adata = sc.read_h5ad(path)
+        # Compute UMAP if not present
+        if "X_umap" not in adata.obsm:
+            sc.pp.neighbors(adata, use_rep="X", n_neighbors=30)
+            sc.tl.umap(adata)
+            adata.write(path)  # overwrite file with UMAP stored
+        adatas[name] = adata
+
+    # Set up 2x3 figure
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    for col, name in enumerate(names):
+        adata = adatas[name]
+
+        # Top row: cell type
+        ax = axes[0, col]
+        sc.pl.umap(adata, color=cell_key, ax=ax, show=False,
+                   legend_loc='right margin', title=f"{name} (cell type)")
+
+        # Bottom row: batch
+        ax = axes[1, col]
+        sc.pl.umap(adata, color=batch_key, ax=ax, show=False,
+                   legend_loc='right margin', title=f"{name} (batch)")
+
+    plt.tight_layout()
+    plt.savefig(f"{out_prefix}.png", dpi=300)
+    plt.close(fig)
