@@ -125,9 +125,8 @@ def combine_covid_batches(adata):
 
     Returns
     -------
-    None
-        Adds a new categorical column `adata.obs['batch_group']` in place.
-
+    adata : anndata.AnnData
+        The modified AnnData object with a new column `batch_group` in `adata.obs`.
     Notes
     -----
     - Merges multiple small sub‐studies from the same lab/protocol (e.g. Krasnow slices,
@@ -155,6 +154,7 @@ def combine_covid_batches(adata):
     adata.obs[new_batch_column_name] = adata.obs[batch_key].replace(mapping)
     unique_batches = adata.obs[new_batch_column_name].unique()
     adata.obs[new_batch_column_name] = adata.obs[new_batch_column_name].cat.set_categories(unique_batches)
+    return adata
 
 
 if __name__ == "__main__":
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     query_out = os.path.join(args.output_dir, args.query_file)
 
     if "covid" in args.orig_path.lower():
-        combine_covid_batches(adata)
+        adata = combine_covid_batches(adata)
 
     ref_query_split(
         adata,
