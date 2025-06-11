@@ -1542,7 +1542,7 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, 
     # Batch on lower right
     fig.legend(handles=bt_handles,
                loc="lower right",
-               bbox_to_anchor=(0.98, 0.15),
+               bbox_to_anchor=(0.98, 0.1),
                title=batch_key,
                ncol=1, fontsize='small', title_fontsize='medium')
 
