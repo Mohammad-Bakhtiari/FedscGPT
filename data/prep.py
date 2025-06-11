@@ -114,7 +114,7 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
         raise ValueError(f"Unknown normalization method: {method}")
 
 
-def combine_covid_batches(adata):
+def combine_covid_batches(adata, batch_key="batch", new_batch_column_name='batch_group'):
     """
     Combine fine‐grained study labels into broader batch groups.
 
@@ -135,8 +135,6 @@ def combine_covid_batches(adata):
         * Avoid overfitting correction parameters on tiny batches.
         * Preserve major technical differences across labs/platforms.
     """
-    batch_key = "study"
-    new_batch_column_name = 'batch_group'
     mapping = {
         "Krasnow_distal 1a": "Krasnow",
         "Krasnow_distal 2": "Krasnow",
@@ -155,6 +153,54 @@ def combine_covid_batches(adata):
     unique_batches = adata.obs[new_batch_column_name].unique()
     adata.obs[new_batch_column_name] = adata.obs[new_batch_column_name].cat.set_categories(unique_batches)
     return adata
+
+
+def detect_standalone_celltypes(adata, celltype_key, batch_key):
+    """
+    Identify cell types that appear in only one batch, record and print their batch.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Single-cell data with .obs containing cell type and batch annotations.
+    celltype_key : str
+        Column name in adata.obs for cell type labels.
+    batch_key : str
+        Column name in adata.obs for batch labels.
+
+    Returns
+    -------
+    dict
+        Mapping of each cell type present in exactly one batch to that batch label.
+    """
+    # DataFrame view
+    df = adata.obs[[celltype_key, batch_key]].copy()
+
+    # Count unique batches per cell type
+    batch_counts = df.groupby(celltype_key)[batch_key].nunique()
+
+    # Find standalone cell types
+    standalone_cts = batch_counts[batch_counts == 1].index.tolist()
+
+    # Build mapping
+    mapping = {}
+    for ct in standalone_cts:
+        batch_val = df.loc[df[celltype_key] == ct, batch_key].iloc[0]
+        mapping[ct] = batch_val
+
+    # Print results
+    if mapping:
+        print(f"Detected {len(mapping)} standalone cell types:")
+        for ct, batch in mapping.items():
+            print(f"  Cell type '{ct}' appears only in batch '{batch}'")
+    else:
+        print("No standalone cell types found.")
+
+    # Store mapping
+    adata.uns['standalone_celltypes'] = mapping
+
+    return adata
+
 
 
 if __name__ == "__main__":
@@ -236,15 +282,18 @@ if __name__ == "__main__":
     query_out = os.path.join(args.output_dir, args.query_file)
 
     if "covid" in args.orig_path.lower():
-        adata = combine_covid_batches(adata)
+        adata = combine_covid_batches(adata, batch_key='study', new_batch_column_name='batch_group')
+        adata = detect_standalone_celltypes(adata, args.celltype_key, 'batch_group')
+        adata.write_h5ad(args.orig_path.replace(".h5ad", "-uncorrected.h5ad"))
+    else:
 
-    ref_query_split(
-        adata,
-        reference_out,
-        query_out,
-        batch_key=args.batch_key,
-        query_batch=args.query_batch,
-        celltype_key=args.celltype_key
-    )
+        ref_query_split(
+            adata,
+            reference_out,
+            query_out,
+            batch_key=args.batch_key,
+            query_batch=args.query_batch,
+            celltype_key=args.celltype_key
+        )
 
-    print("All done.")
+        print("All done.")
