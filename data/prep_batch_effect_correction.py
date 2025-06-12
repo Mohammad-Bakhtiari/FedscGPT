@@ -205,25 +205,22 @@ def detect_standalone_celltypes(adata, celltype_key, batch_key):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare CellLine dataset for benchmarking.")
-    parser.add_argument("--data_dir", type=str, help="Directory containing the dataset files.")
     parser.add_argument(
         "--orig_adata",
         type=str,
-        help="Path to the original CellLine AnnData file (e.g., CellLine.h5ad).",
+        help="Path to the original AnnData file (e.g., CellLine.h5ad).",
     )
     parser.add_argument("--uncorrected_adata", type=str, help="Uncorrected AnnData file name.")
     parser.add_argument("--corrected_adata", type=str, help="Corrected AnnData file name.")
     parser.add_argument(
         "--reference_file",
         type=str,
-        default="reference.h5ad",
-        help="Filename for the reference subset (saved under --output_dir).",
+        help="Path to the reference adata file.",
     )
     parser.add_argument(
         "--query_file",
         type=str,
-        default="query.h5ad",
-        help="Filename for the query subset (saved under --output_dir).",
+        help="Path to the query adata file.",
     )
     parser.add_argument(
         "--celltype_key",
@@ -246,20 +243,18 @@ if __name__ == "__main__":
         help="Which batch value to use for the query subset.",
     )
     parser.add_argument("--stage", type=str, choices=["uncorrected", "corrected"])
-
-
     args = parser.parse_args()
     if args.stage == "uncorrected":
-        adata = anndata.read_h5ad(os.path.join(args.data_dir, args.orig_adata))
+        adata = anndata.read_h5ad(args.orig_adata)
         adata.X = normalize_data(adata.X, "log")
         print("Normalization complete.\n")
 
         adata = combine_covid_batches(adata, batch_key=args.batch_key, new_batch_column_name=args.batch_group_key)
         adata = detect_standalone_celltypes(adata, args.celltype_key, args.batch_group_key)
-        adata.write_h5ad(os.path.join(args.data_dir, args.uncorrected_adata))
+        adata.write_h5ad(args.uncorrected_adata)
     elif args.stage == "corrected":
-        uncorrected_adata = anndata.read_h5ad(os.path.join(args.data_dir, args.uncorrected_adata))
-        corrected_adata = anndata.read_h5ad(os.path.join(args.data_dir, args.corrected_adata))
+        uncorrected_adata = anndata.read_h5ad(args.uncorrected_adata)
+        corrected_adata = anndata.read_h5ad(args.corrected_adata)
         standalone_ct = uncorrected_adata.uns["standalone_celltypes"].keys()
         standalone_adata = uncorrected_adata[uncorrected_adata.obs[args.celltype_key].isin(standalone_ct)].copy()
         adata = anndata.concat([corrected_adata, standalone_adata], join='outer')
@@ -271,8 +266,8 @@ if __name__ == "__main__":
             args.query_set_value = str(args.query_set_value)
         ref_query_split(
             adata,
-            os.path.join(args.data_dir, args.reference_file),
-            os.path.join(args.data_dir, args.query_file),
+            args.reference_file,
+            args.query_file,
             split_key=args.ref_query_split_key,
             query_set_vale=args.query_set_value,
             celltype_key=args.celltype_key

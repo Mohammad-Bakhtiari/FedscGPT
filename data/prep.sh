@@ -16,9 +16,8 @@ if [[ "$correction" == "true" ]]; then
       IFS='|' read -r -a args <<< "${datasets[$key]}"
 
       python prep_batch_effect_correction.py \
-        --data_dir "$data_dir/${args[0]}" \
-        --orig_adata "${args[1]}" \
-        --uncorrected_adata "${args[2]}" \
+        --orig_adata "$data_dir/${args[0]}/${args[1]}" \
+        --uncorrected_adata "$data_dir/${args[0]}/${args[1]}/${args[2]}" \
         --celltype_key "${args[3]}" \
         --batch_key "${args[4]}" \
         --stage "uncorrected"
@@ -26,20 +25,20 @@ if [[ "$correction" == "true" ]]; then
     done
   elif [[ "$correction_stage" == "corrected" ]]; then
     declare -A datasets
-    # Order: subdir|orig_file|corrected_adata|uncorrected_adata|reference_filename|query_filename|celltype_key|batch_key|query_batch|normalize|min_max
-    datasets["COVID-cent"]="covid|Covid_annot-uncorrected.h5ad|corrected.h5ad|reference_corrected.h5ad|query_corrected.h5ad|celltype|q"
-    datasets["COVID-fed"]="covid|Covid_annot-uncorrected.h5ad|fed_corrected.h5ad|reference_fed_corrected.h5ad|query_fed_corrected.h5ad|celltype|q"
+    # Order: dataset_subdir|uncorrected_subdir|corrected_adata|reference_filename|query_filename|celltype_key
+    datasets["COVID-cent"]="covid-corrected|covid|Covid_annot-uncorrected.h5ad|corrected.h5ad|reference.h5ad|query.h5ad|celltype"
+    datasets["COVID-fed"]="covid-fed-corrected|covid|Covid_annot-uncorrected.h5ad|fed_corrected.h5ad|reference.h5ad|query.h5ad|celltype"
 
     for key in "${!datasets[@]}"; do
       echo -e "\e[32mPreprocessing data after batch effect correction for ${key}\e[0m"
       IFS='|' read -r -a args <<< "${datasets[$key]}"
+      output="$data_dir/${args[0]}"
       python prep_batch_effect_correction.py \
-        --data_dir "$data_dir/${args[0]}" \
-        --uncorrected_adata "${args[1]}" \
-        --corrected_adata "${args[2]}" \
-        --reference_file "${args[3]}" \
-        --query_file "${args[4]}" \
-        --celltype_key "${args[5]}" \
+        --uncorrected_adata "${data_dir}/${args[1]}/${args[2]}" \
+        --corrected_adata "${output}/${args[3]}" \
+        --reference_file "${output}/${args[4]}" \
+        --query_file "${output}/${args[5]}" \
+        --celltype_key "${args[6]}" \
         --stage "corrected"
     done
   else
