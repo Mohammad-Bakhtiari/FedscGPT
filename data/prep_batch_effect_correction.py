@@ -209,7 +209,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--orig_adata",
         type=str,
-        required=True,
         help="Path to the original CellLine AnnData file (e.g., CellLine.h5ad).",
     )
     parser.add_argument("--uncorrected_adata", type=str, help="Uncorrected AnnData file name.")
