@@ -21,22 +21,22 @@ def calc_umap(adata):
     Compute (if needed) and display basic info about UMAP.
     Stores UMAP in adata.obsm['X_umap'].
     """
+    if "X_umap" not in adata.obsm_keys():
+        # 1) Compute PCA if missing
+        if "X_pca" not in adata.obsm_keys():
+            print("X_pca not found → Running PCA (n_comps=50).")
+            sc.pp.pca(adata, n_comps=50, svd_solver="arpack")
+        else:
+            print("X_pca already exists; skipping PCA.")
 
-    # 1) Compute PCA if missing
-    if "X_pca" not in adata.obsm_keys():
-        print("X_pca not found → Running PCA (n_comps=50).")
-        sc.pp.pca(adata, n_comps=50, svd_solver="arpack")
-    else:
-        print("X_pca already exists; skipping PCA.")
+        # 2) Build neighbors graph (using X_pca)
+        print("Building neighbors graph (n_neighbors=30, use_rep='X_pca').")
+        sc.pp.neighbors(adata, n_neighbors=30, use_rep="X_pca")
 
-    # 2) Build neighbors graph (using X_pca)
-    print("Building neighbors graph (n_neighbors=30, use_rep='X_pca').")
-    sc.pp.neighbors(adata, n_neighbors=30, use_rep="X_pca")
-
-    # 3) Compute UMAP
-    print("Computing UMAP (min_dist=0.5).")
-    sc.tl.umap(adata, min_dist=0.5)
-    print("UMAP stored in adata.obsm['X_umap'].\n")
+        # 3) Compute UMAP
+        print("Computing UMAP (min_dist=0.5).")
+        sc.tl.umap(adata, min_dist=0.5)
+        print("UMAP stored in adata.obsm['X_umap'].\n")
 
 
 def ref_query_split(
