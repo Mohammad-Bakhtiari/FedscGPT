@@ -6,7 +6,7 @@ n_epochs="$2"
 n_rounds="$3"
 smpc="${4-false}"
 GPU="${5-0}"
-agg_method="${6-none}"
+agg_method="${6-fedavg}"
 weighted="${7-false}"
 mu="${8-0}"
 
