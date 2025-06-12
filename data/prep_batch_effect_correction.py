@@ -246,11 +246,11 @@ if __name__ == "__main__":
         default='q',
         help="Which batch value to use for the query subset.",
     )
-    parser.add_argument("--stage", type=str, choices=["prep_uncorrected", "split"])
+    parser.add_argument("--stage", type=str, choices=["uncorrected", "corrected"])
 
 
     args = parser.parse_args()
-    if args.stage == "prep_uncorrected":
+    if args.stage == "uncorrected":
         adata = anndata.read_h5ad(os.path.join(args.data_dir, args.orig_adata))
         adata.X = normalize_data(adata.X, "log")
         print("Normalization complete.\n")
@@ -258,7 +258,7 @@ if __name__ == "__main__":
         adata = combine_covid_batches(adata, batch_key=args.batch_key, new_batch_column_name=args.batch_group_key)
         adata = detect_standalone_celltypes(adata, args.celltype_key, args.batch_group_key)
         adata.write_h5ad(os.path.join(args.data_dir, args.uncorrected_adata))
-    elif args.stage == "split":
+    elif args.stage == "corrected":
         uncorrected_adata = anndata.read_h5ad(os.path.join(args.data_dir, args.uncorrected_adata))
         corrected_adata = anndata.read_h5ad(os.path.join(args.data_dir, args.corrected_adata))
         standalone_ct = uncorrected_adata.uns["standalone_celltypes"].keys()
