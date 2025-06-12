@@ -205,7 +205,7 @@ def detect_standalone_celltypes(adata, celltype_key, batch_key):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare CellLine dataset for benchmarking.")
-    parser.add_argument("data_dir", type=str, help="Directory containing the dataset files.")
+    parser.add_argument("--data_dir", type=str, help="Directory containing the dataset files.")
     parser.add_argument(
         "--orig_adata",
         type=str,
