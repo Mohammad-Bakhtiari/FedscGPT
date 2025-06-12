@@ -265,7 +265,7 @@ if __name__ == "__main__":
         adata = anndata.concat([corrected_adata, standalone_adata], join='outer')
         adata.uns = uncorrected_adata.uns.copy()
         adata.var = uncorrected_adata.var.copy()
-        data.X = normalize_data(adata.X, "min_max")
+        adata.X = normalize_data(adata.X, "min_max")
         calc_umap(adata, overwrite=True)
         if type(args.query_set_value) != str:
             args.query_set_value = str(args.query_set_value)
