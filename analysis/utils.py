@@ -14,7 +14,6 @@ import anndata
 import scanpy as sc
 import random
 
-from FedscGPT.utils import print_config, generate_palette
 
 SEED = 42
 def set_seed(seed=SEED):
@@ -26,6 +25,55 @@ image_format = 'svg'
 ANNOTATION_PLOTS_DIR = 'plots/annotation'
 FEDSCGPT_MARKER = 'D'
 FEDSCGPT_SMPC_MARKER = '*'
+
+def print_config(config: dict or tuple, level=0):
+    for k, v in config.items():
+        if isinstance(v, dict):
+            print("  " * level + str(k) + ":")
+            print_config(v, level + 1)
+        else:
+            print("  " * level + str(k) + ":", v)
+
+def generate_palette(unique_celltypes):
+    """
+    Build a large palette:
+     - First 20 colors from 'tab20'
+     - If > 20, next up to 20 from 'tab20b'
+     - If > 40, sample the remainder from 'gist_ncar'
+    Args:
+        unique_celltypes: list of category names
+    Returns:
+        dict mapping each category to an (r, g, b, a) tuple
+    """
+    n_cats = len(unique_celltypes)
+    palette_ = {}
+
+    if n_cats <= 20:
+        base = plt.get_cmap("tab20", 20)
+        for i, cat in enumerate(unique_celltypes):
+            palette_[cat] = base(i)
+    elif n_cats <= 40:
+        base1 = plt.get_cmap("tab20", 20)
+        base2 = plt.get_cmap("tab20b", 20)
+        for i, cat in enumerate(unique_celltypes):
+            if i < 20:
+                palette_[cat] = base1(i)
+            else:
+                palette_[cat] = base2(i - 20)
+    else:
+        base1 = plt.get_cmap("tab20", 20)
+        base2 = plt.get_cmap("tab20b", 20)
+        # For the remainder, sample evenly from gist_ncar
+        n_extra = n_cats - 40
+        base3 = plt.get_cmap("gist_ncar", n_extra)
+        for i, cat in enumerate(unique_celltypes):
+            if i < 20:
+                palette_[cat] = base1(i)
+            elif i < 40:
+                palette_[cat] = base2(i - 20)
+            else:
+                palette_[cat] = base3(i - 40)
+    return palette_
 
 
 def load_metric(filepath, metric):
@@ -943,9 +991,29 @@ def shorten_batch_value(batch_value):
         'P1058': 'P1058',
         'client_cerebral cortex': "Cerebral",
         'client_prefrontal cortex': 'Prefrontal',
-        'client_premotor cortex': 'Premotor'
+        'client_premotor cortex': 'Premotor',
+        'Northwestern_Misharin_2018Reyfman': 'Misharin',
     }
     return replace.get(batch_value, batch_value)
+
+def shorten_celltype_value(celltype):
+    replace = {
+        "CD4+ T cells": "CD4 T",
+        "CD8+ T cells": "CD8 T",
+        "CD14+ Monocytes": "CD14 Mono",
+        "CD16+ Monocytes": "CD16 Mono",
+        "CD20+ B cells": "CD20 B",
+        "Dendritic cell": "Dendritic",
+        "Proliferating Macrophage": "Prolif Macro",
+        "Megakaryocyte progenitors": "Megakaryo prog",
+        "Signaling Alveolar Epithelial Type 2": "Sig AET2",  # if present
+        "M2 Macrophage": "M2 Macro",
+        "IGSF21+ Dendritic": "IGSF21 DC",
+        "Mast cells": "Mast",
+        "NKT cells": "NKT",
+    }
+    return replace.get(celltype, celltype)
+
 
 def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
     """
@@ -1453,99 +1521,75 @@ def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_th
 
 
 def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, cell_key, out_prefix, standalone=False):
-    """
-    Plot a 2×3 grid of UMAPs:
-      Top row: Raw, Centralized, Federated colored by cell type.
-      Bottom row: Raw, Centralized, Federated colored by batch.
-    After computing UMAP (if missing), save it back to the original file.
-
-    Parameters
-    ----------
-    raw_h5ad : str
-        Path to raw (uncorrected) AnnData file.
-    cent_corrected : str
-        Path to centralized-corrected AnnData file.
-    fed_corrected : str
-        Path to federated-corrected AnnData file.
-    batch_key : str
-        Key in adata.obs for batch labels.
-    cell_key : str
-        Key in adata.obs for cell type labels.
-    out_prefix : str
-        Prefix for the saved plot file (without extension).
-    """
+    sc.settings.figdir = ""
     # Load AnnData objects
     names = ["Raw", "Centralized", "Federated"]
     paths = [raw_h5ad, cent_corrected, fed_corrected]
     adatas = {}
+
     for name, path in zip(names, paths):
         adata = sc.read_h5ad(path)
-        # Compute UMAP if not present
         if "X_umap" not in adata.obsm:
             sc.pp.neighbors(adata, use_rep="X", n_neighbors=30)
             sc.tl.umap(adata)
-            adata.write(path)  # overwrite file with UMAP stored
+            adata.write(path)
         adatas[name] = adata
-    # drop standalone cell types
+
+    # Remove standalone cell types if requested
     if not standalone:
-        stand_alone_celltypes = ["CCR7+ T", "CD8 T", "CD10+ B cells", "Ciliated", "DC_activated", "Erythrocytes",
-                                "Erythroid progenitors", "IGSF21+ Dendritic", "M2 Macrophage", "Megakaryocytes",
-                                "Monocyte progenitors", "Proliferating T", "Signaling Alveolar Epithelial Type 2",
-                                "Treg", "Tregs", "innate T"]
+        stand_alone_celltypes = [
+            "CCR7+ T", "CD8 T", "CD10+ B cells", "Ciliated", "DC_activated", "Erythrocytes",
+            "Erythroid progenitors", "IGSF21+ Dendritic", "M2 Macrophage", "Megakaryocytes",
+            "Monocyte progenitors", "Proliferating T", "Signaling Alveolar Epithelial Type 2",
+            "Treg", "Tregs", "innate T"
+        ]
         for name, adata in adatas.items():
             adatas[name] = adata[~adata.obs[cell_key].isin(stand_alone_celltypes)]
+
     uniq_ct = list(adatas["Centralized"].obs[cell_key].cat.categories)
     cell_palette = generate_palette(uniq_ct)
-    # batches come from the raw data
+
     uniq_batch = list(adatas["Raw"].obs[batch_key].cat.categories)
     batch_palette = generate_palette(uniq_batch)
 
-    # 3) Set up 2x3 grid + space for legends on right
-    fig, axes = plt.subplots(2, 3, figsize=(18, 12),
-                             gridspec_kw={"right": 0.75})
+    os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
 
-    # 4) Plotting
-    for col, name in enumerate(names):
+    # Save separate UMAPs without legends
+    for name in names:
         ad = adatas[name]
-        # Top: cell type
-        ax_ct = axes[0, col]
-        sc.pl.umap(ad, color=cell_key, ax=ax_ct, show=False,
-                   palette=cell_palette, legend_loc=None)
-        ax_ct.set_title(f"{name} (cell type)")
-        ax_ct.axis("off")
-        # Bottom: batch
-        ax_bt = axes[1, col]
-        sc.pl.umap(ad, color=batch_key, ax=ax_bt, show=False,
-                   palette=batch_palette, legend_loc=None)
-        ax_bt.set_title(f"{name} (batch)")
-        ax_bt.axis("off")
 
-    # 5) Create external legends
-    # Cell‐type legend
+        # Cell type plot
+        sc.pl.umap(ad, color=cell_key, show=False, legend_loc=None,
+                   palette=cell_palette, title=f"{name} (cell type)")
+        plt.savefig(f"{out_prefix}_{name}_celltype.png", dpi=300)
+        plt.close()
+
+        # Batch plot
+        sc.pl.umap(ad, color=batch_key, show=False, legend_loc=None,
+                   palette=batch_palette, title=f"{name} (batch)")
+        plt.savefig(f"{out_prefix}_{name}_batch.png", dpi=300)
+        plt.close()
+
+    # Create separate legend for cell type
     ct_handles = [
-        plt.Line2D([0], [0], marker='o', color=cell_palette[ct], linestyle='', label=ct)
+        plt.Line2D([0], [0], marker='o', color=cell_palette[ct], linestyle='', label=shorten_celltype_value(ct))
         for ct in uniq_ct
     ]
-    # Batch legend
+    fig_ct, ax_ct = plt.subplots(figsize=(4, max(4, len(ct_handles) * 0.25)))
+    ax_ct.legend(handles=ct_handles, loc='center', title=cell_key, fontsize='small', title_fontsize='medium')
+    ax_ct.axis("off")
+    plt.tight_layout()
+    fig_ct.savefig(f"{out_prefix}_legend_celltype.png", dpi=300)
+    plt.close(fig_ct)
+
+    # Create separate legend for batch
     bt_handles = [
-        plt.Line2D([0], [0], marker='o', color=batch_palette[b], linestyle='', label=b)
+        plt.Line2D([0], [0], marker='o', color=batch_palette[b], linestyle='', label=shorten_batch_value(b))
         for b in uniq_batch
     ]
-
-    # Place legends
-    # Cell‐type on upper right
-    fig.legend(handles=ct_handles,
-               loc="upper right",
-               bbox_to_anchor=(1, 0.98),
-               title=cell_key,
-               ncol=1, fontsize='small', title_fontsize='medium')
-    # Batch on lower right
-    fig.legend(handles=bt_handles,
-               loc="lower right",
-               bbox_to_anchor=(1, 0.05),
-               title=batch_key,
-               ncol=1, fontsize='small', title_fontsize='medium')
-    fig.subplots_adjust(left=0.01, right=0.75)
+    fig_bt, ax_bt = plt.subplots(figsize=(4, max(4, len(bt_handles) * 0.25)))
+    ax_bt.legend(handles=bt_handles, loc='center', title=batch_key, fontsize='small', title_fontsize='medium')
+    ax_bt.axis("off")
     plt.tight_layout()
-    plt.savefig(f"{out_prefix}.png", dpi=300)
-    plt.close(fig)
+    fig_bt.savefig(f"{out_prefix}_legend_batch.png", dpi=300)
+    plt.close(fig_bt)
