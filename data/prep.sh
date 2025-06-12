@@ -41,6 +41,7 @@ if [[ "$correction" == "true" ]]; then
         --query_file "${args[4]}" \
         --celltype_key "${args[5]}" \
         --stage "corrected"
+    done
   else
     echo -e "\e[31mInvalid correction stage: $correction_stage. Use 'uncorrected' or 'corrected'.\e[0m"
     exit 1
