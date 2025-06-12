@@ -621,8 +621,7 @@ def validate_fed_code(centralized_adata, clients_adata):
 
 def split_data_by_batch(adata, batch_key, keep_vars):
     original_categories = {k: adata.obs[k].cat.categories for k in adata.obs.keys() if adata.obs[k].dtype == "category"}
-    batch_ids = adata.obs[batch_key].tolist()
-    unique_batch_ids = list(set(batch_ids))
+    unique_batch_ids = sorted(adata.obs[batch_key].unique())
     batches = {}
     for client, batch_id in enumerate(unique_batch_ids):
         batch_adata = adata[adata.obs[batch_key] == batch_id].copy()
