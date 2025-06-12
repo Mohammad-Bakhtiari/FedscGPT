@@ -10,7 +10,15 @@ batch_key="$6"
 gpu="$7"
 n_epochs="${8-0}"
 n_rounds="${9-0}"
-smpc="${10-flase}"
+agg_method="${10-fedavg}"
+weighted="${11-true}"
+smpc="${12-flase}"
+mu="${13-0.01}"
+
+if [[ "$agg_method" != "fedavg" && "$agg_method" != "fedprox" ]]; then
+    echo "Invalid aggregation method. Use 'fedavg' or 'fedprox'."
+    exit 1
+fi
 
 # Get the root directory, which is the parent directory of the current working directory
 root_dir="$(dirname "$PWD")"
@@ -65,6 +73,15 @@ fi
 if [ "$smpc" == "true" ]; then
     cmd="$cmd --smpc"
 fi
+
+if [ "$weighted" == "true" ]; then
+    cmd+=" --weighted"
+fi
+
+if [ "$agg_method" == "fedprox" ]; then
+    cmd="$cmd --use_fedprox --mu $mu"
+fi
+
 
 # Execute the command
 eval $cmd

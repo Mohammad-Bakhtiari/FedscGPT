@@ -23,6 +23,11 @@ echo -e "\e[34m Running local clients annotation with scGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
 ./run_annotation.sh centralized_clients 20 0 false $GPU
 
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running Federated annotation with FedscGPT\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_annotation.sh federated_finetune 1 20 true $GPU fedavg true 0.01
+
 chmod +x annotation.sh
 #echo -e "\e[34m-------------------------------------\e[0m"
 #echo -e "\e[34m Running annotation with FedscGPT without SMPC on MS dataset for two local epochs and seven rounds\e[0m"
