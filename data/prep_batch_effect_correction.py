@@ -139,7 +139,7 @@ def preprocess(dataset, raw_data_path, batch_key, celltype_key):
     adata = anndata.read_h5ad(raw_data_path)
     adata.obs['batch_group'] = adata.obs[batch_key].replace(Batch_Mapping[dataset])
     adata = adata[adata.obs[celltype_key].isin(DROPPED_CELLTYPES[dataset])].copy()
-    adata["ref-query-split"] = adata.obs["batch_group"].apply(lambda x: "q" if x in QUERY_BATCHES[dataset] else "ref")
+    adata.obs["ref-query-split"] = adata.obs["batch_group"].apply(lambda x: "q" if x in QUERY_BATCHES[dataset] else "ref")
     return adata
 
 def preprocess_for_batch_effect_correction(dataset, raw_data_path, prep_for_be_datapath,  reference_file, query_file, batch_key, celltype_key):
@@ -179,7 +179,9 @@ if __name__ == "__main__":
             raw_data_path=args.raw_data_path,
             prep_for_be_datapath=args.prep_for_be_datapath,
             batch_key=args.batch_key,
-            celltype_key=args.celltype_key
+            celltype_key=args.celltype_key,
+            reference_file = args.reference_file,
+            query_file = args.query_file,
         )
     elif args.prep_type == "post":
         postprocess_corrected_data(

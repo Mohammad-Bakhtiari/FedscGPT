@@ -4,7 +4,7 @@ data_dir="$1"
 
 declare -A datasets
 # order: dataset_subdir|raw_filename|preprocessed_for_be_filename|celltype_key|batch_key|BATCHES
-datasets["COVID"]="covid|COVID_annot.h5ad|preprocessed_for_be.h5ad|celltype|study|HCL,Krasnow,Sanger_Meyer_2019Madissoon,COVID-19 (query),Sun,10X,Oetjen,Northwestern_Misharin_2018Reyfman,Freytag"
+datasets["COVID"]="covid|Covid_annot.h5ad|preprocessed_for_be.h5ad|celltype|study|HCL,Krasnow,Sanger_Meyer_2019Madissoon,COVID-19 (query),Sun,10X,Oetjen,Northwestern_Misharin_2018Reyfman,Freytag"
 #datasets["MS"]
 
 for dataset in "${!datasets[@]}"; do
@@ -106,3 +106,4 @@ for dataset in "${!datasets[@]}"; do
             --celltype_key "${celltype_key}" \
             --reference_file "${reference_file_prefix}_fed_corrected.h5ad" \
             --query_file "${query_file_prefix}_fed_corrected.h5ad"
+done
