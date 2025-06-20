@@ -1,4 +1,4 @@
-.gitignore
+*
 !.gitignore
-!prep.py
-!prep.sh
+!*.py
+!*.sh

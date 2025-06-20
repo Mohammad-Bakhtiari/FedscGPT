@@ -114,28 +114,10 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
         raise ValueError(f"Unknown normalization method: {method}")
 
 
-def combine_covid_batches(adata, batch_key="batch", new_batch_column_name='batch_group'):
-    """
-    Combine fine‐grained study labels into broader batch groups.
 
-    Parameters
-    ----------
-    adata : anndata.AnnData
-        Annotated data object containing per‐cell metadata in `adata.obs`.
-
-    Returns
-    -------
-    adata : anndata.AnnData
-        The modified AnnData object with a new column `batch_group` in `adata.obs`.
-    Notes
-    -----
-    - Merges multiple small sub‐studies from the same lab/protocol (e.g. Krasnow slices,
-      Sun donors, Oetjen lobes) into single labels (“Krasnow”, “Sun”, “Oetjen”) to:
-        * Increase sample size per batch for more stable batch‐effect estimation.
-        * Avoid overfitting correction parameters on tiny batches.
-        * Preserve major technical differences across labs/platforms.
-    """
-    mapping = {
+DROPPED_CELLTYPES = {"covid": ['Signaling Alveolar Epithelial Type 2', 'IGSF21+ Dendritic', 'Megakaryocytes'],
+                     "MS": []}
+Batch_Mapping = {"covid": {
         "Krasnow_distal 1a": "Krasnow",
         "Krasnow_distal 2": "Krasnow",
         "Krasnow_distal 3": "Krasnow",
@@ -149,131 +131,65 @@ def combine_covid_batches(adata, batch_key="batch", new_batch_column_name='batch
         "Oetjen_P": "Oetjen",
         "Oetjen_A": "Oetjen",
     }
-    adata.obs[new_batch_column_name] = adata.obs[batch_key].replace(mapping)
-    unique_batches = adata.obs[new_batch_column_name].unique()
-    adata.obs[new_batch_column_name] = adata.obs[new_batch_column_name].cat.set_categories(unique_batches)
+}
+QUERY_BATCHES = {"covid": ['Krasnow', 'Sun', 'Freytag'],
+                 "MS": []}
+
+def preprocess(dataset, raw_data_path, batch_key, celltype_key):
+    adata = anndata.read_h5ad(raw_data_path)
+    adata.obs['batch_group'] = adata.obs[batch_key].replace(Batch_Mapping[dataset])
+    adata = adata[adata.obs[celltype_key].isin(DROPPED_CELLTYPES[dataset])].copy()
+    adata["ref-query-split"] = adata.obs["batch_group"].apply(lambda x: "q" if x in QUERY_BATCHES[dataset] else "ref")
     return adata
 
+def preprocess_for_batch_effect_correction(dataset, raw_data_path, prep_for_be_datapath,  reference_file, query_file, batch_key, celltype_key):
+    adata = preprocess(dataset, raw_data_path, batch_key, celltype_key)
+    ref_query_split(adata, reference_file, query_file, split_key="ref-query-split", query_set_vale="q", celltype_key=celltype_key)
+    adata.X = normalize_data(adata.X, "log")
+    adata.write_h5ad(prep_for_be_datapath)
 
-def detect_standalone_celltypes(adata, celltype_key, batch_key):
-    """
-    Identify cell types that appear in only one batch, record and print their batch.
-
-    Parameters
-    ----------
-    adata : anndata.AnnData
-        Single-cell data with .obs containing cell type and batch annotations.
-    celltype_key : str
-        Column name in adata.obs for cell type labels.
-    batch_key : str
-        Column name in adata.obs for batch labels.
-
-    Returns
-    -------
-    dict
-        Mapping of each cell type present in exactly one batch to that batch label.
-    """
-    # DataFrame view
-    df = adata.obs[[celltype_key, batch_key]].copy()
-
-    # Count unique batches per cell type
-    batch_counts = df.groupby(celltype_key)[batch_key].nunique()
-
-    # Find standalone cell types
-    standalone_cts = batch_counts[batch_counts == 1].index.tolist()
-
-    # Build mapping
-    mapping = {}
-    for ct in standalone_cts:
-        batch_val = df.loc[df[celltype_key] == ct, batch_key].iloc[0]
-        mapping[ct] = batch_val
-
-    # Print results
-    if mapping:
-        print(f"Detected {len(mapping)} standalone cell types:")
-        for ct, batch in mapping.items():
-            print(f"  Cell type '{ct}' appears only in batch '{batch}'")
-    else:
-        print("No standalone cell types found.")
-
-    # Store mapping
-    adata.uns['standalone_celltypes'] = mapping
-
-    return adata
-
-
+def postprocess_corrected_data(corrected_data_path, reference_file, query_file, celltype_key="cell_type"):
+    adata = anndata.read_h5ad(corrected_data_path)
+    adata.X = normalize_data(adata.X, "min_max")
+    calc_umap(adata, overwrite=True)
+    ref_query_split(
+        adata,
+        reference_file,
+        query_file,
+        split_key="ref-query-split",
+        query_set_vale="q",
+        celltype_key=celltype_key
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare CellLine dataset for benchmarking.")
-    parser.add_argument(
-        "--orig_adata",
-        type=str,
-        help="Path to the original AnnData file (e.g., CellLine.h5ad).",
-    )
-    parser.add_argument("--uncorrected_adata", type=str, help="Uncorrected AnnData file name.")
-    parser.add_argument("--corrected_adata", type=str, help="Corrected AnnData file name.")
-    parser.add_argument(
-        "--reference_file",
-        type=str,
-        help="Path to the reference adata file.",
-    )
-    parser.add_argument(
-        "--query_file",
-        type=str,
-        help="Path to the query adata file.",
-    )
-    parser.add_argument(
-        "--celltype_key",
-        type=str,
-        default="cell_type",
-        help="Column in adata.obs that holds true cell‐type labels.",
-    )
-    parser.add_argument(
-        "--batch_key",
-        type=str,
-        default="batch",
-        help="Column in adata.obs that holds batch labels.",
-    )
-    parser.add_argument("--ref-query_split_key", type=str, default="ref-query-split", help="Key to split reference and query subsets.")
-    parser.add_argument("--batch_group_key", type=str, default="batch_group", help="Column in adata.obs that holds batch group labels.")
-    parser.add_argument(
-        "--query_set_value",
-        type=str,
-        default='q',
-        help="Which batch value to use for the query subset.",
-    )
-    parser.add_argument("--stage", type=str, choices=["uncorrected", "corrected"])
+    parser.add_argument("--prep_type", type=str, default="pre", help="Stage of the pipeline to run.", choices=["pre", "post"])
+    parser.add_argument("--dataset", type=str, default="covid", help="Dataset name.", choices=["covid", "MS"])
+    parser.add_argument("--raw_data_path", type=str, help="Raw data path.")
+    parser.add_argument("--prep_for_be_datapath", type=str, help="Path to save pre-processed data for batch effect correction.")
+    parser.add_argument("--corrected_data_path", type=str, help="Corrected data path.")
+    parser.add_argument("--reference_file",        type=str,        help="Path to the reference adata file.",    )
+    parser.add_argument("--query_file",        type=str,        help="Path to the query adata file.",    )
+    parser.add_argument("--celltype_key",        type=str,        default="cell_type",        help="Column in adata.obs that holds true cell‐type labels.",    )
+    parser.add_argument("--batch_key",        type=str,        default="batch",        help="Column in adata.obs that holds batch labels.",    )
     args = parser.parse_args()
-    if args.stage == "uncorrected":
-        adata = anndata.read_h5ad(args.orig_adata)
-        adata.X = normalize_data(adata.X, "log")
-        print("Normalization complete.\n")
-
-        adata = combine_covid_batches(adata, batch_key=args.batch_key, new_batch_column_name=args.batch_group_key)
-        adata = detect_standalone_celltypes(adata, args.celltype_key, args.batch_group_key)
-        adata.write_h5ad(args.uncorrected_adata)
-    elif args.stage == "corrected":
-        uncorrected_adata = anndata.read_h5ad(args.uncorrected_adata)
-        corrected_adata = anndata.read_h5ad(args.corrected_adata)
-        standalone_ct = uncorrected_adata.uns["standalone_celltypes"].keys()
-        standalone_adata = uncorrected_adata[uncorrected_adata.obs[args.celltype_key].isin(standalone_ct)].copy()
-        adata = anndata.concat([corrected_adata, standalone_adata], join='outer')
-        adata.uns = uncorrected_adata.uns.copy()
-        adata.var = uncorrected_adata.var.copy()
-        adata.X = normalize_data(adata.X, "min_max")
-        calc_umap(adata, overwrite=True)
-        if type(args.query_set_value) != str:
-            args.query_set_value = str(args.query_set_value)
-        ref_query_split(
-            adata,
-            args.reference_file,
-            args.query_file,
-            split_key=args.ref_query_split_key,
-            query_set_vale=args.query_set_value,
+    if args.prep_type == "pre":
+        preprocess_for_batch_effect_correction(
+            dataset=args.dataset,
+            raw_data_path=args.raw_data_path,
+            prep_for_be_datapath=args.prep_for_be_datapath,
+            batch_key=args.batch_key,
             celltype_key=args.celltype_key
         )
-
-
+    elif args.prep_type == "post":
+        postprocess_corrected_data(
+            corrected_data_path=args.corrected_data_path,
+            reference_file=args.reference_file,
+            query_file=args.query_file,
+            celltype_key=args.celltype_key
+        )
+    else:
+        raise ValueError(f"Unknown prep_type: {args.prep_type}")
 
 
 
