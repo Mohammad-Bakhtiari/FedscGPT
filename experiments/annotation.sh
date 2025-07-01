@@ -29,9 +29,19 @@ smpc_subdir=""
 if [[ "$mode" == "cent_prep_fed_finetune" ]]; then
   general_mode="federated/cent-prep"
 elif [[ "$mode" == *"federated"* ]]; then
-  general_mode="federated"
+  if [[ "$agg_method" == "fedprox" ]]; then
+    general_mode="fedprox"
+  elif [[ "$agg_method" == "fedavg" ]]; then
+    general_mode="fedavg"
+  else
+    echo "Invalid aggregation method. Use 'fedavg' or 'fedprox'."
+    exit 1
+  fi
   if [ "$smpc" == "true" ]; then
-    smpc_subdir="/smpc"
+    general_mode="${general_mode}-smpc"
+  fi
+  if [[ "$weighted" == "true" ]]; then
+    general_mode="${general_mode}-weighted"
   fi
 fi
 
@@ -40,7 +50,7 @@ fi
 data_dir="${root_dir}/data/scgpt/benchmark/${dataset}"
 reference="${data_dir}/${reference_file}"
 query="${data_dir}/${query_file}"
-output="${root_dir}/output/annotation/${dataset}/${general_mode}${smpc_subdir}"
+output="${root_dir}/output/annotation/${dataset}/${general_mode}"
 INTI_WEIGHTS_DIR="${root_dir}/models/init"
 
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
