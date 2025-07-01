@@ -38,6 +38,7 @@ for dataset in "${!datasets[@]}"; do
     output="${ds_data_dir}/output"
     mkdir -p "$output"
     init_model_path="${output}/model"
+    export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
     echo -e "\e[32mCentralized batch effect correction of $dataset.\e[0m"
     output_path="${output}/centralized"
