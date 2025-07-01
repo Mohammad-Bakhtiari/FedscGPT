@@ -138,7 +138,7 @@ QUERY_BATCHES = {"covid": ['Krasnow', 'Sun', 'Freytag'],
 def preprocess(dataset, raw_data_path, batch_key, celltype_key):
     adata = anndata.read_h5ad(raw_data_path)
     adata.obs['batch_group'] = adata.obs[batch_key].replace(Batch_Mapping[dataset])
-    adata = adata[adata.obs[celltype_key].isin(DROPPED_CELLTYPES[dataset])].copy()
+    adata = adata[~adata.obs[celltype_key].isin(DROPPED_CELLTYPES[dataset])].copy()
     adata.obs["ref-query-split"] = adata.obs["batch_group"].apply(lambda x: "q" if x in QUERY_BATCHES[dataset] else "ref")
     return adata
 
