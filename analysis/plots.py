@@ -19,7 +19,8 @@ if __name__ == '__main__':
                                                      'annotation_cent_box_plt',
                                                      'reference_map_boxplot',
                                                      'fed_embedding_umap',
-                                                     "umap_batch_effect",
+                                                     "umap_covid_batch_effect",
+                                                     "umap_ms_batch_effect",
                                                      ], default='annotation_cent_box_plt')
     parser.add_argument("--mode", choices=['centralized', 'federated'], default='centralized')
     parser.add_argument("--root_dir", type=str, default='/home/bba1658/FedscGPT/output/annotation')
@@ -73,7 +74,7 @@ if __name__ == '__main__':
         embedding_boxplot(args.root_dir, args.format)
     elif args.plot == "fed_embedding_umap":
         fed_embedding_umap(args.data_dir, args.root_dir, img_format='png')
-    elif args.plot == "umap_batch_effect":
+    elif args.plot == "umap_covid_batch_effect":
         plot_batch_effect_umaps(
             raw_h5ad = os.path.join(args.data_dir, "Covid_annot-uncorrected.h5ad"),
             cent_corrected = os.path.join(args.data_dir, "corrected.h5ad"),
@@ -81,4 +82,13 @@ if __name__ == '__main__':
             batch_key = "batch_group",
             cell_key = "celltype",
             out_prefix = os.path.join("plots", "umap_batch_effect")
+        )
+    elif args.plot == "umap_ms_batch_effect":
+        plot_batch_effect_umaps(
+            raw_h5ad = os.path.join(args.data_dir, "refined_ms.h5ad"),
+            cent_corrected = os.path.join(args.data_dir, "output", "centralized", "corrected.h5ad"),
+            fed_corrected = os.path.join(args.data_dir, "output", "federated", "fed_corrected.h5ad"),
+            batch_key = "batch_group",
+            cell_key = "Factor Value[inferred cell type - authors labels]",
+            out_prefix = os.path.join(args.data_dir, "umap_ms_batch_effect")
         )
