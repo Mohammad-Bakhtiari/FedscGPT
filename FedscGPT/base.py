@@ -388,7 +388,9 @@ class FedBase:
         self.clients_data_dir = [f"{self.data_dir}/client_{batch}" for batch in sorted(adata.obs[batch_key].unique())]
         if not all([os.path.exists(f"{d}/{filename}") for d in self.clients_data_dir]):
             batches = split_data_by_batch(adata, batch_key, keep_vars)
-            self.clients_data_dir = self.create_dirs(self.data_dir)
+            for dir in range(self.clients_data_dir):
+                if not os.path.exists(dir):
+                    os.makedirs(dir)
             assert self.n_clients == len(self.clients_data_dir), \
                 f"Number of clients directories {len(self.clients_data_dir)} does not match the number of clients {self.n_clients}"
             save_data_batches(batches, self.clients_data_dir, filename, keep_vars)
