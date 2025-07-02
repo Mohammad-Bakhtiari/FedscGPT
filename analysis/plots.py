@@ -88,7 +88,7 @@ if __name__ == '__main__':
             raw_h5ad = os.path.join(args.data_dir, "refined_ms.h5ad"),
             cent_corrected = os.path.join(args.data_dir, "output", "centralized", "corrected.h5ad"),
             fed_corrected = os.path.join(args.data_dir, "output", "federated", "fed_corrected.h5ad"),
-            batch_key = "batch_group",
+            batch_key = "Factor Value[sampling site]",
             cell_key = "Factor Value[inferred cell type - authors labels]",
             out_prefix = os.path.join(args.data_dir, "umap_ms_batch_effect")
         )
