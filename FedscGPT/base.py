@@ -388,7 +388,7 @@ class FedBase:
         self.clients_data_dir = [f"{self.data_dir}/client_{batch}" for batch in sorted(adata.obs[batch_key].unique())]
         if not all([os.path.exists(f"{d}/{filename}") for d in self.clients_data_dir]):
             batches = split_data_by_batch(adata, batch_key, keep_vars)
-            for dir in range(self.clients_data_dir):
+            for dir in self.clients_data_dir:
                 if not os.path.exists(dir):
                     os.makedirs(dir)
             assert self.n_clients == len(self.clients_data_dir), \
