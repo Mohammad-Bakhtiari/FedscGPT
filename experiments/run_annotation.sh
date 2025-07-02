@@ -16,6 +16,8 @@ chmod +x annotation.sh
 declare -A datasets
 datasets["MS"]="ms|reference.h5ad|query.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]"
 datasets["MS-refined"]="refined_ms|reference-raw.h5ad|query-raw.h5ad|Factor Value[inferred cell type - authors labels]|batch_group"
+datasets["MS-corrected"]="ms-corrected|reference_corrected.h5ad|query_corrected.h5ad|Factor Value[inferred cell type - authors labels]|batch_group"
+datasets["MS-fed-corrected"]="ms-fed-corrected|reference_fed_corrected.h5ad|query_fed_corrected.h5ad|Factor Value[inferred cell type - authors labels]|batch_group"
 datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
