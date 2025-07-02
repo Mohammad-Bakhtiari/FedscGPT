@@ -1,11 +1,13 @@
 #!/bin/bash
-
+set -e
 data_dir="$1"
 
 declare -A datasets
 # order: dataset_subdir|raw_filename|preprocessed_for_be_filename|celltype_key|batch_key|BATCHES
 datasets["COVID"]="covid|Covid_annot.h5ad|preprocessed_for_be.h5ad|celltype|study|HCL,Krasnow,Sanger_Meyer_2019Madissoon,COVID-19 (query),Sun,10X,Oetjen,Northwestern_Misharin_2018Reyfman,Freytag"
-#datasets["MS"]
+datasets["MS"]="ms|refined_ms.h5ad|preprocessed_for_be.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]|prefrontal cortex,cerebral cortex,premotor cortex"
+
+
 
 for dataset in "${!datasets[@]}"; do
     echo -e "\e[32m******************************************\e[0m"
@@ -47,7 +49,7 @@ for dataset in "${!datasets[@]}"; do
       --model_path "$init_model_path" \
       --data_path "${prep_for_be_datapath}" \
       --output_path "$output_path" \
-      --epoch 1 \
+      --epoch 100 \
       --batch_key "batch_group" \
       --cell_key "${celltype_key}" \
       --z_dim 10 \
@@ -65,7 +67,7 @@ for dataset in "${!datasets[@]}"; do
       --init_model_path "$init_model_path" \
       --adata "${prep_for_be_datapath}" \
       --output "$output_path" \
-      --epoch 1 \
+      --epoch 2 \
       --batch_key "batch_group" \
       --cell_key "${celltype_key}" \
       --batches "$BATCHES" \
@@ -78,7 +80,7 @@ for dataset in "${!datasets[@]}"; do
       --remove_cell_types "" \
       --n_clients "${n_clients}" \
       --gpu 1 \
-      --n_rounds 1 \
+      --n_rounds 8 \
       --aggregation "fedavg" \
       --smpc
 
