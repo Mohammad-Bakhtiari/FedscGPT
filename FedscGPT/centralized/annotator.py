@@ -238,8 +238,7 @@ class Inference(Base):
         dump_results(predictions, labels, results, self.cell_id2type, self.output_dir)
 
     def save_records(self):
-        if self.param_tuning:
-            self.result_recorder.save()
+        self.result_recorder.save()
 
     def update_records(self, **kwargs):
         self.result_recorder.update(labels=self.celltypes_labels, id_maps=self.cell_id2type, **kwargs)
