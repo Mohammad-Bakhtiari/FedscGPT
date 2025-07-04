@@ -559,7 +559,7 @@ def dump_results(predictions, labels, results, id2type, save_dir, epoch=None, n_
         print(f"Results saved for epoch {epoch}, round {n_rounds} in {save_path}")
 
 
-def eval_annotation(celltypes: list, predictions, labels, id2type, save_dir):
+def confusion_matrix_evaluation(celltypes: list, predictions, labels, id2type, save_dir):
     for i in set([id2type[p] for p in predictions]):
         if i not in celltypes:
             celltypes.remove(i)
