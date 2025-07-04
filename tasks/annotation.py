@@ -2,7 +2,7 @@
 
 """
 import __init__
-from FedscGPT.utils import eval_annotation, split_data_by_batch, save_data_batches, set_seed
+from FedscGPT.utils import confusion_matrix_evaluation, split_data_by_batch, save_data_batches, set_seed
 from FedscGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
 from FedscGPT.federated.annotator import FedAnnotator
 from FedscGPT.federated.aggregator import FedAvg
@@ -59,17 +59,19 @@ def centralized_finetune_inference(**kwargs):
     """
     """
     annotator = centralized_finetune(**kwargs)
-    centralized_inference(logger=annotator.logger,
-                          load_model=False,
-                          weights=annotator.best_model.state_dict(),
-                          **kwargs
-                          )
+    inference_model = centralized_inference(logger=annotator.logger,
+                                            load_model=False,
+                                            weights=annotator.best_model.state_dict(),
+                                            plot_results=True,
+                                            **kwargs
+                                            )
+    inference_model.save_records()
 
 def centralized_inference(annotator=None,
                           logger=None,
                           load_model=True,
                           weights=None,
-                          save_results=True,
+                          plot_results=False,
                           model_name='model.pt',
                           round_number=None,
                           **kwargs,
@@ -81,20 +83,19 @@ def centralized_inference(annotator=None,
             raise Warning("Inferencing cell types using random network!")
         else:
             annotator.best_model.load_state_dict(weights)
-    if kwargs['param_tuning'] or save_results:
-        predictions, labels = annotator.inference(plot_results=save_results,
-                                                  save=save_results,
-                                                  round_num=round_number,
-                                                  n_epochs=kwargs['n_epochs'],
-                                                  mu=kwargs['mu'] if kwargs['use_fedprox'] else None)
-    if save_results:
-        eval_annotation(annotator.unique_cell_types,
-                        predictions,
-                        labels,
-                        annotator.cell_id2type,
+    predictions, labels = annotator.inference(plot_results=plot_results,
+                                              round_num=round_number,
+                                              n_epochs=kwargs['n_epochs'],
+                                              mu=kwargs['mu'] if kwargs['use_fedprox'] else None)
+
+    if plot_results:
+        confusion_matrix_evaluation(annotator.unique_cell_types,
+                                    predictions,
+                                    labels,
+                                    annotator.cell_id2type,
                         f"{kwargs['output_dir']}/plots",
 
-                        )
+                                    )
     return annotator
 
 
@@ -102,7 +103,7 @@ def federated_finetune(**kwargs):
     annotator = fed_prep(**kwargs)
     annotator.post_prep_setup()
     annotator.init_global_weights()
-    cent_inf = partial(centralized_inference, logger=annotator.logger, load_model=False, **kwargs)
+    cent_inf = partial(centralized_inference, agg_methdod="federated", logger=annotator.logger, load_model=False, **kwargs)
     inference_model = cent_inf(weights=annotator.global_weights, save_results=False, round_number=0)
     n_local_samples = [client.n_samples for client in annotator.clients]
     for round in range(1, annotator.fed_config.n_rounds + 1):
@@ -156,7 +157,7 @@ def clients_centralized_training(federated_prep, **kwargs):
         kwargs['reference_adata'] = client_ref_adata
         kwargs['data_dir'] = data_dir
         kwargs['output_dir'] = output_dir
-        centralized_finetune_inference(preprocess=False, **kwargs)
+        centralized_finetune_inference(preprocess=False, agg_method=os.path.basename(data_dir), **kwargs)
 
 def single_shot_fed(**kwargs):
     cent_inf = partial(centralized_inference, load_model=False, save_results=False, **kwargs)
@@ -194,12 +195,12 @@ if __name__ == '__main__':
         federated_zeroshot_annotation(args.config_file, args.data_dir, args.adata, args.test_adata,
                                       args.pretrained_model_dir, args.output_dir)
     elif args.mode == "centralized_inference":
-        centralized_inference(task='annotation', **vars(args))
-    elif args.mode == "centralized_finetune_inference": # checked! it works fine!
-        centralized_finetune_inference(task='annotation', **vars(args))
+        centralized_inference(task='annotation', agg_method="cent-inference", plot_results=True, **vars(args))
+    elif args.mode == "centralized_finetune_inference":
+        centralized_finetune_inference(task='annotation', agg_method="centralized", **vars(args))
     elif args.mode == "cent_prep_fed_finetune":
         centralized_prep_fed_annotation(task='annotation', **vars(args))
-    elif args.mode == "centralized_clients": # checked! it works fine!
+    elif args.mode == "centralized_clients":
         clients_centralized_training(task='annotation', **vars(args))
     elif args.mode == "single_shot_federated":
         single_shot_fed(task='annotation', **vars(args))
