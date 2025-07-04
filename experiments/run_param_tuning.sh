@@ -46,7 +46,7 @@ if [ "$smpc" == "true" ]; then
     smpc_subdir="/smpc"
 fi
 
-param_tuning_res="${root_dir}/output/annotation/param-tuning-res"
+param_tuning_res="${root_dir}/output/annotation/results_summary"
 
 
 

@@ -24,7 +24,7 @@ def instantiate_args():
     parser.add_argument("--verbose", action='store_true', default=False)
     parser.add_argument("--dataset_name", type=str, default='ms')
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--param_tuning_res", type=str, default=f"{HOME_DIR}/output/annotation/param-tuning-res")
+    parser.add_argument("--param_tuning_res", type=str, default=f"{HOME_DIR}/output/annotation/results_summary")
     return parser
 
 
