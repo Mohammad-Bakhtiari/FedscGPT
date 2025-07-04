@@ -793,8 +793,11 @@ class ResultsRecorder:
         self.logger = logger if logger else print
         self.verbose = verbose
         self.agg_method = agg_method
-        if self.agg_method not in self.all_results:
-            self.all_results[self.agg_method] = {}
+        if dataset not in self.all_results:
+            self.all_results[dataset] = {}
+        if self.agg_method not in self.all_results[dataset]:
+            self.all_results[dataset][self.agg_method] = {}
+
 
     def load_or_create_dataframe(self):
         """Load the DataFrame from a CSV file or create a new one if the file doesn't exist."""
@@ -845,30 +848,21 @@ class ResultsRecorder:
         if dataset is None:
             dataset = self.dataset
 
-        if dataset not in self.all_results[self.agg_method]:
-            self.all_results[self.agg_method][dataset] = {}
 
-
-        if 'id_maps' not in self.all_results[self.agg_method][dataset]:
-            self.all_results[self.agg_method][dataset]['id_maps'] = id_maps
+        if 'id_maps' not in self.all_results[dataset]:
+            self.all_results[dataset]['id_maps'] = id_maps
         else:
-            assert self.all_results[self.agg_method][dataset]['id_maps'] == id_maps, f"ID Maps mismatch for dataset {dataset}"
+            assert self.all_results[dataset]['id_maps'] == id_maps, f"ID Maps mismatch for dataset {dataset}"
 
         # Initialize epoch if not present
-        if epoch not in self.all_results[self.agg_method][dataset]:
-            self.all_results[self.agg_method][dataset][epoch] = {}
+        if epoch not in self.all_results[dataset][self.agg_method]:
+            self.all_results[dataset][self.agg_method][epoch] = {}
 
-
-        # Ensure round_number is not overwritten
-        if round_number in self.all_results[self.agg_method][dataset][epoch]:
-            self.logger(f"Warning: Round {round_number} already exists for epoch {epoch} in dataset {dataset}.")
-        entry = {'predictions': predictions, 'labels': labels}
-        if mu is None:
-            self.all_results[self.agg_method][dataset][epoch][round_number] = entry
-        else:
-            if round_number not in self.all_results[self.agg_method][dataset][epoch]:
-                self.all_results[self.agg_method][dataset][epoch][round_number] = {}
-            self.all_results[self.agg_method][dataset][epoch][round_number][mu] = entry
+        if round_number not in self.all_results[dataset][self.agg_method][epoch]:
+            self.all_results[dataset][self.agg_method][epoch][round_number] = {}
+        if mu not in self.all_results[dataset][self.agg_method][epoch][round_number]:
+            self.all_results[dataset][self.agg_method][epoch][round_number][mu] = {}
+        self.all_results[dataset][self.agg_method][epoch][round_number][mu] = {'predictions': predictions, 'labels': labels}
 
     def save_pickle(self):
         """Save the detailed results dictionary to the pickle file."""
