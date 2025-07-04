@@ -103,7 +103,7 @@ def federated_finetune(**kwargs):
     annotator = fed_prep(**kwargs)
     annotator.post_prep_setup()
     annotator.init_global_weights()
-    cent_inf = partial(centralized_inference, agg_methdod="federated", logger=annotator.logger, load_model=False, **kwargs)
+    cent_inf = partial(centralized_inference, agg_method="federated", logger=annotator.logger, load_model=False, **kwargs)
     inference_model = cent_inf(weights=annotator.global_weights, save_results=False, round_number=0)
     n_local_samples = [client.n_samples for client in annotator.clients]
     for round in range(1, annotator.fed_config.n_rounds + 1):
