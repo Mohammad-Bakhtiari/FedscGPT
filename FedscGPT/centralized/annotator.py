@@ -194,7 +194,17 @@ class Inference(Base):
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
         macro_f1 = f1_score(self.celltypes_labels, predictions, average="macro")
-        self.update_records(accuracy=accuracy, precision=precision, recall=recall, macro_f1=macro_f1, round_number=round_num, n_epochs=n_epochs, predictions=predictions, mu=mu)
+        self.result_recorder.update(accuracy,
+                                    precision,
+                                    recall,
+                                    macro_f1,
+                                    predictions,
+                                    self.celltypes_labels,
+                                    self.cell_id2type,
+                                    round_num,
+                                    n_epochs,
+                                    mu=mu
+                                    )
         results = {
             "test/accuracy": accuracy,
             "test/precision": precision,
