@@ -148,7 +148,7 @@ class Training(Base):
 
 
 class Inference(Base):
-    def __init__(self, query_adata, dataset_name, param_tuning_res, load_model=True, model_name="model.pt", param_tuning=False, **kwargs):
+    def __init__(self, query_adata, dataset_name, param_tuning_res, load_model=True, model_name="model.pt", param_tuning=False, agg_method=None, **kwargs):
         super().__init__(**kwargs)
         self.celltypes_labels = None
         self.read_query(query_adata)
@@ -172,9 +172,10 @@ class Inference(Base):
             os.makedirs(self.plot_dir, exist_ok=True)
         self.test_loader = None
         self.param_tuning = param_tuning
-        agg_method = "FedProx" if self.use_fedprox else "FedAvg"
-        agg_method = f"weighted-{agg_method}" if kwargs["weighted"] else agg_method
-        agg_method = f"SMPC-{agg_method}" if kwargs['smpc'] else agg_method
+        if agg_method is "federated":
+            agg_method = "FedProx" if self.use_fedprox else "FedAvg"
+            agg_method = f"weighted-{agg_method}" if kwargs["weighted"] else agg_method
+            agg_method = f"SMPC-{agg_method}" if kwargs['smpc'] else agg_method
         self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=param_tuning_res, logger=self.log, agg_method=agg_method)
 
     def read_query(self, query_adata):
@@ -226,13 +227,11 @@ class Inference(Base):
             worker_init_fn=seed_worker
         )
 
-    def inference(self, plot_results=True, save=True, round_num=None, n_epochs=None, mu=None):
+    def inference(self, plot_results=False, round_num=None, n_epochs=None, mu=None):
         predictions, labels, results = self.test(round_num, n_epochs, mu)
         self.adata_test_raw.obs["predictions"] = [self.cell_id2type[p] for p in predictions]
         if plot_results:
             plot(self.adata_test_raw, self.unique_cell_types, self.celltype_key, self.plot_dir)
-        if save:
-            self.save_results(labels, predictions, results)
         return predictions, labels
 
     def save_results(self, labels, predictions, results):
