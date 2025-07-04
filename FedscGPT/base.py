@@ -387,7 +387,7 @@ class FedBase:
         self.client_ids = sorted(adata.obs[batch_key].unique()) if self.client_ids is None else self.client_ids
         print(self.client_ids)
         self.logger = get_logger(self.output_dir, "FedscGPT", self.client_ids)
-        self.logger.federated(f"testNumber of clients: {self.n_clients}")
+        self.logger.info(f"testNumber of clients: {self.n_clients}")
         exit()
         self.clients_data_dir = [f"{self.data_dir}/client_{batch}" for batch in self.client_ids]
         if not all([os.path.exists(f"{d}/{filename}") for d in self.clients_data_dir]):
