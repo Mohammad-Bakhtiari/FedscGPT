@@ -4,7 +4,7 @@ import numpy as np
 from prep_batch_effect_correction import ref_query_split
 
 # === Config ===
-root_dir = "../ms"
+root_dir = "scgpt/benchmark/ms"
 query_path = f"{root_dir}/query.h5ad"
 reference_path = f"{root_dir}/reference.h5ad"
 celltype_key = "Factor Value[inferred cell type - authors labels]"
@@ -13,7 +13,6 @@ output_combined = f"{root_dir}/ms_annot.h5ad"
 reference_out = f"{root_dir}/reference_annot.h5ad"
 query_out = f"{root_dir}/query_annot.h5ad"
 
-target_batch = "multiple sclerosis | premotor cortex"
 disease_key = "Sample Characteristic[disease]"
 region_key = "Sample Characteristic[sampling site]"
 
@@ -22,7 +21,7 @@ query = sc.read_h5ad(query_path)
 reference = sc.read_h5ad(reference_path)
 
 # === 2. Combine datasets ===
-adata = reference.concatenate(query, batch_key=split_key, batch_categories=["reference", "query"])
+adata = reference.concatenate(query, batch_key='split_label', batch_categories=["reference", "query"])
 print(f"Combined shape: {adata.shape}")
 
 adata.obs[disease_key] = adata.obs[disease_key].astype(str)
