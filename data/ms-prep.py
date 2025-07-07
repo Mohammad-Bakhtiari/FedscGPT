@@ -1,6 +1,7 @@
 import scanpy as sc
 import pandas as pd
 import numpy as np
+from prep_batch_effect_correction import ref_query_split
 
 # === Config ===
 root_dir = "../ms"
@@ -8,7 +9,9 @@ query_path = f"{root_dir}/query.h5ad"
 reference_path = f"{root_dir}/reference.h5ad"
 celltype_key = "Factor Value[inferred cell type - authors labels]"
 batch_key = "Factor Value[sampling site]"
-output_combined = f"{root_dir}/ms.h5ad"
+output_combined = f"{root_dir}/ms_annot.h5ad"
+reference_out = f"{root_dir}/reference_annot.h5ad"
+query_out = f"{root_dir}/query_annot.h5ad"
 
 target_batch = "multiple sclerosis | premotor cortex"
 disease_key = "Sample Characteristic[disease]"
@@ -44,6 +47,27 @@ sc.tl.umap(adata)
 
 # === 5. Save combined AnnData ===
 adata.write(output_combined)
+reference = adata[~adata.obs[region_key] == 'premotor cortex'].copy()
+query = adata[adata.obs[region_key] == 'premotor cortex'].copy()
+
+for layer_key, arr in adata.obsm.items():
+    if arr.shape[0] == adata.n_obs:
+        query.obsm[layer_key] = arr[query_mask.values, :].copy()
+        reference.obsm[layer_key] = arr[(~query_mask.values), :].copy()
+query.var = adata.var.copy()
+reference.var = adata.var.copy()
+unique_cts = adata.obs[celltype_key].cat.categories.tolist()
+query.obs[celltype_key] = pd.Categorical(query.obs[celltype_key], categories=unique_cts)
+reference.obs[celltype_key] = pd.Categorical(reference.obs[celltype_key], categories=unique_cts)
+
+print(f"Query     : {query.n_obs} cells × {query.n_vars} genes")
+print(f"Reference : {reference.n_obs} cells × {reference.n_vars} genes\n")
+
+print(f"Writing reference → {reference_out}")
+reference.write_h5ad(reference_out)
+
+print(f"Writing query     → {query_out}")
+query.write_h5ad(query_out)
 
 # === 6. Save split-specific cell type counts ===
 counts = (
