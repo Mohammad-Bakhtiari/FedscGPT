@@ -46,7 +46,7 @@ sc.tl.umap(adata)
 
 # === 5. Save combined AnnData ===
 adata.write(output_combined)
-reference = adata[~adata.obs[region_key] == 'premotor cortex'].copy()
+reference = adata[~(adata.obs[region_key] == 'premotor cortex')].copy()
 query = adata[adata.obs[region_key] == 'premotor cortex'].copy()
 
 for layer_key, arr in adata.obsm.items():
@@ -71,12 +71,12 @@ query.write_h5ad(query_out)
 # === 6. Save split-specific cell type counts ===
 counts = (
     adata.obs
-    .groupby([batch_key, split_key])[celltype_key]
+    .groupby([batch_key, 'split_label'])[celltype_key]
     .value_counts()
     .unstack(fill_value=0)
     .reset_index()
 )
-counts.to_csv(output_celltype_stats, index=False)
+counts.to_csv(f"{root_dir}/counts.csv", index=False)
 
 # === 7. Save total cell type counts per batch ===
 combined_counts = (
@@ -86,7 +86,7 @@ combined_counts = (
     .unstack(fill_value=0)
     .reset_index()
 )
-combined_counts.to_csv(output_combined_stats, index=False)
+combined_counts.to_csv(f"{root_dir}/combined_counts.csv", index=False)
 
 print("✅ Done. Files written:")
 print(f" - {output_combined}")
