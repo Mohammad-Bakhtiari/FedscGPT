@@ -83,8 +83,3 @@ combined_counts = (
     .reset_index()
 )
 combined_counts.to_csv(f"{root_dir}/combined_counts.csv", index=False)
-
-print("✅ Done. Files written:")
-print(f" - {output_combined}")
-print(f" - {output_celltype_stats}")
-print(f" - {output_combined_stats}")
