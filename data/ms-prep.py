@@ -48,11 +48,7 @@ sc.tl.umap(adata)
 adata.write(output_combined)
 reference = adata[~(adata.obs[region_key] == 'premotor cortex')].copy()
 query = adata[adata.obs[region_key] == 'premotor cortex'].copy()
-
-for layer_key, arr in adata.obsm.items():
-    if arr.shape[0] == adata.n_obs:
-        query.obsm[layer_key] = arr[query_mask.values, :].copy()
-        reference.obsm[layer_key] = arr[(~query_mask.values), :].copy()
+print(f"OBSM check ==> Reference:{reference.obsm.keys()} Query: {query.obsm.keys()}")
 query.var = adata.var.copy()
 reference.var = adata.var.copy()
 unique_cts = adata.obs[celltype_key].cat.categories.tolist()
