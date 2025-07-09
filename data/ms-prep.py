@@ -90,4 +90,4 @@ if __name__ == '__main__':
         reference, query = prep(reference_path=f"{root_dir}/reference.h5ad",
              query_path=f"{root_dir}/query.h5ad",
                                 output_combined = f"{root_dir}/ms_annot.h5ad")
-    get_stats(reference, query, celltype_key, summary_out=f"{root_dir}stats.xlsx")
+    get_stats(reference, query, celltype_key, summary_out=f"{root_dir}/stats.xlsx")
