@@ -57,21 +57,10 @@ def get_stats(reference, query, celltype_key, summary_out):
     reference_obs['source'] = 'reference'
     combined = pd.concat([combined, reference_obs], axis=0)
 
-    # Group by split_label and celltype
-    summary_df = (
-        combined.groupby(['split_label', celltype_key])
-        .size()
-        .reset_index(name='count')
-        .pivot(index='split_label', columns=celltype_key, values='count')
-        .fillna(0)
-        .astype(int)
-    )
-
-    # Add row sums
+    summary_df = combined.groupby([celltype_key, 'split_label']).size().unstack(fill_value=0)
+    # Add row and column totals
     summary_df['Total'] = summary_df.sum(axis=1)
-
-    # Add column totals (including Total column)
-    summary_df.loc['Total'] = summary_df.sum(axis=0)
+    summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
 
     # Save as Excel (XLS)
     summary_df.to_excel(summary_out)
