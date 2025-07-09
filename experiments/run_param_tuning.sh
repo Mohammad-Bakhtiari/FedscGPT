@@ -6,7 +6,7 @@ weighted="${3-true}"
 smpc="${4-true}"
 N_ROUNDS="${5-20}"
 GPU=${6-0}
-epochs="${7-1,2,3,4,5}"
+epochs="${7-1-20}"
 
 
 if [[ "$agg_method" != "fedavg" && "$agg_method" != "fedprox" ]]; then
@@ -15,7 +15,7 @@ if [[ "$agg_method" != "fedavg" && "$agg_method" != "fedprox" ]]; then
 fi
 
 declare -A datasets
-datasets["MS"]="ms|reference.h5ad|query.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]"
+datasets["MS"]="ms|reference_annot.h5ad|query_annot.h5ad|Factor Value[inferred cell type - authors labels]|split_label"
 datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
@@ -35,7 +35,28 @@ else
     keys=("${!datasets[@]}")
 fi
 
-IFS=',' read -ra epochs_values <<< "$epochs"
+epochs_values=()
+
+# Function to expand a range like 3-5 to 3 4 5
+expand_range() {
+  local start=${1%-*}
+  local end=${1#*-}
+  for ((i=start; i<=end; i++)); do
+    epochs_values+=("$i")
+  done
+}
+
+# Split input by comma
+IFS=',' read -ra parts <<< "$epochs"
+
+for part in "${parts[@]}"; do
+  if [[ "$part" =~ ^[0-9]+-[0-9]+$ ]]; then
+    expand_range "$part"
+  elif [[ "$part" =~ ^[0-9]+$ ]]; then
+    epochs_values+=("$part")
+  fi
+done
+
 
 
 root_dir="$(dirname "$PWD")"
