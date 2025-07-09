@@ -1,7 +1,7 @@
 import scanpy as sc
 import pandas as pd
 import numpy as np
-from prep_batch_effect_correction import ref_query_split
+import os
 
 
 def prep(reference_path, query_path, output_combined):
