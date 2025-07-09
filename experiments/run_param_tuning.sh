@@ -6,7 +6,7 @@ weighted="${3-true}"
 smpc="${4-true}"
 N_ROUNDS="${5-20}"
 GPU=${6-0}
-epochs="${7-1-20}"
+epochs="${7-1-5}"
 
 
 if [[ "$agg_method" != "fedavg" && "$agg_method" != "fedprox" ]]; then
