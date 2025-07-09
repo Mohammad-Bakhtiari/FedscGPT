@@ -2,31 +2,41 @@
 GPU=0
 
 chmod +x run_param_tuning.sh
+# Arguments: datasetnames, aggregation method, weighted, smpc, N_ROUNDS, GPU, epochs_values
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running parameter tuning for FedscGPT with SMPC\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_param_tuning.sh true
+./run_param_tuning.sh "HP,MYELOID-top4+rest" fedavg true true 20 $GPU
 
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running parameter tuning for FedscGPT without SMPC\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_param_tuning.sh false
+./run_param_tuning.sh "HP,MYELOID-top4+rest" fedavg true false 20 $GPU
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running mu tuning for FedscGPT with SMPC and FedProx \e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_param_tuning.sh "MS-cent_corrected,COVID-cent_corrected" fedprox true true 20 $GPU "1,2,3,4,5"
+
 
 chmod +x run_annotation.sh
+# Arguments datasetnames, mode, n_epochs, n_rounds, smpc, GPU, agg_method, weighted, mu
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running centralized annotation with scGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_annotation.sh centralized_finetune_inference 20 0 false $GPU
+./run_annotation.sh all centralized_finetune_inference 20 0 false $GPU
 
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running local clients annotation with scGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_annotation.sh centralized_clients 20 0 false $GPU
+./run_annotation.sh all centralized_clients 20 0 false $GPU
 
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running Federated annotation with FedscGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_annotation.sh federated_finetune 1 20 true $GPU fedavg true 0.01
+./run_annotation.sh "HP,MYELOID-top4+rest" federated_finetune 1 20 true $GPU fedavg true 0.01
+
+
 
 chmod +x annotation.sh
 #echo -e "\e[34m-------------------------------------\e[0m"
