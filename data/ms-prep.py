@@ -89,6 +89,7 @@ def get_stats(reference, query, celltype_key, summary_out):
     reference_obs['source'] = 'reference'
     combined = pd.concat([combined, reference_obs], axis=0)
     combined["cell type"] = combined[celltype_key].map(celltype_mapping)
+    combined.drop(columns=[celltype_key], inplace=True)
 
     summary_df = combined.groupby(['cell type', 'split_label']).size().unstack(fill_value=0)
     # Add row and column totals
