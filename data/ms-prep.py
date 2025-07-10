@@ -60,6 +60,27 @@ def prep(reference_path, query_path, output_combined):
     query.write_h5ad(query_out)
     return reference, query
 
+celltype_mapping = {
+    'PVALB-expressing interneuron': 'PVALB interneuron',
+    'SST-expressing interneuron': 'SST interneuron',
+    'VIP-expressing interneuron': 'VIP interneuron',
+    'SV2C-expressing interneuron': 'SV2C interneuron',
+    'cortical layer 2-3 excitatory neuron A': 'L2/3 excitatory A',
+    'cortical layer 2-3 excitatory neuron B': 'L2/3 excitatory B',
+    'cortical layer 4 excitatory neuron': 'L4 excitatory',
+    'cortical layer 5-6 excitatory neuron': 'L5/6 excitatory',
+    'pyramidal neuron?': 'Pyramidal neuron?',
+    'mixed excitatory neuron': 'Mixed excitatory',
+    'oligodendrocyte A': 'Oligodendrocyte A',
+    'oligodendrocyte C': 'Oligodendrocyte C',
+    'oligodendrocyte precursor cell': 'OPC',
+    'astrocyte': 'Astrocyte',
+    'microglial cell': 'Microglia',
+    'phagocyte': 'Phagocyte',
+    'endothelial cell': 'Endothelial',
+    'mixed glial cell?': 'Mixed glia'
+}
+
 
 def get_stats(reference, query, celltype_key, summary_out):
     combined = query.obs.copy()
@@ -67,8 +88,9 @@ def get_stats(reference, query, celltype_key, summary_out):
     reference_obs = reference.obs.copy()
     reference_obs['source'] = 'reference'
     combined = pd.concat([combined, reference_obs], axis=0)
+    combined["cell type"] = combined[celltype_key].map(celltype_mapping)
 
-    summary_df = combined.groupby([celltype_key, 'split_label']).size().unstack(fill_value=0)
+    summary_df = combined.groupby(['cell type', 'split_label']).size().unstack(fill_value=0)
     # Add row and column totals
     summary_df['Total'] = summary_df.sum(axis=1)
     summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
