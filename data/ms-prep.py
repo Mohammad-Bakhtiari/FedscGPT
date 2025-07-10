@@ -22,12 +22,12 @@ def prep(reference_path, query_path, output_combined):
     categories = adata.obs[celltype_key].cat.categories.tolist()
     adata.obs[celltype_key] = pd.Categorical(adata.obs[celltype_key], categories=categories)
     split_label_map = {
-        "normal-premotor cortex": "Ctrl-Premotor",
-        "multiple sclerosis-premotor cortex": "MS-Premotor",
-        "normal-prefrontal cortex": "Ctrl-Prefrontal",
-        "multiple sclerosis-prefrontal cortex": "MS-Prefrontal",
-        "normal-cerebral cortex": "Ctrl-Cerebral",
-        "multiple sclerosis-cerebral cortex": "MS-Cerebral",
+        "normal-premotor cortex": "Ctrl_Premotor",
+        "multiple sclerosis-premotor cortex": "MS_Premotor",
+        "normal-prefrontal cortex": "CtrlPrefrontal",
+        "multiple sclerosis-prefrontal cortex": "MS_Prefrontal",
+        "normal-cerebral cortex": "Ctrl_Cerebral",
+        "multiple sclerosis-cerebral cortex": "MS_Cerebral",
     }
     # ensure that all split labels are mapped correctly
     assert set(adata.obs['split_label'].unique()) == set(split_label_map.keys()), "Mismatch in split labels."
