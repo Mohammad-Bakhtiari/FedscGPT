@@ -69,7 +69,7 @@ celltype_mapping = {
     'cortical layer 2-3 excitatory neuron B': 'L2/3 excitatory B',
     'cortical layer 4 excitatory neuron': 'L4 excitatory',
     'cortical layer 5-6 excitatory neuron': 'L5/6 excitatory',
-    'pyramidal neuron?': 'Pyramidal neuron?',
+    'pyramidal neuron?': 'Pyramidal neuron',
     'mixed excitatory neuron': 'Mixed excitatory',
     'oligodendrocyte A': 'Oligodendrocyte A',
     'oligodendrocyte C': 'Oligodendrocyte C',
