@@ -98,6 +98,10 @@ def get_stats(reference, query, celltype_key, summary_out):
 
     # Save as Excel (XLS)
     summary_df.to_excel(summary_out)
+    print(summary_df)
+
+
+
 
 if __name__ == '__main__':
     root_dir = "scgpt/benchmark/ms"
