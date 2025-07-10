@@ -271,9 +271,11 @@ class FedEmbedder(FedBase):
             self.clients.append(client)
         self.query, self.embed_query = self.embed_query_adata(query_adata, output_dir=output_dir, data_dir=data_dir, **kwargs)
         self.n_query_samples = self.query.shape[0]
+        self.secure_embed = None
         if self.smpc:
             embed_query = torch.tensor(self.embed_query.obsm["X_scGPT"], dtype=torch.float32, device=self.device)
-            self.embed_query.obsm['secure_embed'] = crypten.cryptensor(embed_query)
+            # self.embed_query.obsm['secure_embed'] = crypten.cryptensor(embed_query)
+            self.secure_embed = crypten.cryptensor(embed_query)
 
     def embed_query_adata(self, query_adata, **kwargs):
         """
@@ -412,7 +414,8 @@ class FedEmbedder(FedBase):
         """
         self.collect_global_celltypes()
         client_distances, client_indices = [], []
-        query_embedding = self.embed_query.obsm["secure_embed" if self.smpc else "X_scGPT"]
+        # query_embedding = self.embed_query.obsm["secure_embed" if self.smpc else "X_scGPT"]
+        query_embedding = self.secure_embed if self.smpc else self.embed_query.obsm["X_scGPT"]
         for client in self.clients:
             distances, indices = client.compute_local_distances(query_embedding)
             client_distances.append(distances)
