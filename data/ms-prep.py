@@ -24,7 +24,7 @@ def prep(reference_path, query_path, output_combined):
     split_label_map = {
         "normal-premotor cortex": "Ctrl_Premotor",
         "multiple sclerosis-premotor cortex": "MS_Premotor",
-        "normal-prefrontal cortex": "CtrlPrefrontal",
+        "normal-prefrontal cortex": "Ctrl_Prefrontal",
         "multiple sclerosis-prefrontal cortex": "MS_Prefrontal",
         "normal-cerebral cortex": "Ctrl_Cerebral",
         "multiple sclerosis-cerebral cortex": "MS_Cerebral",
