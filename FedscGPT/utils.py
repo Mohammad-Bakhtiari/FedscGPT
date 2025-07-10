@@ -302,7 +302,7 @@ def add_client_logging(logger, client_id, level_num):
     setattr(logging.Logger, level_name.lower(), log_for_client)
     logger.setLevel(min(logger.level, level_num))  # Ensure logger level includes the new custom level
 
-def get_logger(output_dir, logger_title="scGPT", client_ids=None):
+def get_logger(output_dir, logger_title="scGPT", client_ids=None, debug=False):
     assert logger_title in ["scGPT", "FedscGPT"], f"Invalid logger title: {logger_title}"
     if client_ids is None:
         client_ids = []
@@ -335,7 +335,8 @@ def get_logger(output_dir, logger_title="scGPT", client_ids=None):
             add_client_logging(logger, client_id, BASE_CLIENT_LEVEL_NUM + idx)
 
     add_inference_logging(logger)
-    print_available_log_levels(logger)
+    if debug:
+        print_available_log_levels(logger)
     return logger
 
 
