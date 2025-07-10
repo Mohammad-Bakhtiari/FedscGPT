@@ -4,7 +4,7 @@ import pandas as pd
 
 # Mapping for cell types
 celltype_mapping = {
-    ms: {
+    'ms': {
         'PVALB-expressing interneuron': 'PVALB interneuron',
         'SST-expressing interneuron': 'SST interneuron',
         'VIP-expressing interneuron': 'VIP interneuron',
@@ -70,5 +70,6 @@ with pd.ExcelWriter(output_excel_path) as writer:
                              celltype_mapping=celltype_mapping[dataset],
                              batch_map=batch_map[dataset]
                              )
+        print(stats_df)
         stats_df.to_excel(writer, sheet_name=dataset)
 
