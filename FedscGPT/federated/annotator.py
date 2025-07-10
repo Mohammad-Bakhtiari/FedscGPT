@@ -125,7 +125,7 @@ class FedAnnotator(FedBase, FedAvg):
             client = ClientAnnotator(reference_adata='adata.h5ad',
                                      data_dir=self.clients_data_dir[c],
                                      output_dir=self.clients_output_dir[c],
-                                     log_id=f"client_{self.client_ids[c]}",
+                                     log_id=f"CLIENT_{self.client_ids[c]}",
                                      logger=self.logger,
                                      n_total_samples=n_total_samples,
                                      **kwargs)
