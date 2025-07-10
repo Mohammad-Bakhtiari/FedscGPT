@@ -291,16 +291,6 @@ def add_inference_logging(logger):
     logger.setLevel(min(logger.level, INFERENCE_LEVEL_NUM))  # Ensure logger level includes the new custom level
 
 
-# def add_client_logging(logger, client_id, level_num):
-#     level_name = f"CLIENT_{client_id}"
-#     logging.addLevelName(level_num, level_name)
-#
-#     def log_for_client(self, message, *args, **kws):
-#         if self.isEnabledFor(level_num):
-#             self._log(level_num, message, args, **kws)
-#
-#     setattr(logging.Logger, level_name.lower(), log_for_client)
-#     logger.setLevel(min(logger.level, level_num))  # Ensure logger level includes the new custom level
 def add_client_logging(logger, client_id, level_num):
     level_name = f"CLIENT_{client_id}"
     logging.addLevelName(level_num, level_name)
@@ -309,10 +299,8 @@ def add_client_logging(logger, client_id, level_num):
         if self.isEnabledFor(level_num):
             self._log(level_num, message, args, **kws)
 
-    # Normalize method name (replace hyphens with underscores)
-    method_name = f"client_{client_id}".replace("-", "_")
-    setattr(logging.Logger, method_name, log_for_client)
-    logger.setLevel(min(logger.level, level_num))
+    setattr(logging.Logger, level_name.lower(), log_for_client)
+    logger.setLevel(min(logger.level, level_num))  # Ensure logger level includes the new custom level
 
 def get_logger(output_dir, logger_title="scGPT", client_ids=None):
     assert logger_title in ["scGPT", "FedscGPT"], f"Invalid logger title: {logger_title}"
@@ -347,8 +335,20 @@ def get_logger(output_dir, logger_title="scGPT", client_ids=None):
             add_client_logging(logger, client_id, BASE_CLIENT_LEVEL_NUM + idx)
 
     add_inference_logging(logger)
+    print_available_log_levels(logger)
     return logger
 
+
+def print_available_log_levels(logger):
+    """Print all log levels available for the given logger."""
+    print(f"Logger: {logger.name}, Effective Level: {logging.getLevelName(logger.level)} ({logger.level})")
+    print("Available Log Levels:")
+    # Sort levels by numeric value
+    levels = sorted(logging._levelToName.items(), key=lambda x: x[0])
+    for level_num, level_name in levels:
+        # Only include levels that are >= the logger's effective level
+        if level_num >= logger.level:
+            print(f"  {level_name} ({level_num})")
 
 def per_epoch_data_prep(tokenized_train, tokenized_valid, train_celltype_labels, valid_celltype_labels,
                         train_batch_labels,
