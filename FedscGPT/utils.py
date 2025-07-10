@@ -299,7 +299,7 @@ def add_client_logging(logger, client_id, level_num):
         if self.isEnabledFor(level_num):
             self._log(level_num, message, args, **kws)
 
-    setattr(logging.Logger, level_name.lower(), log_for_client)
+    setattr(logging.Logger, level_name, log_for_client)
     logger.setLevel(min(logger.level, level_num))  # Ensure logger level includes the new custom level
 
 def get_logger(output_dir, logger_title="scGPT", client_ids=None, debug=False):
