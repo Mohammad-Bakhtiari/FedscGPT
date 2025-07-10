@@ -63,7 +63,7 @@ datasets = {
 output_excel_path = "summary_stats.xlsx"
 with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
-        adata = sc.read_h5ad(os.path.join(rootdir, datasets[dataset]["h5ad_file"]))
+        adata = sc.read_h5ad(os.path.join(rootdir, dataset, datasets[dataset]["h5ad_file"]))
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
