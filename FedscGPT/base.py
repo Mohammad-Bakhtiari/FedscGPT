@@ -383,12 +383,8 @@ class FedBase:
         """
         filename = "adata.h5ad"
         self.n_clients = len(adata.obs[batch_key].unique())
-        print(self.client_ids)
         self.client_ids = sorted(adata.obs[batch_key].unique()) if self.client_ids is None else self.client_ids
-        print(self.client_ids)
-        self.logger = get_logger(self.output_dir, "FedscGPT", self.client_ids)
-        print([attr for attr in vars(self.logger)])
-
+        self.logger = get_logger(self.output_dir, "FedscGPT", self.client_ids, debug=True)
         self.clients_data_dir = [f"{self.data_dir}/client_{batch}" for batch in self.client_ids]
         if not all([os.path.exists(f"{d}/{filename}") for d in self.clients_data_dir]):
             batches = split_data_by_batch(adata, batch_key, keep_vars)
