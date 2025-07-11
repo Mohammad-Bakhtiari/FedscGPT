@@ -25,6 +25,7 @@ celltype_mapping = {
         'mixed glial cell?': 'Mixed glia'
     },
     "covid": {
+
     },
     "hp": {
     },
@@ -42,6 +43,9 @@ batch_map = {
         "MS_Cerebral": "MS Cerebral",
     },
     "covid": {
+        'Sanger_Meyer_2019Madissoon': 'Sanger',
+        'COVID-19 (query)': 'COVID',
+        'Northwestern_Misharin_2018Reyfman': 'Northwestern',
     },
     "hp": {
     },
@@ -66,18 +70,18 @@ datasets = {
     #     "celltype_key": "Factor Value[inferred cell type - authors labels]",
     #     "batch_key": "split_label",
     # },
-    'covid-annotation': {
+    'covid': {
         "folder": "covid",
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
     },
-    'covid-embedding': {
-        "folder": "covid-emb",
-        "h5ad_file": "reference.h5ad|query.h5ad",
-        "celltype_key": "celltype",
-        "batch_key": "str_batch",
-    },
+    # 'covid-embedding': {
+    #     "folder": "covid-emb",
+    #     "h5ad_file": "reference.h5ad|query.h5ad",
+    #     "celltype_key": "celltype",
+    #     "batch_key": "str_batch",
+    # },
 # datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 # datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 # datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
