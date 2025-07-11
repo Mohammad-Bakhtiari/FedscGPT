@@ -2,8 +2,6 @@ import os
 import scanpy as sc
 import pandas as pd
 
-from FedscGPT.utils import print_available_log_levels
-
 # Mapping for cell types
 celltype_mapping = {
     'ms': {
