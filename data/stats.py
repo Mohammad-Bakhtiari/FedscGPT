@@ -66,7 +66,7 @@ datasets = {
         "batch_key": "split_label",
     },
     'covid': {
-        "h5ad_file": "Covid_annot-uncorrected.h5ad",
+        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
     },
@@ -109,6 +109,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
                              batch_map=batch_map[dataset]
                              )
         stats_df.to_excel(writer, sheet_name=dataset)
+        print(f"######### Statistics for {dataset}: #########")
         print(stats_df)
         print("#" * 50)
 
