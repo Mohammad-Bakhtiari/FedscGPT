@@ -22,7 +22,6 @@ for dataset in "${!datasets[@]}"; do
     prep_for_be_datapath="${ds_data_dir}/${args[2]}"
     celltype_key="${args[3]}"
 
-    echo -e "\e[32mPreprocessing for $dataset completed.\e[0m"
     python prep_batch_effect_correction.py \
             --prep_type "pre" \
             --dataset "${ds_name}" \
@@ -32,7 +31,7 @@ for dataset in "${!datasets[@]}"; do
             --batch_key "${args[4]}" \
             --reference_file "${reference_file_prefix}-raw.h5ad" \
             --query_file "${query_file_prefix}-raw.h5ad"
-
+    echo -e "\e[32mPreprocessing for $dataset completed.\e[0m"
     echo -e "\e[32mBatch effect correction of $dataset.\e[0m"
     BATCHES="${args[5]}"
     n_clients=$(echo "$BATCHES" | tr ',' '\n' | wc -l)
