@@ -24,6 +24,10 @@ celltype_mapping = {
         'endothelial cell': 'Endothelial',
         'mixed glial cell?': 'Mixed glia'
     },
+    "covid": {
+    },
+    "hp": {
+    },
 
 }
 
@@ -36,6 +40,10 @@ batch_map = {
         "MS_Prefrontal": "MS Prefrontal",
         "Ctrl_Cerebral": "Control Cerebral",
         "MS_Cerebral": "MS Cerebral",
+    },
+    "covid": {
+    },
+    "hp": {
     },
 
 }
