@@ -21,16 +21,17 @@ datasets["COVID-fed-corrected"]="covid-fed-corrected|reference_fed_corrected.h5a
 # ----------------------
 resolve_dataset_keys() {
     local datasetnames="$1"
-    IFS=',' read -ra keys <<< "$datasetnames"
+    IFS=',' read -ra input_keys <<< "$datasetnames"
 
     if [[ "$datasetnames" != "all" ]]; then
-        for key in "${keys[@]}"; do
+        for key in "${input_keys[@]}"; do
             if [[ -z "${datasets[$key]}" ]]; then
                 echo "❌ Dataset \"$key\" not found."
                 echo "✅ Available datasets: ${!datasets[@]}"
                 exit 1
             fi
         done
+        keys=("${input_keys[@]}")
     else
         keys=("${!datasets[@]}")
     fi
