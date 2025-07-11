@@ -16,27 +16,14 @@ from sklearn.preprocessing import (
 from scipy import sparse
 
 
-def calc_umap(adata, overwrite=False):
+def calc_umap(adata):
     """
     Compute (if needed) and display basic info about UMAP.
     Stores UMAP in adata.obsm['X_umap'].
     """
-    if "X_umap" not in adata.obsm_keys() or overwrite:
-        # 1) Compute PCA if missing
-        if "X_pca" not in adata.obsm_keys() or overwrite:
-            print("X_pca not found → Running PCA (n_comps=50).")
-            sc.pp.pca(adata, n_comps=50, svd_solver="arpack")
-        else:
-            print("X_pca already exists; skipping PCA.")
-
-        # 2) Build neighbors graph (using X_pca)
-        print("Building neighbors graph (n_neighbors=30, use_rep='X_pca').")
-        sc.pp.neighbors(adata, n_neighbors=30, use_rep="X_pca")
-
-        # 3) Compute UMAP
-        print("Computing UMAP (min_dist=0.5).")
-        sc.tl.umap(adata, min_dist=0.5)
-        print("UMAP stored in adata.obsm['X_umap'].\n")
+    sc.tl.pca(adata, n_comps=20)
+    sc.pp.neighbors(adata, use_rep='X_pca', n_pcs=20)
+    sc.tl.umap(adata)
 
 
 def ref_query_split(
@@ -147,14 +134,16 @@ def preprocess_for_batch_effect_correction(dataset, raw_data_path, prep_for_be_d
     adata = preprocess(dataset, raw_data_path, batch_key, celltype_key)
     raw = adata.copy()
     raw.x = normalize_data(raw, 'min_max')
+    calc_umap(raw)
     ref_query_split(raw, reference_file, query_file, split_key="ref-query-split", query_set_vale="q", celltype_key=celltype_key)
+    calc_umap(adata)
     adata.X = normalize_data(adata.X, "log")
     adata.write_h5ad(prep_for_be_datapath)
 
 def postprocess_corrected_data(corrected_data_path, reference_file, query_file, celltype_key="cell_type"):
     adata = anndata.read_h5ad(corrected_data_path)
     adata.X = normalize_data(adata.X, "min_max")
-    calc_umap(adata, overwrite=True)
+    calc_umap(adata)
     ref_query_split(
         adata,
         reference_file,
