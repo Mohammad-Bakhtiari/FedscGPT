@@ -135,8 +135,8 @@ with pd.ExcelWriter(output_excel_path) as writer:
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
-                             celltype_mapping=celltype_mapping[dataset],
-                             batch_map=batch_map[dataset]
+                             celltype_mapping=celltype_mapping[folder],
+                             batch_map=batch_map[folder]
                              )
         stats_df.to_excel(writer, sheet_name=dataset)
         print(f"######### Statistics for {dataset}: #########")
