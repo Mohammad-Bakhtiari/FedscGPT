@@ -1527,9 +1527,9 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, 
     names = ["Raw", "Centralized", "Federated"]
     paths = [raw_h5ad, cent_corrected, fed_corrected]
     adatas = {}
-
     for name, path in zip(names, paths):
         adata = sc.read_h5ad(path)
+        adata.obsm.keys()
         if "X_umap" not in adata.obsm:
             sc.pp.neighbors(adata, use_rep="X", n_neighbors=30)
             sc.tl.umap(adata)
