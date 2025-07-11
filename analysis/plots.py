@@ -76,7 +76,7 @@ if __name__ == '__main__':
         fed_embedding_umap(args.data_dir, args.root_dir, img_format='png')
     elif args.plot == "umap_covid_batch_effect":
         plot_batch_effect_umaps(
-            raw_h5ad = os.path.join(args.data_dir, "Covid.h5ad"),
+            raw_h5ad = os.path.join(args.data_dir, "preprocessed_for_be.h5ad"),
             cent_corrected=os.path.join(args.data_dir, "output", "centralized", "corrected.h5ad"),
             fed_corrected=os.path.join(args.data_dir, "output", "federated", "fed_corrected.h5ad"),
             batch_key = "batch_group",
