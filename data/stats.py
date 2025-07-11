@@ -73,10 +73,17 @@ datasets = {
     #     "celltype_key": "Factor Value[inferred cell type - authors labels]",
     #     "batch_key": "split_label",
     # },
-    'covid': {
+    'covid-annotation': {
+        "folder": "covid",
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
+    },
+    'covid-embedding': {
+        "folder": "covid",
+        "h5ad_file": "reference.h5ad|query.h5ad",
+        "celltype_key": "celltype",
+        "batch_key": "str_batch",
     },
 # datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 # datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
