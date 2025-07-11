@@ -130,13 +130,15 @@ def read_adata(files, ds_path):
 with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
         folder = datasets[dataset].get("folder", dataset)
+        ctm = celltype_mapping.get(folder, {})
+        bm = batch_map.get(folder, {})
         print(folder, dataset)
         adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
-                             celltype_mapping=celltype_mapping[folder],
-                             batch_map=batch_map[folder]
+                             celltype_mapping=ctm,
+                             batch_map=bm
                              )
         stats_df.to_excel(writer, sheet_name=dataset)
         print(f"######### Statistics for {dataset}: #########")
