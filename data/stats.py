@@ -53,13 +53,6 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
     # Safe partial mapping: use original value if not in map
     df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x))
     df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x))
-
-    print("\n[Cell type counts]")
-    print(df['cell type'].value_counts(dropna=False))
-
-    print("\n[Batch counts]")
-    print(df['batch'].value_counts(dropna=False))
-
     summary_df = df.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
     summary_df['Total'] = summary_df.sum(axis=1)
     summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
@@ -136,9 +129,8 @@ def read_adata(files, ds_path):
 
 with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
-        adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, dataset))
-        print(adata.obs.celltype.unique())
-        print(adata.obs.batch_group.value_counts())
+        folder = datasets[dataset]["folder"] if "folder" in datasets[dataset] else dataset
+        adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
