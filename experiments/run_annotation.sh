@@ -17,21 +17,6 @@ resolve_dataset_keys "$datasetnames"
 
 chmod +x annotation.sh
 
-
-
-#IFS=',' read -ra keys <<< "$datasetnames"
-#if [[ "${datasetnames}" != "all" ]]; then
-#    for key in "${keys[@]}"; do
-#        if [[ -z "${datasets[$key]}" ]]; then
-#            echo "Dataset \"$key\" not found. Available keys: ${!datasets[@]}"
-#            exit 1
-#        fi
-#    done
-#else
-#    keys=("${!datasets[@]}")
-#fi
-
-
 echo "Running annotation for ${mode}"
 
 
