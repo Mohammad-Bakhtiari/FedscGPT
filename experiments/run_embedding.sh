@@ -24,7 +24,7 @@ gene_col="gene_name"
 echo "Running reference mapping for ${mode}"
 
 # Loop through each dataset configuration
-for key in "${!datasets[@]}"; do
+for key in "${keys[@]}"; do
     echo -e "\e[34mRunning reference mapping for $key\e[0m"
 
     # Read dataset configuration into an array using the custom delimiter
