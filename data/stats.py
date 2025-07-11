@@ -89,14 +89,35 @@ datasets = {
 output_excel_path = "summary_stats.xlsx"
 
 
-def read_adata(files):
-    if len(files) == 1:
-        return sc.read_h5ad(os.path.join(rootdir, dataset, files[0]))
 
-    reference_file, query_file = files
-    reference_path = os.path.join(rootdir, dataset, reference_file)
-    query_path = os.path.join(rootdir, dataset, query_file)
-    return sc.read_h5ad(reference_path).concatenate(sc.read_h5ad(query_path))
+def read_adata(files, rootdir, dataset):
+    """
+    Reads and concatenates h5ad files for a given dataset.
+
+    Parameters:
+    - files: list of filenames (1 or 2 .h5ad files)
+    - rootdir: base directory containing datasets
+    - dataset: subdirectory for the dataset
+
+    Returns:
+    - AnnData object (single or concatenated)
+    """
+    if len(files) == 1:
+        file_path = os.path.join(rootdir, dataset, files[0])
+        return sc.read_h5ad(file_path)
+
+    elif len(files) == 2:
+        reference_file, query_file = files
+        reference_path = os.path.join(rootdir, dataset, reference_file)
+        query_path = os.path.join(rootdir, dataset, query_file)
+
+        reference = sc.read_h5ad(reference_path)
+        query = sc.read_h5ad(query_path)
+
+        return reference.concatenate(query, batch_key="query_ref_split_label", batch_categories=["reference", "query"])
+
+    else:
+        raise ValueError("files must contain one or two filenames")
 
 
 with pd.ExcelWriter(output_excel_path) as writer:
