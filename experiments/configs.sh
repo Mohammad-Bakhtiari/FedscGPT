@@ -32,6 +32,7 @@ resolve_dataset_keys() {
             fi
         done
         keys=("${input_keys[@]}")
+        echo "✅ Selected datasets: ${keys[*]}"
     else
         keys=("${!datasets[@]}")
     fi
