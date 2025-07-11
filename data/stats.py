@@ -73,7 +73,7 @@ datasets = {
         "batch_key": "batch_group",
     },
     'covid-embedding': {
-        "folder": "covid",
+        "folder": "covid-emb",
         "h5ad_file": "reference.h5ad|query.h5ad",
         "celltype_key": "celltype",
         "batch_key": "str_batch",
