@@ -81,7 +81,7 @@ if __name__ == '__main__':
             fed_corrected=os.path.join(args.data_dir, "output", "federated", "fed_corrected.h5ad"),
             batch_key = "batch_group",
             cell_key = "celltype",
-            out_prefix = os.path.join("plots", "umap_batch_effect")
+            out_prefix = os.path.join(args.data_dir, "plots")
         )
     elif args.plot == "umap_ms_batch_effect":
         plot_batch_effect_umaps(
