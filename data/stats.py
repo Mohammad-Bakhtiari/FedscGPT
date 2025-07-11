@@ -60,11 +60,11 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
 # Dataset configuration list
 rootdir = "scgpt/benchmark"
 datasets = {
-    "ms": {
-        "h5ad_file": "ms_annot.h5ad",
-        "celltype_key": "Factor Value[inferred cell type - authors labels]",
-        "batch_key": "split_label",
-    },
+    # "ms": {
+    #     "h5ad_file": "ms_annot.h5ad",
+    #     "celltype_key": "Factor Value[inferred cell type - authors labels]",
+    #     "batch_key": "split_label",
+    # },
     'covid': {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
         "celltype_key": "celltype",
@@ -77,12 +77,12 @@ datasets = {
 # datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
 # datasets["COVID-cent_corrected"]="covid-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
 # datasets["COVID-fed-corrected"]="covid-fed-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
-    "hp": {
-
-        "h5ad_file": "reference_refined.h5ad|query.h5ad",
-        "celltype_key": "cell_type",
-        "batch_key": "batch_group",
-    },
+#     "hp": {
+#
+#         "h5ad_file": "reference_refined.h5ad|query.h5ad",
+#         "celltype_key": "cell_type",
+#         "batch_key": "batch_group",
+#     },
 }
 
 # Output Excel file with multiple sheets
@@ -122,7 +122,8 @@ def read_adata(files, ds_path):
 with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
         adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, dataset))
-        print(adata.obs.keys())
+        print(adata.obs.celltype.unique())
+        print(adata.obs.batch_group.unique())
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
