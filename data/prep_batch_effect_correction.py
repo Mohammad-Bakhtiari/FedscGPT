@@ -145,7 +145,7 @@ def preprocess(dataset, raw_data_path, batch_key, celltype_key):
 
 def preprocess_for_batch_effect_correction(dataset, raw_data_path, prep_for_be_datapath,  reference_file, query_file, batch_key, celltype_key):
     adata = preprocess(dataset, raw_data_path, batch_key, celltype_key)
-    ref_query_split(adata, reference_file, query_file, split_key="ref-query-split", query_set_vale="q", celltype_key=celltype_key)
+    ref_query_split(normalize_data(adata, 'min_max'), reference_file, query_file, split_key="ref-query-split", query_set_vale="q", celltype_key=celltype_key)
     adata.X = normalize_data(adata.X, "log")
     adata.write_h5ad(prep_for_be_datapath)
 
