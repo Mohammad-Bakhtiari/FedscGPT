@@ -2,6 +2,8 @@ import os
 import scanpy as sc
 import pandas as pd
 
+from FedscGPT.utils import print_available_log_levels
+
 # Mapping for cell types
 celltype_mapping = {
     'ms': {
@@ -57,19 +59,50 @@ datasets = {
         "celltype_key": "Factor Value[inferred cell type - authors labels]",
         "batch_key": "split_label",
     },
+    'covid': {
+        "h5ad_file": "Covid_annot-uncorrected.h5ad",
+        "celltype_key": "celltype",
+        "batch_key": "batch_group",
+    },
+# datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
+# datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
+# datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
+# datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch"
+# datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
+# datasets["COVID-cent_corrected"]="covid-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
+# datasets["COVID-fed-corrected"]="covid-fed-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
+    "hp": {
+
+        "h5ad_file": "reference_refined.h5ad|query.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "batch_group",
+    },
 }
 
 # Output Excel file with multiple sheets
 output_excel_path = "summary_stats.xlsx"
+
+
+def read_adata(files):
+    if len(files) == 1:
+        return sc.read_h5ad(os.path.join(rootdir, dataset, files[0]))
+
+    reference_file, query_file = files
+    reference_path = os.path.join(rootdir, dataset, reference_file)
+    query_path = os.path.join(rootdir, dataset, query_file)
+    return sc.read_h5ad(reference_path).concatenate(sc.read_h5ad(query_path))
+
+
 with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
-        adata = sc.read_h5ad(os.path.join(rootdir, dataset, datasets[dataset]["h5ad_file"]))
+        adata = read_adata(datasets[dataset]["h5ad_file"].split("|"))
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
                              celltype_mapping=celltype_mapping[dataset],
                              batch_map=batch_map[dataset]
                              )
-        print(stats_df)
         stats_df.to_excel(writer, sheet_name=dataset)
+        print(stats_df)
+        print("#" * 50)
 
