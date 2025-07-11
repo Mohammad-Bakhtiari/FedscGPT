@@ -96,19 +96,18 @@ def read_adata(files, ds_path):
 
     Parameters:
     - files: list of filenames (1 or 2 .h5ad files)
-    - rootdir: base directory containing datasets
-    - dataset: subdirectory for the dataset
+    - ds_path: path to the dataset directory
 
     Returns:
     - AnnData object (single or concatenated)
     """
     if len(files) == 1:
-        file_path = os.path.join(ds_patht, files[0])
+        file_path = os.path.join(ds_path, files[0])
         return sc.read_h5ad(file_path)
 
     elif len(files) == 2:
         reference_file, query_file = files
-        reference_path = os.path.join(ds_patht, reference_file)
+        reference_path = os.path.join(ds_path, reference_file)
         query_path = os.path.join(ds_path, query_file)
 
         reference = sc.read_h5ad(reference_path)
