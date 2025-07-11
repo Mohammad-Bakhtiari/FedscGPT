@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ./configs.sh
+
 # Assign command-line arguments to variables
 datasetnames="${1}"
 mode="$2"
@@ -11,29 +13,23 @@ agg_method="${7-fedavg}"
 weighted="${8-false}"
 mu="${9-0}"
 
+resolve_dataset_keys "$datasetnames"
+
 chmod +x annotation.sh
 
-declare -A datasets
-datasets["MS"]="ms|reference_annot.h5ad|query_annot.h5ad|Factor Value[inferred cell type - authors labels]|split_label"
-datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
-datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
-datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
-datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch"
-datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
-datasets["COVID-cent_corrected"]="covid-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
-datasets["COVID-fed-corrected"]="covid-fed-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
 
-IFS=',' read -ra keys <<< "$datasetnames"
-if [[ "${datasetnames}" != "all" ]]; then
-    for key in "${keys[@]}"; do
-        if [[ -z "${datasets[$key]}" ]]; then
-            echo "Dataset \"$key\" not found. Available keys: ${!datasets[@]}"
-            exit 1
-        fi
-    done
-else
-    keys=("${!datasets[@]}")
-fi
+
+#IFS=',' read -ra keys <<< "$datasetnames"
+#if [[ "${datasetnames}" != "all" ]]; then
+#    for key in "${keys[@]}"; do
+#        if [[ -z "${datasets[$key]}" ]]; then
+#            echo "Dataset \"$key\" not found. Available keys: ${!datasets[@]}"
+#            exit 1
+#        fi
+#    done
+#else
+#    keys=("${!datasets[@]}")
+#fi
 
 
 echo "Running annotation for ${mode}"
