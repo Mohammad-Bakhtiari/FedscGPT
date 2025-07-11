@@ -123,7 +123,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
         adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, dataset))
         print(adata.obs.celltype.unique())
-        print(adata.obs.batch_group.unique())
+        print(adata.obs.batch_group.value_counts())
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
