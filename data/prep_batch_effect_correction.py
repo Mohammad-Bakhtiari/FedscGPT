@@ -67,8 +67,8 @@ def ref_query_split(
     query.var = adata.var.copy()
     reference.var = adata.var.copy()
     unique_cts = adata.obs[celltype_key].cat.categories.tolist()
-    query.obs[celltype_key] = query.obs[celltype_key].cat.set_categories(unique_cts)
-    reference.obs[celltype_key] = reference.obs[celltype_key].cat.set_categories(unique_cts)
+    query.obs[celltype_key] = pd.Categorical(query.obs[celltype_key], categories=unique_cts)
+    reference.obs[celltype_key] = pd.Categorical(reference.obs[celltype_key], categories=unique_cts)
     if query.n_obs == 0:
         sys.stderr.write(f"⚠️ Warning: query is empty (no cells with {split_key} == {query_set_vale}).\n")
     if reference.n_obs == 0:
@@ -116,8 +116,9 @@ def normalize_data(data: np.ndarray or pd.Series, method: str) -> np.ndarray:
 
 
 DROPPED_CELLTYPES = {"covid": ['Signaling Alveolar Epithelial Type 2', 'IGSF21+ Dendritic', 'Megakaryocytes'],
-                     "MS": []}
-Batch_Mapping = {"covid": {
+                     }
+Batch_Mapping = {
+    "covid": {
         "Krasnow_distal 1a": "Krasnow",
         "Krasnow_distal 2": "Krasnow",
         "Krasnow_distal 3": "Krasnow",
@@ -133,7 +134,7 @@ Batch_Mapping = {"covid": {
     }
 }
 QUERY_BATCHES = {"covid": ['Krasnow', 'Sun', 'Freytag'],
-                 "MS": []}
+                 }
 
 def preprocess(dataset, raw_data_path, batch_key, celltype_key):
     adata = anndata.read_h5ad(raw_data_path)
@@ -164,7 +165,7 @@ def postprocess_corrected_data(corrected_data_path, reference_file, query_file, 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare CellLine dataset for benchmarking.")
     parser.add_argument("--prep_type", type=str, default="pre", help="Stage of the pipeline to run.", choices=["pre", "post"])
-    parser.add_argument("--dataset", type=str, default="covid", help="Dataset name.", choices=["covid", "MS"])
+    parser.add_argument("--dataset", type=str, default="covid", help="Dataset name.", choices=["covid"])
     parser.add_argument("--raw_data_path", type=str, help="Raw data path.")
     parser.add_argument("--prep_for_be_datapath", type=str, help="Path to save pre-processed data for batch effect correction.")
     parser.add_argument("--corrected_data_path", type=str, help="Corrected data path.")

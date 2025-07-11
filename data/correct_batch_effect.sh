@@ -4,8 +4,7 @@ data_dir="$1"
 
 declare -A datasets
 # order: dataset_subdir|raw_filename|preprocessed_for_be_filename|celltype_key|batch_key|BATCHES
-datasets["COVID"]="covid|Covid_annot.h5ad|preprocessed_for_be.h5ad|celltype|study|HCL,Krasnow,Sanger_Meyer_2019Madissoon,COVID-19 (query),Sun,10X,Oetjen,Northwestern_Misharin_2018Reyfman,Freytag"
-datasets["MS"]="ms|refined_ms.h5ad|preprocessed_for_be.h5ad|Factor Value[inferred cell type - authors labels]|Factor Value[sampling site]|prefrontal cortex,cerebral cortex,premotor cortex"
+datasets["COVID"]="covid|Covid.h5ad|preprocessed_for_be.h5ad|celltype|study|HCL,Krasnow,Sanger_Meyer_2019Madissoon,COVID-19 (query),Sun,10X,Oetjen,Northwestern_Misharin_2018Reyfman,Freytag"
 
 
 
