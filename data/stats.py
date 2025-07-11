@@ -49,12 +49,12 @@ batch_map = {
 }
 
 
-def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
-    df["cell type"] = df[celltype_key].map(celltype_mapping)
-    df["batch"] = df[batch_key].map(batch_map)
-    print(df['cell type'].value_counts())
-    print(df['batch'].value_counts())
-    summary_df = df.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
+def get_stats(adata, celltype_key, batch_key, celltype_mapping, batch_map):
+    adata.obs["cell type"] = adata.obs[celltype_key].map(celltype_mapping)
+    adata.obs["batch"] = adata.obs[batch_key].map(batch_map)
+    print(adata.obs['cell type'].value_counts())
+    print(adata.obs['batch'].value_counts(dropna=False))
+    summary_df = adata.obs.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
     summary_df['Total'] = summary_df.sum(axis=1)
     summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
     return summary_df
@@ -126,7 +126,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
         adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, dataset))
         print(adata.obs.celltype.unique())
         print(adata.obs.batch_group.value_counts())
-        stats_df = get_stats(adata.obs,
+        stats_df = get_stats(adata,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
                              celltype_mapping=celltype_mapping[dataset],
