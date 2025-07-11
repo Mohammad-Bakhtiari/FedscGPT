@@ -102,7 +102,7 @@ for dataset in "${!datasets[@]}"; do
     corrected_data_path="${output}/federated/fed_corrected.h5ad"
     python prep_batch_effect_correction.py \
             --prep_type "post" \
-            --dataset "${ds_name}" \
+            --raw_data_path "${ds_data_dir}/${args[1]}" \
             --corrected_data_path "${corrected_data_path}" \
             --celltype_key "${celltype_key}" \
             --reference_file "${reference_file_prefix}_fed_corrected.h5ad" \

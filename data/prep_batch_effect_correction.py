@@ -140,8 +140,10 @@ def preprocess_for_batch_effect_correction(dataset, raw_data_path, prep_for_be_d
     adata.X = normalize_data(adata.X, "log")
     adata.write_h5ad(prep_for_be_datapath)
 
-def postprocess_corrected_data(corrected_data_path, reference_file, query_file, celltype_key="cell_type"):
+def postprocess_corrected_data(raw_data_path, corrected_data_path, reference_file, query_file, celltype_key="cell_type"):
+    raw = anndata.read_h5ad(raw_data_path)
     adata = anndata.read_h5ad(corrected_data_path)
+    adata.var = raw.var.copy()
     adata.X = normalize_data(adata.X, "min_max")
     calc_umap(adata)
     ref_query_split(
@@ -177,6 +179,7 @@ if __name__ == "__main__":
         )
     elif args.prep_type == "post":
         postprocess_corrected_data(
+            raw_data_path=args.raw_data_path,
             corrected_data_path=args.corrected_data_path,
             reference_file=args.reference_file,
             query_file=args.query_file,
