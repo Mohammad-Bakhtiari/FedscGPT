@@ -34,45 +34,42 @@ def print_config(config: dict or tuple, level=0):
         else:
             print("  " * level + str(k) + ":", v)
 
+safe_extended_palette = [
+    '#0173b2', '#de8f05', '#029e73', '#d55e00', '#cc78bc',
+    '#ca9161', '#fbafe4', '#949494', '#ece133', '#56b4e9',
+    '#0c69ff', '#49ff90', '#4b00bd', '#00cae4', '#bcdbff',
+    '#856ef9', '#00441f', '#91a5ba', '#00c87e', '#0179aa'
+]
+
 def generate_palette(unique_celltypes):
     """
-    Build a large palette:
-     - First 20 colors from 'tab20'
-     - If > 20, next up to 20 from 'tab20b'
-     - If > 40, sample the remainder from 'gist_ncar'
+    Generate a red-green colorblind–friendly palette for cell type labels.
+
     Args:
         unique_celltypes: list of category names
+
     Returns:
-        dict mapping each category to an (r, g, b, a) tuple
+        dict mapping each category to a color hex code
     """
     n_cats = len(unique_celltypes)
     palette_ = {}
 
-    if n_cats <= 20:
-        base = plt.get_cmap("tab20", 20)
+    if n_cats <= len(safe_extended_palette):
+        # Direct mapping from safe palette
         for i, cat in enumerate(unique_celltypes):
-            palette_[cat] = base(i)
-    elif n_cats <= 40:
-        base1 = plt.get_cmap("tab20", 20)
-        base2 = plt.get_cmap("tab20b", 20)
-        for i, cat in enumerate(unique_celltypes):
-            if i < 20:
-                palette_[cat] = base1(i)
-            else:
-                palette_[cat] = base2(i - 20)
+            palette_[cat] = safe_extended_palette[i]
     else:
-        base1 = plt.get_cmap("tab20", 20)
-        base2 = plt.get_cmap("tab20b", 20)
-        # For the remainder, sample evenly from gist_ncar
-        n_extra = n_cats - 40
-        base3 = plt.get_cmap("gist_ncar", n_extra)
-        for i, cat in enumerate(unique_celltypes):
-            if i < 20:
-                palette_[cat] = base1(i)
-            elif i < 40:
-                palette_[cat] = base2(i - 20)
-            else:
-                palette_[cat] = base3(i - 40)
+        # Use all predefined safe colors
+        for i, cat in enumerate(unique_celltypes[:len(safe_extended_palette)]):
+            palette_[cat] = safe_extended_palette[i]
+
+        # Generate additional colors from a perceptually uniform color map
+        extra_colors = plt.get_cmap("cividis", n_cats - len(safe_extended_palette))
+        for i, cat in enumerate(unique_celltypes[len(safe_extended_palette):]):
+            rgba = extra_colors(i)
+            # Convert to hex
+            palette_[cat] = '#%02x%02x%02x' % tuple(int(255 * c) for c in rgba[:3])
+
     return palette_
 
 
@@ -457,6 +454,10 @@ def handle_ds_name(name):
         return "HP"
     if name.lower() == "ms":
         return "MS"
+    if name.lower() == "ms-corrected":
+        return "MS-Corrected"
+    if name.lower() == "ms-fed-corrected":
+        return "MS-Fed-Corrected"
     if name.lower() == "myeloid":
         return "Myeloid"
     if name.lower() == "covid":
@@ -932,14 +933,14 @@ def get_clients_batch_value(h5ad_file_dir, ds_name):
 
 
 def get_batch_key(ds_name):
-    if ds_name == "covid":
-        return "str_batch"
+    if ds_name in ["covid", "covid-corrected", "covid-fed-corrected"]:
+        return "batch_group"
     if ds_name == "lung":
         return "sample"
     if ds_name == "hp":
         return "batch"
     if ds_name == "ms":
-        return "Factor Value[sampling site]"
+        return "split_label"
     if ds_name == "myeloid":
         return "top4+rest"
     raise ValueError(f"Invalid dataset name: {ds_name}")
@@ -1534,17 +1535,6 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, 
             sc.tl.umap(adata)
             adata.write(path)
         adatas[name] = adata
-
-    # Remove standalone cell types if requested
-    if not standalone:
-        stand_alone_celltypes = [
-            "CCR7+ T", "CD8 T", "CD10+ B cells", "Ciliated", "DC_activated", "Erythrocytes",
-            "Erythroid progenitors", "IGSF21+ Dendritic", "M2 Macrophage", "Megakaryocytes",
-            "Monocyte progenitors", "Proliferating T", "Signaling Alveolar Epithelial Type 2",
-            "Treg", "Tregs", "innate T"
-        ]
-        for name, adata in adatas.items():
-            adatas[name] = adata[~adata.obs[cell_key].isin(stand_alone_celltypes)]
 
     uniq_ct = list(adatas["Centralized"].obs[cell_key].cat.categories)
     cell_palette = generate_palette(uniq_ct)
