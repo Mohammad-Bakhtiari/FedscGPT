@@ -133,7 +133,7 @@ def preprocess(dataset, raw_data_path, batch_key, celltype_key):
 def preprocess_for_batch_effect_correction(dataset, raw_data_path, prep_for_be_datapath,  reference_file, query_file, batch_key, celltype_key):
     adata = preprocess(dataset, raw_data_path, batch_key, celltype_key)
     raw = adata.copy()
-    raw.x = normalize_data(raw, 'min_max')
+    raw.x = normalize_data(raw.X, 'min_max')
     calc_umap(raw)
     ref_query_split(raw, reference_file, query_file, split_key="ref-query-split", query_set_vale="q", celltype_key=celltype_key)
     calc_umap(adata)
