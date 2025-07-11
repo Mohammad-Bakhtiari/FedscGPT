@@ -90,7 +90,7 @@ output_excel_path = "summary_stats.xlsx"
 
 
 
-def read_adata(files, rootdir, dataset):
+def read_adata(files, ds_path):
     """
     Reads and concatenates h5ad files for a given dataset.
 
@@ -103,13 +103,13 @@ def read_adata(files, rootdir, dataset):
     - AnnData object (single or concatenated)
     """
     if len(files) == 1:
-        file_path = os.path.join(rootdir, dataset, files[0])
+        file_path = os.path.join(ds_patht, files[0])
         return sc.read_h5ad(file_path)
 
     elif len(files) == 2:
         reference_file, query_file = files
-        reference_path = os.path.join(rootdir, dataset, reference_file)
-        query_path = os.path.join(rootdir, dataset, query_file)
+        reference_path = os.path.join(ds_patht, reference_file)
+        query_path = os.path.join(ds_path, query_file)
 
         reference = sc.read_h5ad(reference_path)
         query = sc.read_h5ad(query_path)
@@ -122,7 +122,7 @@ def read_adata(files, rootdir, dataset):
 
 with pd.ExcelWriter(output_excel_path) as writer:
     for dataset in datasets.keys():
-        adata = read_adata(datasets[dataset]["h5ad_file"].split("|"))
+        adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, dataset))
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
