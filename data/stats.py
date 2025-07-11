@@ -52,6 +52,8 @@ batch_map = {
 def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
     df["cell type"] = df[celltype_key].map(celltype_mapping)
     df["batch"] = df[batch_key].map(batch_map)
+    print(df['cell type'].value_counts())
+    print(df['batch'].value_counts())
     summary_df = df.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
     summary_df['Total'] = summary_df.sum(axis=1)
     summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
