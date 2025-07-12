@@ -59,18 +59,6 @@ batch_map = {
 }
 
 
-# def get_stats(df, celltype_key, batch_key):
-#     # Safe partial mapping: use original value if not in map
-#     df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x))
-#     df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x))
-#     summary_df = df.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
-#     summary_df['Total'] = summary_df.sum(axis=1)
-#     summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
-#     return summary_df
-
-
-import pandas as pd
-
 def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
     """
     Generates a summary of cell type counts across Reference and Query batches.
@@ -78,37 +66,38 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
     Parameters:
     - df: pandas DataFrame (e.g., `adata.obs`)
     - celltype_key: column name for cell type annotations
-    - sample_key: column name for sample IDs (e.g., 'sample')
-    - split_key: column name indicating 'Reference' or 'Query' (e.g., 'query_ref_split_label')
-    - celltype_mapping: optional dictionary to rename cell types
+    - batch_key: column name for sample IDs or batch identifiers (e.g., 'sample')
+    - celltype_mapping: dictionary to rename cell types (optional)
+    - batch_map: dictionary to rename batch keys (optional)
 
     Returns:
-    - summary_df: pandas DataFrame with hierarchical columns (Reference/Query → Sample IDs)
+    - summary_df: pandas DataFrame with hierarchical columns (Reference/Query → Sample IDs),
+                  with Query batches ordered after Reference batches.
     """
-
-
-    # Step 1: Rename cell types if mapping provided
-    df = df.copy()  # to avoid modifying original DataFrame
+    # Step 1: Rename cell types and batch names using mappings
+    df = df.copy()
     df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x))
     df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x))
 
     # Step 2: Group by cell type and batch, then pivot to wide format
     summary = df.groupby(["cell type", "batch"]).size().unstack(fill_value=0)
 
-    # Step 3: Get batch → Reference/Query mapping
+    # Step 3: Map each batch to 'Reference' or 'Query'
     batch_to_split = df.drop_duplicates(subset="batch").set_index("batch")["query_ref_split_label"].to_dict()
 
-    # Step 4: Create hierarchical columns
+    # Step 4: Assign hierarchical columns and sort with Query batches last
     new_cols = [(batch_to_split.get(col, "Unknown"), col) for col in summary.columns]
-    summary.columns = pd.MultiIndex.from_tuples(new_cols)
+    sorted_cols = sorted(new_cols, key=lambda x: (0 if x[0] == "Reference" else 1, x[1]))
+    summary.columns = pd.MultiIndex.from_tuples(sorted_cols)
 
-    # Step 5: Add total column per row
-    summary[("","Total")] = summary.sum(axis=1)
+    # Step 5: Add total column per cell type
+    summary[("", "Total")] = summary.sum(axis=1)
 
     # Step 6: Add total row at bottom
     summary.loc["Total"] = summary.sum(numeric_only=True)
 
     return summary
+
 
 
 # Dataset configuration list
