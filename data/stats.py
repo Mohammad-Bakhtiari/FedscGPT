@@ -110,7 +110,7 @@ datasets = {
     },
     'covid': {
         "folder": "covid",
-        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
+        "h5ad_file": "reference-raw.h5ad|query-raw.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
     },
