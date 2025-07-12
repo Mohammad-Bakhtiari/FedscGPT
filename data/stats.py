@@ -103,29 +103,29 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
 # Dataset configuration list
 rootdir = "scgpt/benchmark"
 datasets = {
-    # "ms": {
-    #     "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
-    #     "celltype_key": "Factor Value[inferred cell type - authors labels]",
-    #     "batch_key": "split_label",
-    # },
-    # 'covid': {
-    #     "folder": "covid",
-    #     "h5ad_file": "reference-raw.h5ad|query-raw.h5ad",
-    #     "celltype_key": "celltype",
-    #     "batch_key": "batch_group",
-    # },
-    #
-    # "hp": {
-    #
-    #     "h5ad_file": "reference_refined.h5ad|query.h5ad",
-    #     "celltype_key": "Celltype",
-    #     "batch_key": "batch",
-    # },
-    # "lung": {
-    #     "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
-    #     "celltype_key": "cell_type",
-    #     "batch_key": "sample",
-    # },
+    "ms": {
+        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
+        "celltype_key": "Factor Value[inferred cell type - authors labels]",
+        "batch_key": "split_label",
+    },
+    'covid': {
+        "folder": "covid",
+        "h5ad_file": "reference-raw.h5ad|query-raw.h5ad",
+        "celltype_key": "celltype",
+        "batch_key": "batch_group",
+    },
+
+    "hp": {
+
+        "h5ad_file": "reference_refined.h5ad|query.h5ad",
+        "celltype_key": "Celltype",
+        "batch_key": "batch",
+    },
+    "lung": {
+        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "sample",
+    },
     "myeloid": {
         "h5ad_file": "reference_adata.h5ad|query_adata.h5ad",
         "celltype_key": "combined_celltypes",
