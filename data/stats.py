@@ -198,7 +198,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
                                        )
             stats_df_query.to_excel(writer, sheet_name=dataset + " Query")
             print(f"######### Statistics for {dataset}: Query #########")
-            print(stats_df)
+            print(stats_df_query)
             print("#" * 50)
         else:
             adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
