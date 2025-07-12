@@ -86,8 +86,8 @@ datasets = {
     "hp": {
 
         "h5ad_file": "reference_refined.h5ad|query.h5ad",
-        "celltype_key": "cell_type",
-        "batch_key": "batch_group",
+        "celltype_key": "Celltype",
+        "batch_key": "batch",
     },
 }
 
