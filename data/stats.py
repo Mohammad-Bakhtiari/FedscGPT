@@ -177,7 +177,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
         if dataset == "myeloid":
             ref_file, q_file = datasets[dataset]["h5ad_file"].split("|")
             ref = sc.read_h5ad(os.path.join(rootdir, folder, ref_file))
-            ref["query_ref_split_label"] = "Reference"
+            ref.obs["query_ref_split_label"] = "Reference"
             stats_df = get_stats(ref.obs,
                                  celltype_key=datasets[dataset]["celltype_key"],
                                  batch_key=datasets[dataset]["batch_key"],
@@ -189,7 +189,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
             print(stats_df)
             print("#" * 50)
             query = sc.read_h5ad(os.path.join(rootdir, folder, q_file))
-            query["query_ref_split_label"] = "Query"
+            query.obs["query_ref_split_label"] = "Query"
             stats_df_query = get_stats(query.obs,
                                        celltype_key=datasets[dataset]["celltype_key"],
                                        batch_key=datasets[dataset]["batch_key"],
