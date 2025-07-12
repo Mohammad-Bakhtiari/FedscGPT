@@ -176,8 +176,6 @@ with pd.ExcelWriter(output_excel_path) as writer:
         print(folder, dataset)
         if dataset == "myeloid":
             ref_file, q_file = datasets[dataset]["h5ad_file"].split("|")
-            print(ref_file, q_file)
-            exit()
             ref = sc.read_h5ad(os.path.join(rootdir, folder, ref_file))
             ref.obs["query_ref_split_label"] = "Reference"
             stats_df = get_stats(ref.obs,
