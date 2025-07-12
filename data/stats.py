@@ -25,7 +25,6 @@ celltype_mapping = {
         'mixed glial cell?': 'Mixed glia'
     },
     "covid": {
-
     },
     "hp": {
     },
@@ -70,18 +69,13 @@ datasets = {
     #     "celltype_key": "Factor Value[inferred cell type - authors labels]",
     #     "batch_key": "split_label",
     # },
-    'covid': {
-        "folder": "covid",
-        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
-        "celltype_key": "celltype",
-        "batch_key": "batch_group",
-    },
-    # 'covid-embedding': {
-    #     "folder": "covid-emb",
-    #     "h5ad_file": "reference.h5ad|query.h5ad",
+    # 'covid': {
+    #     "folder": "covid",
+    #     "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
     #     "celltype_key": "celltype",
-    #     "batch_key": "str_batch",
+    #     "batch_key": "batch_group",
     # },
+
 # datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
 # datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 # datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
@@ -89,12 +83,12 @@ datasets = {
 # datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
 # datasets["COVID-cent_corrected"]="covid-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
 # datasets["COVID-fed-corrected"]="covid-fed-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
-#     "hp": {
-#
-#         "h5ad_file": "reference_refined.h5ad|query.h5ad",
-#         "celltype_key": "cell_type",
-#         "batch_key": "batch_group",
-#     },
+    "hp": {
+
+        "h5ad_file": "reference_refined.h5ad|query.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "batch_group",
+    },
 }
 
 # Output Excel file with multiple sheets
