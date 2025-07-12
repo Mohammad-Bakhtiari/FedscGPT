@@ -59,14 +59,57 @@ batch_map = {
 }
 
 
+# def get_stats(df, celltype_key, batch_key):
+#     # Safe partial mapping: use original value if not in map
+#     df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x))
+#     df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x))
+#     summary_df = df.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
+#     summary_df['Total'] = summary_df.sum(axis=1)
+#     summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
+#     return summary_df
+
+
+import pandas as pd
+
 def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
-    # Safe partial mapping: use original value if not in map
+    """
+    Generates a summary of cell type counts across Reference and Query batches.
+
+    Parameters:
+    - df: pandas DataFrame (e.g., `adata.obs`)
+    - celltype_key: column name for cell type annotations
+    - sample_key: column name for sample IDs (e.g., 'sample')
+    - split_key: column name indicating 'Reference' or 'Query' (e.g., 'query_ref_split_label')
+    - celltype_mapping: optional dictionary to rename cell types
+
+    Returns:
+    - summary_df: pandas DataFrame with hierarchical columns (Reference/Query → Sample IDs)
+    """
+
+
+    # Step 1: Rename cell types if mapping provided
+    df = df.copy()  # to avoid modifying original DataFrame
     df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x))
     df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x))
-    summary_df = df.groupby(['cell type', 'batch']).size().unstack(fill_value=0)
-    summary_df['Total'] = summary_df.sum(axis=1)
-    summary_df.loc['Total'] = summary_df.sum(numeric_only=True)
-    return summary_df
+
+    # Step 2: Group by cell type and batch, then pivot to wide format
+    summary = df.groupby(["cell type", "batch"]).size().unstack(fill_value=0)
+
+    # Step 3: Get batch → Reference/Query mapping
+    batch_to_split = df.drop_duplicates(subset="batch").set_index("batch")["query_ref_split_label"].to_dict()
+
+    # Step 4: Create hierarchical columns
+    new_cols = [(batch_to_split.get(col, "Unknown"), col) for col in summary.columns]
+    summary.columns = pd.MultiIndex.from_tuples(new_cols)
+
+    # Step 5: Add total column per row
+    summary[("","Total")] = summary.sum(axis=1)
+
+    # Step 6: Add total row at bottom
+    summary.loc["Total"] = summary.sum(numeric_only=True)
+
+    return summary
+
 
 # Dataset configuration list
 rootdir = "scgpt/benchmark"
@@ -125,11 +168,7 @@ def read_adata(files, ds_path):
     Returns:
     - AnnData object (single or concatenated)
     """
-    if len(files) == 1:
-        file_path = os.path.join(ds_path, files[0])
-        return sc.read_h5ad(file_path)
-
-    elif len(files) == 2:
+    if len(files) == 2:
         reference_file, query_file = files
         reference_path = os.path.join(ds_path, reference_file)
         query_path = os.path.join(ds_path, query_file)
@@ -137,7 +176,7 @@ def read_adata(files, ds_path):
         reference = sc.read_h5ad(reference_path)
         query = sc.read_h5ad(query_path)
 
-        return reference.concatenate(query, batch_key="query_ref_split_label", batch_categories=["reference", "query"])
+        return reference.concatenate(query, batch_key="query_ref_split_label", batch_categories=["Reference", "Query"])
 
     else:
         raise ValueError("files must contain one or two filenames")
@@ -150,7 +189,6 @@ with pd.ExcelWriter(output_excel_path) as writer:
         bm = batch_map.get(folder, {})
         print(folder, dataset)
         adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
-        continue
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
