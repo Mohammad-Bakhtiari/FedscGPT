@@ -175,7 +175,8 @@ with pd.ExcelWriter(output_excel_path) as writer:
         bm = batch_map.get(folder, {})
         print(folder, dataset)
         if dataset == "myeloid":
-            ref = sc.read_h5ad(os.path.join(rootdir, folder, datasets[dataset]["h5ad_file"][0]))
+            ref_file, q_file = datasets[dataset]["h5ad_file"].split("|")
+            ref = sc.read_h5ad(os.path.join(rootdir, folder, ref_file))
             ref["query_ref_split_label"] = "Reference"
             stats_df = get_stats(ref.obs,
                                  celltype_key=datasets[dataset]["celltype_key"],
@@ -187,7 +188,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
             print(f"######### Statistics for {dataset}: Reference #########")
             print(stats_df)
             print("#" * 50)
-            query = sc.read_h5ad(os.path.join(rootdir, folder, datasets[dataset]["h5ad_file"][1]))
+            query = sc.read_h5ad(os.path.join(rootdir, folder, q_file))
             query["query_ref_split_label"] = "Query"
             stats_df_query = get_stats(query.obs,
                                        celltype_key=datasets[dataset]["celltype_key"],
