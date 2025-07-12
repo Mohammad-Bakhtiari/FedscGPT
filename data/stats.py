@@ -47,6 +47,11 @@ batch_map = {
         'Northwestern_Misharin_2018Reyfman': 'Northwestern',
     },
     "hp": {
+        '0': 'Baron',
+        '1': 'Mutaro',
+        '2': 'Segerstolpe',
+        '3': 'Wang',
+        '4': 'Xin'
     },
 
 }
