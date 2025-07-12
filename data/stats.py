@@ -72,7 +72,7 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
 rootdir = "scgpt/benchmark"
 datasets = {
     "ms": {
-        "h5ad_file": "ms_annot.h5ad",
+        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
         "celltype_key": "Factor Value[inferred cell type - authors labels]",
         "batch_key": "split_label",
     },
@@ -127,9 +127,7 @@ def read_adata(files, ds_path):
     """
     if len(files) == 1:
         file_path = os.path.join(ds_path, files[0])
-        adata = sc.read_h5ad(file_path)
-        print(adata.obs.keys())
-        return adada
+        return sc.read_h5ad(file_path)
 
     elif len(files) == 2:
         reference_file, query_file = files
