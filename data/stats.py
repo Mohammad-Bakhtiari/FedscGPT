@@ -71,27 +71,27 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
 # Dataset configuration list
 rootdir = "scgpt/benchmark"
 datasets = {
-    # "ms": {
-    #     "h5ad_file": "ms_annot.h5ad",
-    #     "celltype_key": "Factor Value[inferred cell type - authors labels]",
-    #     "batch_key": "split_label",
-    # },
-    # 'covid': {
-    #     "folder": "covid",
-    #     "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
-    #     "celltype_key": "celltype",
-    #     "batch_key": "batch_group",
-    # },
+    "ms": {
+        "h5ad_file": "ms_annot.h5ad",
+        "celltype_key": "Factor Value[inferred cell type - authors labels]",
+        "batch_key": "split_label",
+    },
+    'covid': {
+        "folder": "covid",
+        "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
+        "celltype_key": "celltype",
+        "batch_key": "batch_group",
+    },
 
 # datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
 # datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
 # datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch"
-#     "hp": {
-#
-#         "h5ad_file": "reference_refined.h5ad|query.h5ad",
-#         "celltype_key": "Celltype",
-#         "batch_key": "batch",
-#     },
+    "hp": {
+
+        "h5ad_file": "reference_refined.h5ad|query.h5ad",
+        "celltype_key": "Celltype",
+        "batch_key": "batch",
+    },
     "lung": {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
         "celltype_key": "cell_type",
@@ -127,7 +127,9 @@ def read_adata(files, ds_path):
     """
     if len(files) == 1:
         file_path = os.path.join(ds_path, files[0])
-        return sc.read_h5ad(file_path)
+        adata = sc.read_h5ad(file_path)
+        print(adata.obs.keys())
+        return adada
 
     elif len(files) == 2:
         reference_file, query_file = files
@@ -150,6 +152,7 @@ with pd.ExcelWriter(output_excel_path) as writer:
         bm = batch_map.get(folder, {})
         print(folder, dataset)
         adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
+        continue
         stats_df = get_stats(adata.obs,
                              celltype_key=datasets[dataset]["celltype_key"],
                              batch_key=datasets[dataset]["batch_key"],
