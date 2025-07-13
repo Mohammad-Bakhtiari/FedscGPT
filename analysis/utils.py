@@ -997,6 +997,30 @@ def shorten_batch_value(batch_value):
     }
     return replace.get(batch_value, batch_value)
 
+batch_map = {
+    "ms":{
+        "Ctrl_Premotor": "Control Premotor",
+        "MS_Premotor": "MS Premotor",
+        "Ctrl_Prefrontal": "Control Prefrontal",
+        "MS_Prefrontal": "MS Prefrontal",
+        "Ctrl_Cerebral": "Control Cerebral",
+        "MS_Cerebral": "MS Cerebral",
+    },
+    "covid": {
+        'Sanger_Meyer_2019Madissoon': 'Sanger',
+        'COVID-19 (query)': 'COVID',
+        'Northwestern_Misharin_2018Reyfman': 'Northwestern',
+    },
+    "hp": {
+        '0': 'Baron',
+        '1': 'Mutaro',
+        '2': 'Segerstolpe',
+        '3': 'Wang',
+        '4': 'Xin'
+    },
+}
+
+
 def shorten_celltype_value(celltype):
     replace = {
         "CD4+ T cells": "CD4 T",
@@ -1071,7 +1095,8 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
 
             # annotate with batch, offsetting if many neighbors
             for j, (x,y,b) in enumerate(zip(x_j, vals, batches)):
-                label = shorten_batch_value(b)
+                # label = shorten_batch_value(b)
+                label = batch_map.get(ds, {}).get(b,b)
                 close_count = np.sum(np.abs(vals - y) < proximity_threshold)
                 if close_count>1 and (j%2)==1:
                     ha, x_off = 'right', -0.05
