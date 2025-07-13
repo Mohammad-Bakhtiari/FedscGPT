@@ -142,7 +142,7 @@ class Embedder(ScGPT):
                 idx = labels[k]
             else:
                 idx, sim = get_similar_vectors(embed_query.obsm["X_scGPT"][k][np.newaxis, ...], self.embed_adata.obsm["X_scGPT"], k)
-            pred = self.embed_adata.obs[self.celltype_key][idx].value_counts()
+            pred = self.embed_adata.obs[self.celltype_key].iloc[idx].value_counts()
             preds.append(pred.index[0])
         gt = query.obs[self.celltype_key].to_numpy()
         return gt, preds
