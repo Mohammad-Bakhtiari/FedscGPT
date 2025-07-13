@@ -948,7 +948,7 @@ def plot_embedding(adata, query, cell_type_key, output_dir):
         # mask the query dataset cell types
         adata_concat.obs[cell_type_key] = adata_concat.obs[cell_type_key].astype("category")
         adata_concat.obs[cell_type_key] = adata_concat.obs[cell_type_key].cat.add_categories(["To be predicted"])
-        adata_concat.obs[cell_type_key][: n_query_samples] = "To be predicted"
+        adata_concat.obs.loc[:n_query_samples - 1, cell_type_key] = "To be predicted"
         return adata_concat
 
 
