@@ -72,7 +72,7 @@ if __name__ == '__main__':
         plot_best_metrics(args.root_dir, args.param_tuning_df, img_format=args.format)
     elif args.plot == 'reference_map_boxplot':
         # Old: Figure 3, New: Figure 4a
-        embedding_boxplot(args.root_dir, ['cl', 'hp', 'lung', 'ms', 'myeloid'], "./plots/embedding", args.format)
+        embedding_boxplot(args.root_dir, ['hp', 'lung', 'ms', 'myeloid'], "./plots/embedding", args.format)
     elif args.plot == 'reference_map_boxplot_covid':
         #  Figure X
         embedding_boxplot(args.root_dir, ['covid', 'covid-corrected', 'covid-fed-corrected'], args.format, "./plots/embedding/covid")
