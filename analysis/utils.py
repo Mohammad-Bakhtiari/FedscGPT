@@ -1096,7 +1096,6 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
             for j, (x,y,b) in enumerate(zip(x_j, vals, batches)):
                 # label = shorten_batch_value(b)
                 label = batch_map.get(ds, {}).get(b,b)
-                print(ds, b, label)
                 close_count = np.sum(np.abs(vals - y) < proximity_threshold)
                 if close_count>1 and (j%2)==1:
                     ha, x_off = 'right', -0.05
