@@ -1077,7 +1077,7 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
     for metric in metrics:
         plt.figure(figsize=(5,5))
         # --- Plot client points with jitter + labels ---
-        cmap = plt.get_cmap('tab10').colors
+        cmap = safe_extended_palette
         for i, ds in enumerate(datasets):
             csub = df[(df['Metric']==metric)&(df['Dataset']==ds)&client_mask]
             if csub.empty:
