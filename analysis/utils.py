@@ -15,7 +15,7 @@ import anndata
 import scanpy as sc
 import random
 
-from FedscGPT.data.stats import datasets as datasets_details
+from data.stats import datasets as datasets_details
 
 
 SEED = 42
