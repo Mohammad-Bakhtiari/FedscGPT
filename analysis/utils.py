@@ -821,7 +821,7 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
     scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
 
     for ds in datasets:
-        print(Path(data_dir).parents[1], datasets_details[ds]['h5ad_file'].split("|")[0])
+        print(Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0])
         # Load centralized and federated results
         scgpt = pd.read_csv(scgpt_file_path[ds])
         fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
