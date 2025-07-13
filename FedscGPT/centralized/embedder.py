@@ -120,6 +120,11 @@ class Embedder(ScGPT):
     def embed_query_adata(self, data_dir, adata):
         self.log(f"Reading query data from {adata}")
         adata = read_h5ad(data_dir, adata)
+        if self.gene_col not in adata.var.columns:
+            if self.gene_col == "index":
+                adata.var[self.gene_col] = adata.var.index
+            else:
+                raise KeyError(f"Gene column '{self.gene_col}' not found in adata.var.")
         embed_adata = self.filter_id_in_vocab(adata)
         adata_embed = self.embed_adata_file(embed_adata)
         return adata, adata_embed
