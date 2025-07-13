@@ -19,12 +19,12 @@ chmod +x run_annotation.sh
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running centralized annotation with scGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_annotation.sh "LUNG,CellLine,COVID,COVID-cent_corrected,COVID-fed-corrected" centralized_finetune_inference 20 0 false $GPU
+./run_annotation.sh all centralized_finetune_inference 20 0 false $GPU
 
 echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running local clients annotation with scGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
-./run_annotation.sh "LUNG,CellLine,COVID,COVID-cent_corrected,COVID-fed-corrected" centralized_clients 20 0 false $GPU
+./run_annotation.sh all centralized_clients 20 0 false $GPU
 #
 #echo -e "\e[34m-------------------------------------\e[0m"
 #echo -e "\e[34m Running Federated annotation with FedscGPT using weighted FedAvg\e[0m"
