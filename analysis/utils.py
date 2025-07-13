@@ -824,7 +824,7 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
     for ds in datasets:
         adata_path = Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0]
         ref = anndata.read_h5ad(adata_path)
-        batches = list(sorted(ref.obs[datasets_details['batch_key']].unique()))
+        batches = list(sorted(ref.obs[datasets_details[ds]['batch_key']].unique()))
         # Load centralized and federated results
         scgpt = pd.read_csv(scgpt_file_path[ds])
         fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
