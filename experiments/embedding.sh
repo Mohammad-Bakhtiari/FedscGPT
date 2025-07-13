@@ -42,7 +42,7 @@ cmd="python ${root_dir}/tasks/embedding.py \
  --reference_adata $reference \
  --query_adata $query \
  --output-dir $output \
- --celltype_key "$celltype_key" \
+ --celltype_key \"${celltype_key}\" \
  --batch_key "$batch_key" \
  --gene_col "$gene_col" \
  --mode $mode \
