@@ -42,7 +42,10 @@ python3 plots.py --plot "annotation_conf_matrix" --root_dir $root_dir --param_tu
 # Plot best metrics based on each metric
 python3 plots.py --plot "annotation_best_metrics" --root_dir "${root_dir}/output/annotation" --param_tuning_df $results_summary_df_file --format 'png'
 
-# Plot reference mapping boxplot
+# Plot reference mapping boxplot for all datasets except COVID
 python3 plots.py --plot "reference_map_boxplot" --root_dir "${root_dir}/output/embedding" --format 'svg'
+
+# Plot reference mapping boxplot for COVID dataset
+python3 plots.py --plot "reference_map_boxplot_covid" --root_dir "${root_dir}/output/embedding" --format 'svg'
 
 python3 plots.py --plot "fed_embedding_umap" --root_dir "${root_dir}/output/embedding" --data_dir $data_dir

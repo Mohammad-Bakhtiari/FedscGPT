@@ -805,18 +805,18 @@ def best_metrics_report(df):
         f"Dataset: {worst_case_row['Dataset']}, Metric: {worst_case_row['Metric']}, Percentage Achieved: {worst_case_row['Percentage Achieved']}%")
 
 
-def embedding_boxplot(data_dir, img_format='svg'):
-    dataset = ["covid", "lung"]
+def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
+
     metrics = ['accuracy', 'precision', 'recall', 'macro_f1']
 
     # Initialize an empty DataFrame to hold all results
     df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
 
-    fedscgpt_file_path = {ds: f"{data_dir}/{ds}/federated/evaluation_metrics.csv" for ds in dataset}
-    fedscgpt_smpc_file_path = {ds: f"{data_dir}/{ds}/federated/smpc/evaluation_metrics.csv" for ds in dataset}
-    scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in dataset}
+    fedscgpt_file_path = {ds: f"{data_dir}/{ds}/federated/evaluation_metrics.csv" for ds in datasets}
+    fedscgpt_smpc_file_path = {ds: f"{data_dir}/{ds}/federated/smpc/evaluation_metrics.csv" for ds in datasets}
+    scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
 
-    for ds in dataset:
+    for ds in datasets:
         # Load centralized and federated results
         scgpt = pd.read_csv(scgpt_file_path[ds])
         fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
@@ -858,7 +858,7 @@ def embedding_boxplot(data_dir, img_format='svg'):
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
     # display_federated_performance_report(df)
-    per_metric_annotated_scatterplot(df, "./plots/embedding", img_format)
+    per_metric_annotated_scatterplot(df, plots_dir, img_format)
 
 def find_federated_performance_comparison(df, federated_types=None):
     """

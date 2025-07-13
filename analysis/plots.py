@@ -18,6 +18,7 @@ if __name__ == '__main__':
                                                      'annotation_best_metrics',
                                                      'annotation_cent_box_plt',
                                                      'reference_map_boxplot',
+                                                     'reference_map_boxplot_covid',
                                                      'fed_embedding_umap',
                                                      "umap_covid_batch_effect",
                                                      "umap_ms_batch_effect",
@@ -71,7 +72,10 @@ if __name__ == '__main__':
         plot_best_metrics(args.root_dir, args.param_tuning_df, img_format=args.format)
     elif args.plot == 'reference_map_boxplot':
         # Old: Figure 3, New: Figure 4a
-        embedding_boxplot(args.root_dir, args.format)
+        embedding_boxplot(args.root_dir, ['cl', 'hp', 'lung', 'ms', 'myeloid'], "./plots/embedding", args.format)
+    elif args.plot == 'reference_map_boxplot_covid':
+        #  Figure X
+        embedding_boxplot(args.root_dir, ['covid', 'covid-corrected', 'covid-fed-corrected'], args.format, "./plots/embedding/covid")
     elif args.plot == "fed_embedding_umap":
         fed_embedding_umap(args.data_dir, args.root_dir, img_format='png')
     elif args.plot == "umap_covid_batch_effect":
