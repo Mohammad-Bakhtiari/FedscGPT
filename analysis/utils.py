@@ -858,13 +858,15 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
             if client_dir.startswith("client"):
                 client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
                 client_num = int(os.path.basename(client_dir).split("_")[1])
+                client_batch_value = batches[client_num]
+                print(ds, client_num, client_batch_value)
                 for metric in metrics:
                     rows.append({
                         'Dataset': ds,
                         'Type': 'Client',
                         'Metric': metric,
                         'Value': client_metrics[metric].values[0],
-                        'Batch': batches[client_num]
+                        'Batch': client_batch_value
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
     # display_federated_performance_report(df)
