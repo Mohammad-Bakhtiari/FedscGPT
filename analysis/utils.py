@@ -858,6 +858,7 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
     # display_federated_performance_report(df)
+    print(df)
     per_metric_annotated_scatterplot(df, plots_dir, img_format)
 
 def find_federated_performance_comparison(df, federated_types=None):
