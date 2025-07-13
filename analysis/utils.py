@@ -13,6 +13,7 @@ import numpy as np
 import anndata
 import scanpy as sc
 import random
+from FedscGPT.data.stats import datasets as datasets_details
 
 
 SEED = 42
@@ -817,6 +818,7 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
     scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
 
     for ds in datasets:
+        print(data_dir, datasets_details[ds]['h5ad_file'].split("|")[0])
         # Load centralized and federated results
         scgpt = pd.read_csv(scgpt_file_path[ds])
         fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
@@ -826,19 +828,19 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
         for metric in metrics:
             rows.append({
                 'Dataset': ds,
-                'Type': 'scGPT',
+                'Type': 'Centralized',
                 'Metric': metric,
                 'Value': scgpt[metric].values[0]
             })
             rows.append({
                 'Dataset': ds,
-                'Type': 'FedscGPT',
+                'Type': 'Federated',
                 'Metric': metric,
                 'Value': fedscgpt[metric].values[0]
             })
             rows.append({
                 'Dataset': ds,
-                'Type': 'FedscGPT-SMPC',
+                'Type': 'Federated-SMPC',
                 'Metric': metric,
                 'Value': fedscgpt_smpc[metric].values[0]
             })
@@ -849,10 +851,11 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
         for client_dir in os.listdir(client_dir_path):
             if client_dir.startswith("client"):
                 client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
+                client_name = os.path.basename(client_dir)  # Get the client name
                 for metric in metrics:
                     rows.append({
                         'Dataset': ds,
-                        'Type': 'Client',
+                        'Type': client_name,
                         'Metric': metric,
                         'Value': client_metrics[metric].values[0]
                     })
