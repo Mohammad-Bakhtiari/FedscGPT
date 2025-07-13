@@ -27,7 +27,6 @@ class Embedder(ScGPT):
         self.embed_adata = self.filter_id_in_vocab(self.adata)
         self.vocab.set_default_index(self.vocab["<pad>"])
         if self.gene_col == 'index':
-            self.gene_col = "gene_name"
             self.embed_adata.var[self.gene_col] = self.embed_adata.var.index
         self.gene_ids = np.array(self.vocab(self.embed_adata.var[self.gene_col].tolist()), dtype=int)
         self.instantiate_transformer_model()
