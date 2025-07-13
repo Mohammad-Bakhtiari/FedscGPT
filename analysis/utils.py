@@ -470,6 +470,16 @@ def handle_ds_name(name):
     if name.lower() == "lung":
         return "Lung-Kim"
 
+DS_NAME_MAP = {
+    "hp": "HP",
+    "ms": "MS",
+    "myeloid": "Myeloid",
+    "covid": "Covid-19",
+    "lung": "Lung-Kim",
+    "cl": "CL",
+}
+
+
 class ImagePlaceholder:
     pass
 
@@ -1127,7 +1137,7 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
         plt.ylim(0, 1)
         plt.ylabel(metric.capitalize(), fontsize=18)
         plt.xticks(range(1, len(datasets)+1),
-                   [handle_ds_name(d) for d in datasets],
+                   [DS_NAME_MAP.get(d, d) for d in datasets],
                    fontsize=18)
         plt.yticks(fontsize=16)
         plt.tight_layout()
@@ -1136,7 +1146,7 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
         plt.close()
 
         # regenerate legend (assumed your helper handles all markers/lines)
-        plot_legend(plots_dir, img_format)
+        plot_legend_embedding(plots_dir, img_format)
 
 def plot_legend(plots_dir, img_format='svg'):
     """
@@ -1165,6 +1175,52 @@ def plot_legend(plots_dir, img_format='svg'):
                marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10,
                markeredgecolor='black',
                label='FedscGPT-SMPC'),
+        Line2D([0], [0],
+               marker='o', color='w', markersize=8,
+               markeredgecolor='black',
+               label='Clients'),
+    ]
+
+    plt.legend(handles=legend_elements,
+               loc='center', fontsize=12,
+               ncol=len(legend_elements),
+               frameon=False,
+               columnspacing=1.0)
+
+    plt.axis('off')
+    plt.savefig(f"{plots_dir}/legend.{img_format}",
+                format=img_format, dpi=300,
+                bbox_inches='tight')
+    plt.close()
+
+
+def plot_legend_embedding(plots_dir, img_format='svg'):
+    """
+    Plot a separate figure containing only the legend for:
+      – scGPT (centralized)
+      – FedscGPT (federated)
+      – FedscGPT-SMPC (federated + SMPC)
+      – Clients
+      – Other approaches
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    plt.figure(figsize=(6, 1.5))
+
+    legend_elements = [
+        Line2D([0], [0],
+               color='black', lw=2, linestyle='--',
+               label='Centralized'),
+        Line2D([0], [0],
+               marker=FEDSCGPT_MARKER, color='w', markersize=10,
+               markeredgecolor='black',
+               label='Federated'),
+        Line2D([0], [0],
+               marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10,
+               markeredgecolor='black',
+               label='Federated-SMPC'),
         Line2D([0], [0],
                marker='o', color='w', markersize=8,
                markeredgecolor='black',
