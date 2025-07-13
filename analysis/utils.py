@@ -1058,9 +1058,9 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
 
     # Style map for known approaches; fallback to X
     style_map = {
-        'scGPT':           {'kind':'line', 'linestyle':'--', 'linewidth':2},
-        'FedscGPT':        {'marker':FEDSCGPT_MARKER, 's':100, 'edgecolor':'black'},
-        'FedscGPT-SMPC':   {'marker':FEDSCGPT_SMPC_MARKER, 's':100, 'edgecolor':'black'}
+        'Centralized':           {'kind':'line', 'linestyle':'--', 'linewidth':2},
+        'Federated':        {'marker':FEDSCGPT_MARKER, 's':100, 'edgecolor':'black'},
+        'Federated-SMPC':   {'marker':FEDSCGPT_SMPC_MARKER, 's':100, 'edgecolor':'black'}
     }
     default_marker = 'X'
 
