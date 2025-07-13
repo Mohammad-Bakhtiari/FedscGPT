@@ -17,6 +17,7 @@ import random
 from pathlib import Path
 
 from data.stats import datasets as datasets_details
+from data.stats import batch_map
 
 
 SEED = 42
@@ -821,7 +822,9 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
     scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
 
     for ds in datasets:
-        print(Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0])
+        adata_path = Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0]
+        ref = anndata.read_h5ad(adata_path)
+        batches = list(sorted(ref.obs[datasets_details['batch_key']].unique()))
         # Load centralized and federated results
         scgpt = pd.read_csv(scgpt_file_path[ds])
         fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
@@ -854,13 +857,14 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
         for client_dir in os.listdir(client_dir_path):
             if client_dir.startswith("client"):
                 client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
-                client_name = os.path.basename(client_dir)  # Get the client name
+                client_num = int(os.path.basename(client_dir).split("_")[1])
                 for metric in metrics:
                     rows.append({
                         'Dataset': ds,
-                        'Type': client_name,
+                        'Type': 'Client',
                         'Metric': metric,
-                        'Value': client_metrics[metric].values[0]
+                        'Value': client_metrics[metric].values[0],
+                        'Batch': batches[client_num]
                     })
         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
     # display_federated_performance_report(df)
@@ -1005,28 +1009,6 @@ def shorten_batch_value(batch_value):
     }
     return replace.get(batch_value, batch_value)
 
-batch_map = {
-    "ms":{
-        "Ctrl_Premotor": "Control Premotor",
-        "MS_Premotor": "MS Premotor",
-        "Ctrl_Prefrontal": "Control Prefrontal",
-        "MS_Prefrontal": "MS Prefrontal",
-        "Ctrl_Cerebral": "Control Cerebral",
-        "MS_Cerebral": "MS Cerebral",
-    },
-    "covid": {
-        'Sanger_Meyer_2019Madissoon': 'Sanger',
-        'COVID-19 (query)': 'COVID',
-        'Northwestern_Misharin_2018Reyfman': 'Northwestern',
-    },
-    "hp": {
-        '0': 'Baron',
-        '1': 'Mutaro',
-        '2': 'Segerstolpe',
-        '3': 'Wang',
-        '4': 'Xin'
-    },
-}
 
 
 def shorten_celltype_value(celltype):
