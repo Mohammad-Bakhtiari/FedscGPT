@@ -168,48 +168,49 @@ def read_adata(files, ds_path):
         raise ValueError("files must contain one or two filenames")
 
 
-with pd.ExcelWriter(output_excel_path) as writer:
-    for dataset in datasets.keys():
-        folder = datasets[dataset].get("folder", dataset)
-        ctm = celltype_mapping.get(folder, {})
-        bm = batch_map.get(folder, {})
-        print(folder, dataset)
-        if dataset == "myeloid":
-            ref_file, q_file = datasets[dataset]["h5ad_file"].split("|")
-            ref = sc.read_h5ad(os.path.join(rootdir, folder, ref_file))
-            ref.obs["query_ref_split_label"] = "Reference"
-            stats_df = get_stats(ref.obs,
-                                 celltype_key=datasets[dataset]["celltype_key"],
-                                 batch_key=datasets[dataset]["batch_key"],
-                                 celltype_mapping=ctm,
-                                 batch_map=bm
-                                 )
-            stats_df.to_excel(writer, sheet_name=dataset + " Reference")
-            print(f"######### Statistics for {dataset}: Reference #########")
-            print(stats_df)
-            print("#" * 50)
-            query = sc.read_h5ad(os.path.join(rootdir, folder, q_file))
-            query.obs["query_ref_split_label"] = "Query"
-            stats_df_query = get_stats(query.obs,
-                                       celltype_key=datasets[dataset]["celltype_key"],
-                                       batch_key=datasets[dataset]["batch_key"],
-                                       celltype_mapping=ctm,
-                                       batch_map=bm
-                                       )
-            stats_df_query.to_excel(writer, sheet_name=dataset + " Query")
-            print(f"######### Statistics for {dataset}: Query #########")
-            print(stats_df_query)
-            print("#" * 50)
-        else:
-            adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
-            stats_df = get_stats(adata.obs,
-                                 celltype_key=datasets[dataset]["celltype_key"],
-                                 batch_key=datasets[dataset]["batch_key"],
-                                 celltype_mapping=ctm,
-                                 batch_map=bm
-                                 )
-            stats_df.to_excel(writer, sheet_name=dataset)
-            print(f"######### Statistics for {dataset}: #########")
-            print(stats_df)
-            print("#" * 50)
+if __name__ == '__main__':
+    with pd.ExcelWriter(output_excel_path) as writer:
+        for dataset in datasets.keys():
+            folder = datasets[dataset].get("folder", dataset)
+            ctm = celltype_mapping.get(folder, {})
+            bm = batch_map.get(folder, {})
+            print(folder, dataset)
+            if dataset == "myeloid":
+                ref_file, q_file = datasets[dataset]["h5ad_file"].split("|")
+                ref = sc.read_h5ad(os.path.join(rootdir, folder, ref_file))
+                ref.obs["query_ref_split_label"] = "Reference"
+                stats_df = get_stats(ref.obs,
+                                     celltype_key=datasets[dataset]["celltype_key"],
+                                     batch_key=datasets[dataset]["batch_key"],
+                                     celltype_mapping=ctm,
+                                     batch_map=bm
+                                     )
+                stats_df.to_excel(writer, sheet_name=dataset + " Reference")
+                print(f"######### Statistics for {dataset}: Reference #########")
+                print(stats_df)
+                print("#" * 50)
+                query = sc.read_h5ad(os.path.join(rootdir, folder, q_file))
+                query.obs["query_ref_split_label"] = "Query"
+                stats_df_query = get_stats(query.obs,
+                                           celltype_key=datasets[dataset]["celltype_key"],
+                                           batch_key=datasets[dataset]["batch_key"],
+                                           celltype_mapping=ctm,
+                                           batch_map=bm
+                                           )
+                stats_df_query.to_excel(writer, sheet_name=dataset + " Query")
+                print(f"######### Statistics for {dataset}: Query #########")
+                print(stats_df_query)
+                print("#" * 50)
+            else:
+                adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
+                stats_df = get_stats(adata.obs,
+                                     celltype_key=datasets[dataset]["celltype_key"],
+                                     batch_key=datasets[dataset]["batch_key"],
+                                     celltype_mapping=ctm,
+                                     batch_map=bm
+                                     )
+                stats_df.to_excel(writer, sheet_name=dataset)
+                print(f"######### Statistics for {dataset}: #########")
+                print(stats_df)
+                print("#" * 50)
 
