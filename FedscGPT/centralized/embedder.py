@@ -22,9 +22,9 @@ class Embedder(ScGPT):
     def __init__(self, data_dir, reference_adata, pretrained_model_dir, gene_col, k, **kwargs):
         super().__init__(data_dir, pretrained_model_dir, **kwargs)
         self.gene_col = gene_col
-        if self.gene_col == 'index':
-            self.embed_adata.var[self.gene_col] = self.embed_adata.var.index
         self.read_reference(reference_adata)
+        if self.gene_col == 'index':
+            self.adata.var[self.gene_col] = self.adata.var.index
         self.load_pretrained_config(set_pretrained_config=True)
         self.embed_adata = self.filter_id_in_vocab(self.adata)
         self.vocab.set_default_index(self.vocab["<pad>"])
