@@ -7,6 +7,9 @@ import crypten
 from crypten.config import cfg
 from collections import OrderedDict
 import hashlib
+import os
+import pandas as pd
+import fcntl
 
 SEED = 42
 def set_seed(seed=None):
@@ -800,8 +803,8 @@ class ResultsRecorder:
         self.pickle_file = file_name + '.pkl'
         self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs', 'mu', 'Aggregation']
         self.dataset = dataset
-        self.results_df = self.load_or_create_dataframe()
-        self.all_results = self.load_or_create_pickle()
+        self.results_df = pd.DataFrame(columns=self.columns)
+        self.all_results = {}
         self.logger = logger if logger else print
         self.verbose = verbose
         self.agg_method = agg_method
@@ -849,39 +852,94 @@ class ResultsRecorder:
         } for metric, value in metrics.items()])
         self.results_df = pd.concat([self.results_df, new_rows], ignore_index=True)
 
+
+
     def save_dataframe(self):
-        """Save the DataFrame to the CSV file."""
-        self.results_df.to_csv(self.results_file, index=False)
-        if self.verbose:
-            self.logger(f"Data successfully saved to {self.results_file}")
+        """Save the DataFrame to the CSV file with file locking (Unix)."""
+        with open(self.results_file, 'a+') as f:
+            try:
+                # Acquire an exclusive lock (blocking)
+                fcntl.flock(f, fcntl.LOCK_EX)
+
+                # Move to the beginning to read (if file exists)
+                f.seek(0)
+                if os.path.getsize(self.results_file) > 0:
+                    f.seek(0)
+                    df = pd.read_csv(f)
+                    self.results_df = pd.concat([df, self.results_df], ignore_index=True)
+
+                # Truncate and write updated content
+                f.seek(0)
+                f.truncate()
+                self.results_df.to_csv(f, index=False)
+
+                if self.verbose:
+                    self.logger(f"Data successfully saved to {self.results_file}")
+            finally:
+                # Always release the lock
+                fcntl.flock(f, fcntl.LOCK_UN)
 
     def update_pickle(self, predictions, labels, id_maps, epoch, round_number, dataset=None, mu=None):
-        """Update the pickle file with detailed results for each epoch and round."""
+        """Update the in-memory dictionary with results for each epoch and round."""
         if dataset is None:
             dataset = self.dataset
-
 
         if 'id_maps' not in self.all_results[dataset]:
             self.all_results[dataset]['id_maps'] = id_maps
         else:
             assert self.all_results[dataset]['id_maps'] == id_maps, f"ID Maps mismatch for dataset {dataset}"
 
-        # Initialize epoch if not present
-        if epoch not in self.all_results[dataset][self.agg_method]:
-            self.all_results[dataset][self.agg_method][epoch] = {}
-
-        if round_number not in self.all_results[dataset][self.agg_method][epoch]:
-            self.all_results[dataset][self.agg_method][epoch][round_number] = {}
-        if mu not in self.all_results[dataset][self.agg_method][epoch][round_number]:
-            self.all_results[dataset][self.agg_method][epoch][round_number][mu] = {}
-        self.all_results[dataset][self.agg_method][epoch][round_number][mu] = {'predictions': predictions, 'labels': labels}
+        # Initialize nested structure if not present
+        self.all_results[dataset].setdefault(self.agg_method, {})
+        self.all_results[dataset][self.agg_method].setdefault(epoch, {})
+        self.all_results[dataset][self.agg_method][epoch].setdefault(round_number, {})
+        self.all_results[dataset][self.agg_method][epoch][round_number][mu] = {
+            'predictions': predictions,
+            'labels': labels
+        }
 
     def save_pickle(self):
-        """Save the detailed results dictionary to the pickle file."""
-        with open(self.pickle_file, 'wb') as f:
-            pickle.dump(self.all_results, f)
-        if self.verbose:
-            self.logger(f"Detailed results successfully saved to {self.pickle_file}")
+        """Merge existing pickle file with current results and save, using file lock (Unix)."""
+        if os.path.exists(self.pickle_file):
+            with open(self.pickle_file, 'rb+') as f:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX)  # lock the file for exclusive access
+                    try:
+                        old_results = pickle.load(f)
+                    except EOFError:
+                        old_results = {}
+
+                    # Merge logic
+                    for dataset, new_data in self.all_results.items():
+                        if dataset not in old_results:
+                            old_results[dataset] = new_data
+                        else:
+                            for key, val in new_data.items():
+                                if key not in old_results[dataset]:
+                                    old_results[dataset][key] = val
+                                elif isinstance(val, dict):  # deep merge if nested dict
+                                    old_results[dataset][key].update(val)
+                                else:
+                                    old_results[dataset][key] = val
+
+                    # Write back merged result
+                    f.seek(0)
+                    f.truncate()
+                    pickle.dump(old_results, f)
+                    if self.verbose:
+                        self.logger(f"Merged and saved results to {self.pickle_file}")
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        else:
+            # First-time save (file doesn't exist yet)
+            with open(self.pickle_file, 'wb') as f:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                    pickle.dump(self.all_results, f)
+                    if self.verbose:
+                        self.logger(f"Saved new results to {self.pickle_file}")
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
 
     def record_metrics(self, round_number, accuracy, precision, recall, macro_f1, n_epochs):
         """Record and save metrics in the DataFrame."""
