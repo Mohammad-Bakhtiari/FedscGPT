@@ -54,10 +54,9 @@ batch_map = {
         '4': 'Xin'
     },
 
-
-
 }
-
+batch_map['covid-corrected'] = batch_map['covid']
+batch_map['covid-fed-corrected'] = batch_map['covid']
 
 def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
     """
@@ -135,6 +134,16 @@ datasets = {
         "h5ad_file": "reference.h5ad|query.h5ad",
         "celltype_key": "cell_type",
         "batch_key": "batch",
+    },
+    "covid-corrected": {
+        "h5ad_file": "reference-corrected.h5ad|query-corrected.h5ad",
+        "celltype_key": "celltype",
+        "batch_key": "batch_group",
+    },
+    "covid-fed-corrected": {
+        "h5ad_file": "reference-fed-corrected.h5ad|query-fed-corrected.h5ad",
+        "celltype_key": "celltype",
+        "batch_key": "batch_group",
     },
 }
 
