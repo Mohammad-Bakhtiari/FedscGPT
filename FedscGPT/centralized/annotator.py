@@ -13,6 +13,7 @@ from sklearn.model_selection import train_test_split
 from FedscGPT.utils import SeqDataset, dump_results, plot, ResultsRecorder
 from FedscGPT.centralized.models import ScGPT
 from FedscGPT.utils import read_h5ad, seed_worker
+from FedscGPT.mlflow_recorder import MLflowResultsRecorder
 import copy
 from functools import partial
 
@@ -147,9 +148,21 @@ class Training(Base):
             self.train_batch_labels = np.array(batch_ids)
 
 
-class Inference(Base):
+class Inference(Base, MLflowResultsRecorder):
     def __init__(self, query_adata, dataset_name, param_tuning_res, load_model=True, model_name="model.pt", param_tuning=False, agg_method=None, **kwargs):
-        super().__init__(**kwargs)
+        Base.__init__(self, **kwargs)
+        if agg_method == "federated":
+            agg_method = "FedProx" if self.use_fedprox else "FedAvg"
+            agg_method = f"weighted-{agg_method}" if kwargs.get("weighted") else agg_method
+            agg_method = f"SMPC-{agg_method}" if kwargs.get("smpc") else agg_method
+        MLflowResultsRecorder.__init__(
+            self,
+            dataset=dataset_name,
+            run_name=param_tuning_res,
+            experiment_name="FedscGPT",
+            agg_method=agg_method,
+            verbose=self.verbose
+        )
         self.celltypes_labels = None
         self.read_query(query_adata)
         self.manege_id2type(self.adata_test)
@@ -172,11 +185,7 @@ class Inference(Base):
             os.makedirs(self.plot_dir, exist_ok=True)
         self.test_loader = None
         self.param_tuning = param_tuning
-        if agg_method is "federated":
-            agg_method = "FedProx" if self.use_fedprox else "FedAvg"
-            agg_method = f"weighted-{agg_method}" if kwargs["weighted"] else agg_method
-            agg_method = f"SMPC-{agg_method}" if kwargs['smpc'] else agg_method
-        self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=param_tuning_res, logger=self.log, agg_method=agg_method)
+
 
     def read_query(self, query_adata):
         self.adata_test_raw = read_h5ad(self.data_dir, query_adata)
@@ -194,17 +203,14 @@ class Inference(Base):
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
         macro_f1 = f1_score(self.celltypes_labels, predictions, average="macro")
-        self.result_recorder.update(accuracy,
-                                    precision,
-                                    recall,
-                                    macro_f1,
-                                    predictions,
-                                    self.celltypes_labels,
-                                    self.cell_id2type,
-                                    round_num,
-                                    n_epochs,
-                                    mu=mu
-                                    )
+
+        id_maps = {
+            "id2type": self.cell_id2type,
+            "celltypes": self.unique_cell_types  # used as class_names
+        }
+        self.update(accuracy, precision, recall, macro_f1, predictions, self.celltypes_labels, id_maps,
+                    round_num, n_epochs, mu=mu)
+
         results = {
             "test/accuracy": accuracy,
             "test/precision": precision,
@@ -242,16 +248,14 @@ class Inference(Base):
         self.adata_test_raw.obs["predictions"] = [self.cell_id2type[p] for p in predictions]
         if plot_results:
             plot(self.adata_test_raw, self.unique_cell_types, self.celltype_key, self.plot_dir)
-        return predictions, labels
+
 
     def save_results(self, labels, predictions, results):
         dump_results(predictions, labels, results, self.cell_id2type, self.output_dir)
 
-    def save_records(self):
-        self.result_recorder.save()
+    def finalize(self):
+        self.end_run()
 
-    def update_records(self, **kwargs):
-        self.result_recorder.update(labels=self.celltypes_labels, id_maps=self.cell_id2type, **kwargs)
 
 class CellTypeAnnotator(Training, Inference):
     def __init__(self, reference_adata, query_adata=None, **kwargs):

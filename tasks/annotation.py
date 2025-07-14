@@ -74,28 +74,31 @@ def centralized_inference(annotator=None,
                           plot_results=False,
                           model_name='model.pt',
                           round_number=None,
-                          **kwargs,
-                          ):
+                          **kwargs):
     if annotator is None:
-        annotator = Inference(log_id="inference", logger=logger, load_model=load_model, model_name=model_name, **kwargs)
+        annotator = Inference(
+            log_id="inference",
+            logger=logger,
+            load_model=load_model,
+            model_name=model_name,
+            **kwargs
+        )
     if not load_model:
         if weights is None:
             raise Warning("Inferencing cell types using random network!")
         else:
             annotator.best_model.load_state_dict(weights)
-    predictions, labels = annotator.inference(plot_results=plot_results,
-                                              round_num=round_number,
-                                              n_epochs=kwargs['n_epochs'],
-                                              mu=kwargs['mu'] if kwargs['use_fedprox'] else None)
 
-    if plot_results:
-        confusion_matrix_evaluation(annotator.unique_cell_types,
-                                    predictions,
-                                    labels,
-                                    annotator.cell_id2type,
-                        f"{kwargs['output_dir']}/plots",
+    annotator.inference(
+        plot_results=plot_results,
+        round_num=round_number,
+        n_epochs=kwargs['n_epochs'],
+        mu=kwargs['mu'] if kwargs.get('use_fedprox') else None
+    )
 
-                                    )
+    # All confusion matrices are now saved internally via MLflowResultsRecorder
+    annotator.finalize()
+
     return annotator
 
 
