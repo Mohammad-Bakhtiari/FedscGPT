@@ -75,7 +75,7 @@ if __name__ == '__main__':
         embedding_boxplot(args.root_dir, ['lung', 'cl', 'hp', 'ms', 'myeloid'], "./plots/embedding", args.format)
     elif args.plot == 'reference_map_boxplot_covid':
         #  Figure X
-        embedding_boxplot(args.root_dir, ['covid', 'covid-corrected', 'covid-fed-corrected'], args.format, "./plots/embedding/covid")
+        embedding_boxplot(args.root_dir, ['covid', 'covid-corrected', 'covid-fed-corrected'], "./plots/embedding/covid", args.format)
     elif args.plot == "fed_embedding_umap":
         fed_embedding_umap(args.data_dir, args.root_dir, img_format='png')
     elif args.plot == "umap_covid_batch_effect":
