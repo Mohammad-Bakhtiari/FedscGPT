@@ -832,7 +832,8 @@ def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
     scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
 
     for ds in datasets:
-        adata_path = Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0]
+        filename = datasets_details['covid' if 'covid' in ds else ds]['h5ad_file'].split("|")[0]
+        adata_path = Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/filename
         ref = anndata.read_h5ad(adata_path)
         batches = list(sorted(ref.obs[datasets_details[ds]['batch_key']].unique()))
         # Load centralized and federated results
