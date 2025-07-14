@@ -1075,7 +1075,7 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
     default_marker = 'X'
 
     for metric in metrics:
-        plt.figure(figsize=(5,5))
+        plt.figure(figsize=(5,8))
         # --- Plot client points with jitter + labels ---
         cmap = safe_extended_palette
         for i, ds in enumerate(datasets):
