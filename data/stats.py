@@ -136,12 +136,12 @@ datasets = {
         "batch_key": "batch",
     },
     "covid-corrected": {
-        "h5ad_file": "reference-corrected.h5ad|query-corrected.h5ad",
+        "h5ad_file": "reference_corrected.h5ad|query_corrected.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
     },
     "covid-fed-corrected": {
-        "h5ad_file": "reference-fed-corrected.h5ad|query-fed-corrected.h5ad",
+        "h5ad_file": "reference_fed_corrected.h5ad|query_fed_corrected.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
     },
