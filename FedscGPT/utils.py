@@ -856,7 +856,12 @@ class ResultsRecorder:
 
     def save_dataframe(self):
         """Save the DataFrame to the CSV file with file locking (Unix)."""
-        with open(self.results_file, 'a+') as f:
+        if os.path.exists(self.results_file):
+            mode = 'r+'
+        else:
+            mode = 'w+'
+
+        with open(self.results_file, mode) as f:
             try:
                 # Acquire an exclusive lock (blocking)
                 fcntl.flock(f, fcntl.LOCK_EX)
@@ -879,24 +884,24 @@ class ResultsRecorder:
                 # Always release the lock
                 fcntl.flock(f, fcntl.LOCK_UN)
 
-    def update_pickle(self, predictions, labels, id_maps, epoch, round_number, dataset=None, mu=None):
-        """Update the in-memory dictionary with results for each epoch and round."""
+    def update_pickle(self, predictions, labels, id_maps, epoch, round_number, all_results=None, dataset=None, mu=None, agg_method=None):
+        """Update the pickle file with detailed results for each epoch and round."""
         if dataset is None:
             dataset = self.dataset
+        if agg_method is None:
+            agg_method = self.agg_method
+        if all_results is None:
+            all_results = self.all_results
 
-        if 'id_maps' not in self.all_results[dataset]:
-            self.all_results[dataset]['id_maps'] = id_maps
+        all_results.setdefault(dataset, {}) \
+            .setdefault(agg_method, {}) \
+            .setdefault(epoch, {}) \
+            .setdefault(round_number, {})[mu] = {'predictions': predictions, 'labels': labels}
+
+        if 'id_maps' not in all_results[dataset]:
+            all_results[dataset]['id_maps'] = id_maps
         else:
-            assert self.all_results[dataset]['id_maps'] == id_maps, f"ID Maps mismatch for dataset {dataset}"
-
-        # Initialize nested structure if not present
-        self.all_results[dataset].setdefault(self.agg_method, {})
-        self.all_results[dataset][self.agg_method].setdefault(epoch, {})
-        self.all_results[dataset][self.agg_method][epoch].setdefault(round_number, {})
-        self.all_results[dataset][self.agg_method][epoch][round_number][mu] = {
-            'predictions': predictions,
-            'labels': labels
-        }
+            assert all_results[dataset]['id_maps'] == id_maps, f"ID Maps mismatch for dataset {dataset}"
 
     def save_pickle(self):
         """Merge existing pickle file with current results and save, using file lock (Unix)."""
@@ -910,17 +915,21 @@ class ResultsRecorder:
                         old_results = {}
 
                     # Merge logic
-                    for dataset, new_data in self.all_results.items():
-                        if dataset not in old_results:
-                            old_results[dataset] = new_data
-                        else:
-                            for key, val in new_data.items():
-                                if key not in old_results[dataset]:
-                                    old_results[dataset][key] = val
-                                elif isinstance(val, dict):  # deep merge if nested dict
-                                    old_results[dataset][key].update(val)
-                                else:
-                                    old_results[dataset][key] = val
+                    for ds_name, ds_dict in self.all_results.items():
+                        for agg_method, agg_dict in ds_dict.items():
+                            for epoch, epoch_dict in agg_dict.items():
+                                for round_number, round_dict in epoch_dict.items():
+                                    for mu, preds in round_dict.items():
+                                        self.update_pickle(preds['predictions'],
+                                                           preds['labels'],
+                                                           ds_dict['id_maps'],
+                                                           epoch,
+                                                           round_number,
+                                                           all_results=old_results,
+                                                           dataset=ds_name,
+                                                           mu=mu,
+                                                           agg_method=agg_method
+                                                           )
 
                     # Write back merged result
                     f.seek(0)
@@ -957,7 +966,7 @@ class ResultsRecorder:
             dataset = self.dataset
         self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs, dataset, mu)
         self.update_pickle(predictions, labels, id_maps, n_epochs, round_number, dataset, mu)
-        self.save()
+
 
     def save(self):
         self.save_dataframe()
