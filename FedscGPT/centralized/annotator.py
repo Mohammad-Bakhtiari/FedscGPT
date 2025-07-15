@@ -172,7 +172,7 @@ class Inference(Base):
             os.makedirs(self.plot_dir, exist_ok=True)
         self.test_loader = None
         self.param_tuning = param_tuning
-        if agg_method is "federated":
+        if agg_method == "federated":
             agg_method = "FedProx" if self.use_fedprox else "FedAvg"
             agg_method = f"weighted-{agg_method}" if kwargs["weighted"] else agg_method
             agg_method = f"SMPC-{agg_method}" if kwargs['smpc'] else agg_method
