@@ -922,6 +922,8 @@ class ResultsRecorder:
                     # Merge logic
                     for ds_name, ds_dict in self.all_results.items():
                         for agg_method, agg_dict in ds_dict.items():
+                            if agg_method == "id_maps":
+                                continue
                             for epoch, epoch_dict in agg_dict.items():
                                 for round_number, round_dict in epoch_dict.items():
                                     for mu, preds in round_dict.items():
