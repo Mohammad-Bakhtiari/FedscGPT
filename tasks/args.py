@@ -47,7 +47,7 @@ def add_federated_annotation_args(parser):
     parser.add_argument("--n_rounds", type=int, default=None, help="Number of rounds")
     parser.add_argument("--n_epochs", type=int, default=None, help="Number of epochs")
     parser.add_argument("--use_fedprox", action='store_true', default=False)
-    parser.add_argument("--mu", type=float, default=0.05, help="Mean parameter")
+    parser.add_argument("--mu", type=float, default=None, help="Mean parameter")
     parser.add_argument("--param_tuning", action='store_true', default=False)
 
 def add_federated_embedding_args(parser):
