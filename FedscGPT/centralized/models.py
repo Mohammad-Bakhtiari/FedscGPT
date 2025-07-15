@@ -174,7 +174,6 @@ class ScGPT(BaseMixin):
                 self.load_matched_param(model_dir)
             self.save_init_weights()
         self.freeze_params()
-        # self.model.to(self.device)
 
 
     def train_for_epoch(self, loader, epoch) -> None:

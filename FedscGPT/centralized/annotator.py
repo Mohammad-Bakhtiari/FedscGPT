@@ -162,8 +162,6 @@ class Inference(Base):
         self.instantiate_transformer_model()
         if load_model:
             self.load_pretrained_model(model_name)
-        # else:
-        #     self.model.to(self.device)
         self.setup_losses()
         self.best_model = copy.deepcopy(self.model)
         self.best_model.eval()

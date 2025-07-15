@@ -125,8 +125,7 @@ class BaseMixin:
     def instantiate_adv(self):
         self.discriminator = AdversarialDiscriminator(
             d_model=self.config.model.embsize,
-            n_cls=self.config.model.num_batch_types,
-        ).to(self.device)
+            n_cls=self.config.model.num_batch_types)
 
     def setup_losses(self):
         self.set_defualt()
