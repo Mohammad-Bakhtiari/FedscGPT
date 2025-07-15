@@ -210,7 +210,6 @@ class Inference(Base):
                                     self.cell_id2type,
                                     round_num,
                                     n_epochs,
-                                    mu=mu
                                     )
         results = {
             "test/accuracy": accuracy,
