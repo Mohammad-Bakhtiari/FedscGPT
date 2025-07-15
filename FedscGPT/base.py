@@ -217,10 +217,12 @@ class BaseMixin:
     def save_init_weights(self):
         torch.save(self.model.state_dict(), self.init_weights_dir)
 
-    def move_to_gpu(self):
-        model_device = next(self.model.parameters()).device
+    def move_to_gpu(self, model=None):
+        if model is None:
+            model = self.model
+        model_device = next(model.parameters()).device
         if model_device != self.device:
-            self.model.to(self.device)
+            model.to(self.device)
         else:
             self.log(f"Model is already on {self.device} device, no need to move it.")
 
@@ -231,10 +233,12 @@ class BaseMixin:
             else:
                 self.log(f"Discriminator is already on {self.device} device, no need to move it.")
 
-    def move_to_cpu(self):
-        model_device = next(self.model.parameters()).device
+    def move_to_cpu(self, model=None):
+        if model is None:
+            model = self.model
+        model_device = next(model.parameters()).device
         if model_device != torch.device("cpu"):
-            self.model.to("cpu")
+            model.to("cpu")
         else:
             self.log(f"Model is already on CPU device, no need to move it.")
 

@@ -467,6 +467,6 @@ class ScGPT(BaseMixin):
         self.move_to_cpu()
 
     def update_best_model(self, val_loss, epoch):
-        self.best_model = copy.deepcopy(self.model)
+        self.best_model = copy.deepcopy(self.model.to('cpu'))
         self.best_model_epoch = epoch
         self.log(f"Best model with score {val_loss:5.4f}")
