@@ -174,7 +174,7 @@ class ScGPT(BaseMixin):
                 self.load_matched_param(model_dir)
             self.save_init_weights()
         self.freeze_params()
-        self.model.to(self.device)
+        # self.model.to(self.device)
 
 
     def train_for_epoch(self, loader, epoch) -> None:
@@ -429,6 +429,7 @@ class ScGPT(BaseMixin):
         return data_loader
 
     def train(self):
+        self.move_to_gpu()
         best_val_loss = float("inf")
         for epoch in range(1, self.config.train.epochs + 1):
             epoch_start_time = time.time()
@@ -463,6 +464,7 @@ class ScGPT(BaseMixin):
                 if val_loss < best_val_loss:
                     self.update_best_model(val_loss, epoch)
             self.lr_schedulers_step()
+        self.move_to_cpu()
 
     def update_best_model(self, val_loss, epoch):
         self.best_model = copy.deepcopy(self.model)

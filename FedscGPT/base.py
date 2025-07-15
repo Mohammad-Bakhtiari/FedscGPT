@@ -217,6 +217,31 @@ class BaseMixin:
     def save_init_weights(self):
         torch.save(self.model.state_dict(), self.init_weights_dir)
 
+    def move_to_gpu(self):
+        if self.model.device != self.device:
+            self.model.to(self.device)
+        else:
+            self.log(f"Model is already on {self.device} device, no need to move it.")
+
+        if self.discriminator is not None:
+            if self.discriminator.device != self.device:
+                self.discriminator.to(self.device)
+            else:
+                self.log(f"Discriminator is already on {self.device} device, no need to move it.")
+
+
+
+    def move_to_cpu(self):
+        if self.model.device != "cpu":
+            self.model.to("cpu")
+        else:
+            self.log(f"Model is already on CPU device, no need to move it.")
+        if self.discriminator is not None:
+            if self.discriminator.device != "cpu":
+                self.discriminator.to("cpu")
+            else:
+                self.log(f"Discriminator is already on CPU device, no need to move it.")
+
 class LossMeter:
     def __init__(self, MLM, CLS, CCE=False, MVC=False, ECS=False, DAB=False, ADV=False, explicit_zero_prob=False,
                  **kwargs):
