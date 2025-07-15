@@ -798,7 +798,7 @@ def verify_tokenization_consistency(client_tokenized_data_list):
 
 
 class ResultsRecorder:
-    def __init__(self, dataset, file_name='param_tuning', logger=None, verbose=False, agg_method="FedAvg"):
+    def __init__(self, dataset, file_name='param_tuning', logger=None, verbose=False, agg_method="FedAvg", mu=None):
         self.results_file = file_name + '.csv'
         self.pickle_file = file_name + '.pkl'
         self.columns = ['Dataset', 'Round', 'Metric', 'Value', 'n_epochs', 'mu', 'Aggregation']
@@ -808,6 +808,7 @@ class ResultsRecorder:
         self.logger = logger if logger else print
         self.verbose = verbose
         self.agg_method = agg_method
+        self.mu = mu
         if dataset not in self.all_results:
             self.all_results[dataset] = {}
         if self.agg_method not in self.all_results[dataset]:
@@ -833,6 +834,8 @@ class ResultsRecorder:
         """Update the DataFrame with new round results."""
         if dataset is None:
             dataset = self.dataset
+        if mu is None:
+            mu = self.mu
         metrics = {
             'Accuracy': accuracy,
             'Precision': precision,
@@ -892,6 +895,8 @@ class ResultsRecorder:
             agg_method = self.agg_method
         if all_results is None:
             all_results = self.all_results
+        if mu is None:
+            mu = self.mu
 
         all_results.setdefault(dataset, {}) \
             .setdefault(agg_method, {}) \
@@ -960,12 +965,9 @@ class ResultsRecorder:
         self.update_pickle(predictions, labels, id_maps, epoch, round_number)
         self.save_pickle()
 
-    def update(self, accuracy, precision, recall, macro_f1, predictions, labels, id_maps, round_number, n_epochs,
-               dataset=None, mu=None):
-        if dataset is None:
-            dataset = self.dataset
-        self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs, dataset, mu)
-        self.update_pickle(predictions, labels, id_maps, n_epochs, round_number, dataset, mu)
+    def update(self, accuracy, precision, recall, macro_f1, predictions, labels, id_maps, round_number, n_epochs):
+        self.update_dataframe(accuracy, precision, recall, macro_f1, round_number, n_epochs)
+        self.update_pickle(predictions, labels, id_maps, n_epochs, round_number)
 
 
     def save(self):
