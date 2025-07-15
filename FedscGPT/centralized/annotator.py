@@ -148,7 +148,7 @@ class Training(Base):
 
 
 class Inference(Base):
-    def __init__(self, query_adata, dataset_name, param_tuning_res, load_model=True, model_name="model.pt", param_tuning=False, agg_method=None, **kwargs):
+    def __init__(self, query_adata, dataset_name, param_tuning_res, load_model=True, model_name="model.pt", param_tuning=False, agg_method=None, mu=None, **kwargs):
         super().__init__(**kwargs)
         self.celltypes_labels = None
         self.read_query(query_adata)
@@ -176,7 +176,12 @@ class Inference(Base):
             agg_method = "FedProx" if self.use_fedprox else "FedAvg"
             agg_method = f"weighted-{agg_method}" if kwargs["weighted"] else agg_method
             agg_method = f"SMPC-{agg_method}" if kwargs['smpc'] else agg_method
-        self.result_recorder = ResultsRecorder(dataset=dataset_name, file_name=param_tuning_res, logger=self.log, agg_method=agg_method)
+        self.result_recorder = ResultsRecorder(dataset=dataset_name,
+                                               file_name=param_tuning_res,
+                                               logger=self.log,
+                                               agg_method=agg_method,
+                                               mu=mu,
+                                               )
 
     def read_query(self, query_adata):
         self.adata_test_raw = read_h5ad(self.data_dir, query_adata)
