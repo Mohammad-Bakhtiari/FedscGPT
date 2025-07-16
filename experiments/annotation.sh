@@ -54,6 +54,7 @@ output="${root_dir}/output/annotation/${dataset}/${general_mode}"
 INTI_WEIGHTS_DIR="${root_dir}/models/init"
 
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 cmd="python ${root_dir}/tasks/annotation.py \
  --dataset_name $dataset \
  --data-dir $data_dir \
