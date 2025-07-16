@@ -192,7 +192,7 @@ class Inference(Base):
     def test(self, round_num, n_epochs, mu=None) -> (np.ndarray, np.ndarray, Dict[str, float]):
         if self.test_loader is None or self.celltypes_labels is None:
             self.load_test_loader()
-        with EfficientGPUContext(self, model=self.best_model, debug=True):
+        with EfficientGPUContext(self, model=self.best_model):
             predictions = self.evaluate(self.best_model, loader=self.test_loader, return_raw=True)
         accuracy = accuracy_score(self.celltypes_labels, predictions)
         precision = precision_score(self.celltypes_labels, predictions, average="macro")

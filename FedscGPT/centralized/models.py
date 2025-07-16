@@ -435,7 +435,7 @@ class ScGPT(BaseMixin):
         return data_loader
 
     def train(self):
-        with EfficientGPUContext(self, debug=True):
+        with EfficientGPUContext(self):
             best_val_loss = float("inf")
             for epoch in range(1, self.config.train.epochs + 1):
                 epoch_start_time = time.time()
