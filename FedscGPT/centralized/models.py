@@ -238,11 +238,18 @@ class ScGPT(BaseMixin):
             self.adversarial_training(batch_labels, input_gene_ids, input_values, src_key_padding_mask)
         self.loss_meter.reset_batch_loss()
 
+    # def fedprox(self):
+    #     if self.use_fedprox and self.global_model:
+    #         prox_term = 0
+    #         for param, global_param in zip(self.model.parameters(), self.global_model.values()):
+    #             prox_term += ((param - global_param.to(self.device)) ** 2).sum()
+    #         self.loss_meter.batch_loss += (self.mu / 2) * prox_term
     def fedprox(self):
         if self.use_fedprox and self.global_model:
-            prox_term = 0
-            for param, global_param in zip(self.model.parameters(), self.global_model.values()):
-                prox_term += ((param - global_param.to(self.device)) ** 2).sum()
+            prox_term = torch.tensor(0.0, device=self.device)
+            with torch.no_grad():
+                for param, global_param in zip(self.model.parameters(), self.global_model.values()):
+                    prox_term += ((param - global_param) ** 2).sum()
             self.loss_meter.batch_loss += (self.mu / 2) * prox_term
 
     def unwrap_batch_data(self, batch_data):
@@ -428,42 +435,42 @@ class ScGPT(BaseMixin):
         return data_loader
 
     def train(self):
-        self.move_to_gpu()
-        best_val_loss = float("inf")
-        for epoch in range(1, self.config.train.epochs + 1):
-            epoch_start_time = time.time()
-            train_data_pt, valid_data_pt = self.per_epoch_data_prep(epoch)
-            train_loader = self.per_epoch_dataloader(train_data_pt,
-                                                     batch_size=self.config.train.batch_size,
-                                                     shuffle=False,
-                                                     intra_domain_shuffle=True,
-                                                     drop_last=False)
-
-
-            self.train_for_epoch(train_loader, epoch)
-            if self.config.log.retain_best_model:
-                num_eval_data = len(valid_data_pt["gene_ids"])
-                if self.config.train.eval_batch_size <= num_eval_data:
-                    batch_size = self.config.train.eval_batch_size
-                else:
-                    batch_size = num_eval_data
-                valid_loader = self.per_epoch_dataloader(valid_data_pt,
-                                                         batch_size=batch_size,
+        with self.efficient_gpu():
+            best_val_loss = float("inf")
+            for epoch in range(1, self.config.train.epochs + 1):
+                epoch_start_time = time.time()
+                train_data_pt, valid_data_pt = self.per_epoch_data_prep(epoch)
+                train_loader = self.per_epoch_dataloader(train_data_pt,
+                                                         batch_size=self.config.train.batch_size,
                                                          shuffle=False,
-                                                         intra_domain_shuffle=False,
+                                                         intra_domain_shuffle=True,
                                                          drop_last=False)
-                val_loss, val_err = self.evaluate(self.model, valid_loader)
-                elapsed = time.time() - epoch_start_time
-                self.log("-" * 89)
-                self.log(
-                    f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
-                    f"valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
-                )
-                self.log("-" * 89)
-                if val_loss < best_val_loss:
-                    self.update_best_model(val_loss, epoch)
-            self.lr_schedulers_step()
-        self.move_to_cpu()
+
+
+                self.train_for_epoch(train_loader, epoch)
+                if self.config.log.retain_best_model:
+                    num_eval_data = len(valid_data_pt["gene_ids"])
+                    if self.config.train.eval_batch_size <= num_eval_data:
+                        batch_size = self.config.train.eval_batch_size
+                    else:
+                        batch_size = num_eval_data
+                    valid_loader = self.per_epoch_dataloader(valid_data_pt,
+                                                             batch_size=batch_size,
+                                                             shuffle=False,
+                                                             intra_domain_shuffle=False,
+                                                             drop_last=False)
+                    val_loss, val_err = self.evaluate(self.model, valid_loader)
+                    elapsed = time.time() - epoch_start_time
+                    self.log("-" * 89)
+                    self.log(
+                        f"| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | "
+                        f"valid loss/mse {val_loss:5.4f} | err {val_err:5.4f}"
+                    )
+                    self.log("-" * 89)
+                    if val_loss < best_val_loss:
+                        self.update_best_model(val_loss, epoch)
+                self.lr_schedulers_step()
+        # self.move_to_cpu()
 
     def update_best_model(self, val_loss, epoch):
         self.best_model = copy.deepcopy(self.model.to('cpu'))
