@@ -217,36 +217,47 @@ class BaseMixin:
         torch.save(self.model.state_dict(), self.init_weights_dir)
 
     def move_to_gpu(self, model=None):
+        target_device = self.device
         if model is None:
-            model = self.model
-        model_device = next(model.parameters()).device
-        if model_device != self.device:
-            model.to(self.device)
+            if next(self.model.parameters()).device != target_device:
+                self.model = self.model.to(target_device)
+            else:
+                self.log(f"Model is already on {target_device}, no need to move it.")
+            model = self.model  # so we return it consistently
         else:
-            self.log(f"Model is already on {self.device} device, no need to move it.")
+            if next(model.parameters()).device != target_device:
+                model = model.to(target_device)
+            else:
+                self.log(f"Provided model is already on {target_device}, no need to move it.")
 
         if self.discriminator is not None:
-            disc_device = next(self.discriminator.parameters()).device
-            if disc_device != self.device:
-                self.discriminator.to(self.device)
+            if next(self.discriminator.parameters()).device != target_device:
+                self.discriminator = self.discriminator.to(target_device)
             else:
-                self.log(f"Discriminator is already on {self.device} device, no need to move it.")
+                self.log(f"Discriminator is already on {target_device}, no need to move it.")
+
+        return model
 
     def move_to_cpu(self, model=None):
         if model is None:
+            if next(self.model.parameters()).device != torch.device("cpu"):
+                self.model = self.model.to("cpu")
+            else:
+                self.log("Model is already on CPU, no need to move it.")
             model = self.model
-        model_device = next(model.parameters()).device
-        if model_device != torch.device("cpu"):
-            model.to("cpu")
         else:
-            self.log(f"Model is already on CPU device, no need to move it.")
+            if next(model.parameters()).device != torch.device("cpu"):
+                model = model.to("cpu")
+            else:
+                self.log("Provided model is already on CPU, no need to move it.")
 
         if self.discriminator is not None:
-            disc_device = next(self.discriminator.parameters()).device
-            if disc_device != torch.device("cpu"):
-                self.discriminator.to("cpu")
+            if next(self.discriminator.parameters()).device != torch.device("cpu"):
+                self.discriminator = self.discriminator.to("cpu")
             else:
-                self.log(f"Discriminator is already on CPU device, no need to move it.")
+                self.log("Discriminator is already on CPU, no need to move it.")
+
+        return model
 
     def efficient_gpu(self):
         """Context manager for efficient GPU memory usage during training."""
