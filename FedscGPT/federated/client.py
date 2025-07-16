@@ -35,7 +35,7 @@ class Client:
         dict
             The weights of the model
         """
-        return self.model.state_dict()
+        return {k: v.detach().clone() for k, v in self.model.state_dict().items()}
 
     def set_weights(self, state_dict):
         """ Set the weights of the model
