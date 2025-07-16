@@ -259,34 +259,6 @@ class BaseMixin:
 
         return model
 
-    def efficient_gpu(self):
-        """Context manager for efficient GPU memory usage during training."""
-
-        class EfficientGPUContext:
-            def __init__(inner_self, outer_self):
-                inner_self.outer = outer_self
-
-            def __enter__(inner_self):
-                self = inner_self.outer
-                # Move model to GPU
-                self.move_to_gpu()
-
-                # Move global_model to GPU if using FedProx
-                if self.use_fedprox and self.global_model:
-                    self.global_model = {k: v.to(self.device) for k, v in self.global_model.items()}
-
-            def __exit__(inner_self, exc_type, exc_value, traceback):
-                self = inner_self.outer
-                # Move model back to CPU
-                self.move_to_cpu()
-
-                # Delete global model to release memory
-                if hasattr(self, "global_model"):
-                    del self.global_model
-                    self.global_model = None
-
-        return EfficientGPUContext(self)
-
 
 class LossMeter:
     def __init__(self, MLM, CLS, CCE=False, MVC=False, ECS=False, DAB=False, ADV=False, explicit_zero_prob=False,

@@ -19,7 +19,7 @@ from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
 from scgpt.model import TransformerModel
 import shutil
 from FedscGPT.base import BaseMixin
-from FedscGPT.utils import SeqDataset, seed_worker, read_h5ad
+from FedscGPT.utils import SeqDataset, seed_worker, read_h5ad, EfficientGPUContext
 
 
 class ScGPT(BaseMixin):
@@ -435,7 +435,7 @@ class ScGPT(BaseMixin):
         return data_loader
 
     def train(self):
-        with self.efficient_gpu():
+        with EfficientGPUContext(self, debug=True):
             best_val_loss = float("inf")
             for epoch in range(1, self.config.train.epochs + 1):
                 epoch_start_time = time.time()

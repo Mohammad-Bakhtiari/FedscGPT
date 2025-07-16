@@ -7,8 +7,7 @@ import crypten
 from crypten.config import cfg
 from collections import OrderedDict
 import hashlib
-import os
-import pandas as pd
+import gc
 import fcntl
 
 SEED = 42
@@ -1332,3 +1331,54 @@ def dump_predictions(preds, path):
     """
     df = pd.DataFrame(preds, columns=["predictions"])
     df.to_csv(f"{path}/preds.csv", index=False)
+
+
+class EfficientGPUContext:
+    def __init__(self, outer_self, debug=False):
+        self.obj = outer_self
+        self.debug = debug
+
+    def __enter__(self):
+        self.obj.log("🚀 Entering EfficientGPUContext: moving model to GPU.")
+        self.obj.move_to_gpu()
+
+        if getattr(self.obj, "use_fedprox", False) and hasattr(self.obj, "global_model") and self.obj.global_model:
+            self.obj.log("📦 Moving global_model to GPU for FedProx.")
+            self.obj.global_model = {
+                k: v.to(self.obj.device) for k, v in self.obj.global_model.items()
+            }
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
+        self.obj.move_to_cpu()
+
+        if hasattr(self.obj, "global_model"):
+            self.obj.log("🗑️ Deleting global_model to release GPU memory.")
+            del self.obj.global_model
+            self.obj.global_model = None
+
+        self.log_gpu_objects()
+        self.obj.log("🧹 Clearing CUDA memory cache (safe for FlashAttention).")
+        torch.cuda.empty_cache()
+        if self.debug:
+            self.log_gpu_objects()
+
+    def log_gpu_objects(self):
+        gpu_tensors = []
+        for obj in gc.get_objects():
+            try:
+                if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                    device = obj.device if torch.is_tensor(obj) else obj.data.device
+                    if device.type == 'cuda':
+                        obj_type = type(obj).__name__
+                        shape = tuple(obj.shape) if hasattr(obj, 'shape') else "N/A"
+                        gpu_tensors.append((obj_type, device, shape))
+            except Exception:
+                pass  # skip broken refs
+
+        if gpu_tensors:
+            self.obj.log(f"📊 Found {len(gpu_tensors)} objects on GPU:")
+            for obj_type, device, shape in gpu_tensors:
+                self.obj.log(f"   🔍 {obj_type} on {device}, shape: {shape}")
+        else:
+            self.obj.log("✅ No residual objects on GPU detected.")
