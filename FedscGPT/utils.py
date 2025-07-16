@@ -1334,14 +1334,15 @@ def dump_predictions(preds, path):
 
 
 class EfficientGPUContext:
-    def __init__(self, outer_self, debug=False):
+    def __init__(self, outer_self, model=None, debug=False):
         self.obj = outer_self
         self.debug = debug
+        self.model = model
 
     def __enter__(self):
         if self.debug:
             self.obj.log("🚀 Entering EfficientGPUContext: moving model to GPU.")
-        self.obj.move_to_gpu()
+        self.obj.move_to_gpu(self.model)
 
         if getattr(self.obj, "use_fedprox", False) and hasattr(self.obj, "global_model") and self.obj.global_model:
             if self.debug:
@@ -1353,7 +1354,7 @@ class EfficientGPUContext:
     def __exit__(self, exc_type, exc_value, traceback):
         if self.debug:
             self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
-        self.obj.move_to_cpu()
+        self.obj.move_to_cpu(self.model)
 
         if hasattr(self.obj, "global_model"):
             if self.debug:

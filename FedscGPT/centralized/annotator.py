@@ -12,7 +12,7 @@ from scipy.sparse import issparse
 from sklearn.model_selection import train_test_split
 from FedscGPT.utils import SeqDataset, dump_results, plot, ResultsRecorder
 from FedscGPT.centralized.models import ScGPT
-from FedscGPT.utils import read_h5ad, seed_worker
+from FedscGPT.utils import read_h5ad, seed_worker, EfficientGPUContext
 import copy
 from functools import partial
 
@@ -192,9 +192,8 @@ class Inference(Base):
     def test(self, round_num, n_epochs, mu=None) -> (np.ndarray, np.ndarray, Dict[str, float]):
         if self.test_loader is None or self.celltypes_labels is None:
             self.load_test_loader()
-        self.move_to_gpu(self.best_model)
-        predictions = self.evaluate(self.best_model, loader=self.test_loader, return_raw=True)
-        self.move_to_cpu(self.best_model)
+        with EfficientGPUContext(self, model=self.best_model, debug=True):
+            predictions = self.evaluate(self.best_model, loader=self.test_loader, return_raw=True)
         accuracy = accuracy_score(self.celltypes_labels, predictions)
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
