@@ -1339,28 +1339,31 @@ class EfficientGPUContext:
         self.debug = debug
 
     def __enter__(self):
-        self.obj.log("🚀 Entering EfficientGPUContext: moving model to GPU.")
+        if self.debug:
+            self.obj.log("🚀 Entering EfficientGPUContext: moving model to GPU.")
         self.obj.move_to_gpu()
 
         if getattr(self.obj, "use_fedprox", False) and hasattr(self.obj, "global_model") and self.obj.global_model:
-            self.obj.log("📦 Moving global_model to GPU for FedProx.")
+            if self.debug:
+                self.obj.log("📦 Moving global_model to GPU for FedProx.")
             self.obj.global_model = {
                 k: v.to(self.obj.device) for k, v in self.obj.global_model.items()
             }
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
+        if self.debug:
+            self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
         self.obj.move_to_cpu()
 
         if hasattr(self.obj, "global_model"):
-            self.obj.log("🗑️ Deleting global_model to release GPU memory.")
+            if self.debug:
+                self.obj.log("🗑️ Deleting global_model to release GPU memory.")
             del self.obj.global_model
             self.obj.global_model = None
 
-        self.log_gpu_objects()
-        self.obj.log("🧹 Clearing CUDA memory cache (safe for FlashAttention).")
         torch.cuda.empty_cache()
         if self.debug:
+            self.obj.log("🧹 Clearing CUDA memory cache (safe for FlashAttention).")
             self.log_gpu_objects()
 
     def log_gpu_objects(self):
