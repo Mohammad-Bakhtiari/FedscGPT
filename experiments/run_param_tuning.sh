@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ./configs.sh
+
 datasetnames="${1-all}"
 agg_method="${2-fedavg}"
 weighted="${3-true}"
@@ -13,15 +15,6 @@ if [[ "$agg_method" != "fedavg" && "$agg_method" != "fedprox" ]]; then
     echo "Invalid aggregation method. Use 'fedavg' or 'fedprox'."
     exit 1
 fi
-
-declare -A datasets
-datasets["MS"]="ms|reference_annot.h5ad|query_annot.h5ad|Factor Value[inferred cell type - authors labels]|split_label"
-datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch"
-datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest"
-datasets["COVID"]="covid|reference_annot.h5ad|query_annot.h5ad|celltype|batch_group"
-datasets["COVID-cent_corrected"]="covid-corrected|reference.h5ad|query.h5ad|celltype|batch_group"
-datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample"
-datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch"
 
 IFS=',' read -ra keys <<< "$datasetnames"
 if [[ "${datasetnames}" != "all" ]]; then
