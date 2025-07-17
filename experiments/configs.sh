@@ -11,6 +11,14 @@ datasets["COVID-corrected"]="covid-corrected|reference_corrected.h5ad|query_corr
 datasets["COVID-fed-corrected"]="covid-fed-corrected|reference_fed_corrected.h5ad|query_fed_corrected.h5ad|celltype|batch_group|gene_name"
 
 
+# Scalability experiments
+datasets["MYELOID-top5"]="myeloid-top5|reference.h5ad|query.h5ad|cell_type|combined_batch|index"
+datasets["MYELOID-top10"]="myeloid-top10|reference.h5ad|query.h5ad|cell_type|combined_batch|index"
+datasets["MYELOID-top20"]="myeloid-top20|reference.h5ad|query.h5ad|cell_type|combined_batch|index"
+datasets["MYELOID-top30"]="myeloid-top30|reference.h5ad|query.h5ad|cell_type|combined_batch|index"
+
+
+
 # ----------------------
 # Dataset selection logic
 # Usage:
