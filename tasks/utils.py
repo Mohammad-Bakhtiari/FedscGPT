@@ -79,7 +79,6 @@ def centralized_inference(annotator=None,
     if annotator is None:
         annotator = Inference(log_id="inference", logger=logger, load_model=load_model, model_name=model_name, **kwargs)
         instantiate = True
-    list_gpu_objects()
     if not load_model:
         if weights is None:
             raise Warning("Inferencing cell types using random network!")
