@@ -239,35 +239,46 @@ class BaseMixin:
         return model
 
     def move_to_cpu(self, model=None):
+        if model is None:
+            model = self.model
         temp= {}
-        for name, attr in vars(self.model).items():
+        for name, attr in vars(model).items():
             if isinstance(attr, torch.Tensor) and attr.device.type == 'cuda':
                 temp[name] = attr.detach().cpu()
         for name in temp.keys():
-            delattr(self.model, name)
+            delattr(model, name)
         for name, attr in temp.items():
-            setattr(self.model, name, attr)
+            setattr(model, name, attr)
 
         del temp
-        if model is None:
-            if next(self.model.parameters()).device != torch.device("cpu"):
-                self.model = self.model.to("cpu")
-                for buffer_name, buffer in self.model.named_buffers():
-                    if buffer.device.type == 'cuda':
-                        print(f"📦 Moving buffer {buffer_name} to CPU")
-                        buffer.data = buffer.data.cpu()
-            else:
-                self.log("Model is already on CPU, no need to move it.")
-            model = self.model
+        if next(model.parameters()).device != torch.device("cpu"):
+            model = model.to("cpu")
+            for buffer_name, buffer in model.named_buffers():
+                if buffer.device.type == 'cuda':
+                    print(f"📦 Moving buffer {buffer_name} to CPU")
+                    buffer.data = buffer.data.cpu()
         else:
-            if next(model.parameters()).device != torch.device("cpu"):
-                model = model.to("cpu")
-                for buffer_name, buffer in model.named_buffers():
-                    if buffer.device.type == 'cuda':
-                        print(f"📦 Moving buffer {buffer_name} to CPU")
-                        buffer.data = buffer.data.cpu()
-            else:
-                self.log("Provided model is already on CPU, no need to move it.")
+            self.log("Provided model is already on CPU, no need to move it.")
+
+        # if model is None:
+        #     if next(self.model.parameters()).device != torch.device("cpu"):
+        #         self.model = self.model.to("cpu")
+        #         for buffer_name, buffer in self.model.named_buffers():
+        #             if buffer.device.type == 'cuda':
+        #                 print(f"📦 Moving buffer {buffer_name} to CPU")
+        #                 buffer.data = buffer.data.cpu()
+        #     else:
+        #         self.log("Model is already on CPU, no need to move it.")
+        #     model = self.model
+        # else:
+        #     if next(model.parameters()).device != torch.device("cpu"):
+        #         model = model.to("cpu")
+        #         for buffer_name, buffer in model.named_buffers():
+        #             if buffer.device.type == 'cuda':
+        #                 print(f"📦 Moving buffer {buffer_name} to CPU")
+        #                 buffer.data = buffer.data.cpu()
+        #     else:
+        #         self.log("Provided model is already on CPU, no need to move it.")
 
         if self.discriminator is not None:
             if next(self.discriminator.parameters()).device != torch.device("cpu"):
