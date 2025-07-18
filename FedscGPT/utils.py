@@ -1354,6 +1354,11 @@ class EfficientGPUContext:
         if self.debug:
             self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
         self.obj.move_to_cpu(self.model)
+        if hasattr(self.model, "cur_gene_token_embs"):
+            if self.debug:
+                self.obj.log("🧹 Clearing model.cur_gene_token_embs from GPU")
+            self.model.cur_gene_token_embs = self.model.cur_gene_token_embs.cpu()
+            del self.model.cur_gene_token_embs
 
         if hasattr(self.obj, "global_model"):
             if self.debug:
