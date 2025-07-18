@@ -300,29 +300,6 @@ class ScGPT(BaseMixin):
         """
         Evaluate the model on the evaluation data.
         """
-
-        def check_local_tensor_sizes(local_vars, target_shape=(31, 1031, 512), target_size_mb=62.4, tolerance=0.1):
-            for name, val in local_vars.items():
-                try:
-                    if torch.is_tensor(val) and val.device.type == "cuda":
-                        shape = tuple(val.shape)
-                        size_mb = val.nelement() * val.element_size() / (1024 ** 2)
-                        print(f"🔍 {name}: shape={shape}, size={size_mb:.2f} MB, device={val.device}")
-                        if shape == target_shape or abs(size_mb - target_size_mb) <= tolerance:
-                            print(f"✅ {name} matches target tensor!")
-                    elif isinstance(val, dict):
-                        for k, v in val.items():
-                            if torch.is_tensor(v) and v.device.type == "cuda":
-                                shape = tuple(v.shape)
-                                size_mb = v.nelement() * v.element_size() / (1024 ** 2)
-                                print(f"🔍 {name}[{k}]: shape={shape}, size={size_mb:.2f} MB, device={v.device}")
-                                if shape == target_shape or abs(size_mb - target_size_mb) <= tolerance:
-                                    print(f"✅ {name}[{k}] matches target tensor!")
-                except Exception:
-                    continue
-
-        # Call it here with local variables
-
         model.eval()
         total_loss, total_dab, total_num, total_error = 0.0, 0.0, 0, 0.0
         predictions = []
@@ -353,8 +330,6 @@ class ScGPT(BaseMixin):
                 total_num += len(input_gene_ids)
                 preds = output_dict["cls_output"].argmax(1).cpu().numpy()
                 predictions.append(preds)
-        check_local_tensor_sizes(locals())
-        del batch_data, batch_labels, celltype_labels, input_gene_ids, input_values, target_values, accuracy
         if return_raw:
             return np.concatenate(predictions, axis=0)
         return total_loss / total_num, total_error / total_num

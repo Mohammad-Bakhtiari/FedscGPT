@@ -194,16 +194,6 @@ class Inference(Base):
             self.load_test_loader()
         with EfficientGPUContext(self, model=self.best_model):
             predictions = self.evaluate(self.best_model, loader=self.test_loader, return_raw=True)
-        for name, param in self.best_model.__dict__.items():
-            if isinstance(param, torch.Tensor) and param.device.type == 'cuda':
-                print(f"❗ self.best_model.{name} is a tensor on {param.device}, shape: {param.shape}")
-            elif isinstance(param, dict):
-                for k, v in param.items():
-                    if isinstance(v, torch.Tensor) and v.device.type == 'cuda':
-                        print(f"❗ self.best_model.{name}[{k}] is tensor on {v.device}, shape: {v.shape}")
-
-        from FedscGPT.utils import list_gpu_objects
-        list_gpu_objects()
         accuracy = accuracy_score(self.celltypes_labels, predictions)
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
