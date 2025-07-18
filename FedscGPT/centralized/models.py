@@ -217,7 +217,6 @@ class ScGPT(BaseMixin):
             self.fedprox()
 
         self.model.zero_grad()
-        return
         self.scaler.scale(self.loss_meter.batch_loss).backward()
         self.scaler.unscale_(self.optimizers["main"])
         with warnings.catch_warnings(record=True) as w:
