@@ -188,6 +188,7 @@ class ScGPT(BaseMixin):
             self.log(f"Setting log_interval to {num_batches}")
         for batch, batch_data in enumerate(loader, 1):
             self.train_on_batch(batch_data)
+            break
             if batch % self.config.log.log_interval == 0 and batch > 0:
                 lr = self.lr_schedulers['main'].get_last_lr()[0]
                 log_txt = self.loss_meter.log(self.config.log.log_interval)
@@ -446,7 +447,7 @@ class ScGPT(BaseMixin):
                                                          intra_domain_shuffle=True,
                                                          drop_last=False)
 
-
+                break
                 self.train_for_epoch(train_loader, epoch)
                 if self.config.log.retain_best_model:
                     num_eval_data = len(valid_data_pt["gene_ids"])
@@ -470,31 +471,10 @@ class ScGPT(BaseMixin):
                     if val_loss < best_val_loss:
                         self.update_best_model(val_loss, epoch)
                 self.lr_schedulers_step()
+        from FedscGPT.utils import list_gpu_objects
+        list_gpu_objects()
+        exit()
 
-        def find_model_gpu_attrs(model):
-            print("📦 Scanning model attributes for stray GPU tensors (excluding parameters and buffers)...")
-
-            param_ids = {id(p) for p in model.parameters()}
-            buffer_ids = {id(b) for b in model.buffers()}
-
-            found = False
-            for attr_name in dir(model):
-                if attr_name.startswith("_"):
-                    continue
-                try:
-                    attr = getattr(model, attr_name)
-                except Exception as e:
-                    continue  # Skip problematic attributes
-
-                if isinstance(attr, torch.Tensor) and attr.device.type == "cuda":
-                    if id(attr) not in param_ids and id(attr) not in buffer_ids:
-                        print(
-                            f"🔍 model.{attr_name}: shape={tuple(attr.shape)}, dtype={attr.dtype}, device={attr.device}, size={attr.element_size() * attr.numel() / 1e6:.2f} MB")
-                        found = True
-            if not found:
-                print("✅ No stray GPU tensors found in model attributes.")
-
-        find_model_gpu_attrs(self.model)
     def update_best_model(self, val_loss, epoch):
         self.best_model = copy.deepcopy(self.model.to('cpu'))
         self.model.to(self.device)
