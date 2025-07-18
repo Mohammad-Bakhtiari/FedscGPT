@@ -478,7 +478,7 @@ class ScGPT(BaseMixin):
                     val = getattr(obj, name)
                 except:
                     continue
-                if isinstance(val, torch.Tensor) and val.device.type == 'cuda':
+                if isinstance(val, torch.Tensor) and val.device.type != 'cpu':
                     print(f"📦 Found tensor: {name}, shape={val.shape}, dtype={val.dtype}")
 
         deep_scan(self)
