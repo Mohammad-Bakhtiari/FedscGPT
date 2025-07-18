@@ -1361,8 +1361,8 @@ class EfficientGPUContext:
             del self.obj.global_model
             self.obj.global_model = None
 
-        torch.cuda.empty_cache()
         gc.collect()
+        torch.cuda.empty_cache()
         if self.debug:
             self.obj.log("🧹 Clearing CUDA memory cache (safe for FlashAttention).")
             self.log_gpu_objects()
