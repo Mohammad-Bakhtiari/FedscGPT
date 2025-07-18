@@ -79,6 +79,7 @@ def centralized_inference(annotator=None,
     if annotator is None:
         annotator = Inference(log_id="inference", logger=logger, load_model=load_model, model_name=model_name, **kwargs)
         instantiate = True
+    list_gpu_objects()
     if not load_model:
         if weights is None:
             raise Warning("Inferencing cell types using random network!")
@@ -107,7 +108,6 @@ def federated_finetune(**kwargs):
     annotator.post_prep_setup()
     annotator.init_global_weights()
     cent_inf = partial(centralized_inference, agg_method="federated", logger=annotator.logger, load_model=False, **kwargs)
-    list_gpu_objects()
     inference_model = cent_inf(weights=annotator.global_weights, save_results=False, round_number=0)
     n_local_samples = [client.n_samples for client in annotator.clients]
     list_gpu_objects()
