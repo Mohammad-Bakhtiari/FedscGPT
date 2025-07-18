@@ -1353,7 +1353,7 @@ class EfficientGPUContext:
     def __exit__(self, exc_type, exc_value, traceback):
         if self.debug:
             self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
-        if self.model is not None:
+        if self.model is None:
             self.obj.reset()
         self.obj.move_to_cpu(self.model)
         if hasattr(self.obj, 'best_model') and self.obj.best_model is not None:

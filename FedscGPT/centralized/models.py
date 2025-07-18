@@ -471,7 +471,6 @@ class ScGPT(BaseMixin):
                         self.update_best_model(val_loss, epoch)
                 self.lr_schedulers_step()
 
-        self.reset()
         from FedscGPT.utils import list_gpu_objects
         list_gpu_objects()
         exit()
