@@ -448,7 +448,7 @@ class ScGPT(BaseMixin):
 
 
                 self.train_for_epoch(train_loader, epoch)
-                del self.scaler, self.losses, self.optimizers
+                del self.scaler, self.losses, self.optimizers, self.lr_schedulers
                 break
                 if self.config.log.retain_best_model:
                     num_eval_data = len(valid_data_pt["gene_ids"])
