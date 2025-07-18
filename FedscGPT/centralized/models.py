@@ -471,6 +471,20 @@ class ScGPT(BaseMixin):
                     if val_loss < best_val_loss:
                         self.update_best_model(val_loss, epoch)
                 self.lr_schedulers_step()
+
+        def deep_scan(obj):
+            for name in dir(obj):
+                try:
+                    val = getattr(obj, name)
+                except:
+                    continue
+                if isinstance(val, torch.Tensor) and val.device.type == 'cuda':
+                    print(f"📦 Found tensor: {name}, shape={val.shape}, dtype={val.dtype}")
+
+        deep_scan(self.model)
+        for name, attr in vars(self.model).items():
+            if isinstance(attr, torch.Tensor) and attr.shape == (60697, 512):
+                print(f"🎯 Suspect tensor found: {name}")
         from FedscGPT.utils import list_gpu_objects
         list_gpu_objects()
         exit()
