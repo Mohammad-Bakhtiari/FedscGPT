@@ -6,23 +6,26 @@ import argparse
 from analysis.utils import (CentralizedMetricPlotter, collect_cent_metrics, plot_tuning_heatmap, find_best_fed,
                             plot_communication_efficiency, plot_metric_cahnges_over_ER, plot_umap_and_conf_matrix,
                             plot_best_metrics, embedding_boxplot, fed_embedding_umap, accuracy_annotated_scatterplot,
-                            plot_batch_effect_umaps)
+                            plot_batch_effect_umaps, investigate_general, investigate_detailed, summarize_best_hyperparams_by_metric,
+                            communication_efficiency_table, plot_stacked_fedavg_heatmaps)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--plot", type=str, choices=["annotation_cent_box_plt",
-                                                     "annotation_metric_heatmap",
-                                                     'annotation_communication',
-                                                     'annotation_accuracy_changes',
-                                                     'annotation_conf_matrix',
-                                                     'annotation_best_metrics',
-                                                     'annotation_cent_box_plt',
-                                                     'reference_map_boxplot',
-                                                     'reference_map_boxplot_covid',
-                                                     'fed_embedding_umap',
-                                                     "umap_covid_batch_effect",
-                                                     "umap_ms_batch_effect",
-                                                     ], default='annotation_cent_box_plt')
+    parser.add_argument("--plot", type=str, choices=[
+        "investigate",
+        "annotation_cent_box_plt",
+        "annotation_metric_heatmap",
+        'annotation_communication',
+        'annotation_accuracy_changes',
+        'annotation_conf_matrix',
+        'annotation_best_metrics',
+        'annotation_cent_box_plt',
+        'reference_map_boxplot',
+        'reference_map_boxplot_covid',
+        'fed_embedding_umap',
+        "umap_covid_batch_effect",
+        "umap_ms_batch_effect",
+        ], default='annotation_cent_box_plt')
     parser.add_argument("--mode", choices=['centralized', 'federated'], default='centralized')
     parser.add_argument("--root_dir", type=str, default='/home/bba1658/FedscGPT/output/annotation')
     parser.add_argument("--metric", choices=['accuracy', 'precision', 'recall', 'macro_f1'], default="accuracy")
@@ -34,7 +37,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     param_tuning_smpc_df = args.param_tuning_df.replace('.csv', '-smpc.csv')
     param_tuning_smpc_pkl = args.param_tuning_pkl.replace('.pkl', '-smpc.pkl')
-    if args.plot == 'annotation_cent_box_plt': # Probably not used
+    if args.plot == 'investigate':
+        df = pd.read_csv("/home/mohammad/PycharmProjects/FedscGPT/output/final.csv")
+        # investigate_general(df)
+        # investigate_detailed(df)
+        # summarize_best_hyperparams_by_metric(df)
+        # communication_efficiency_table(df)
+        plot_stacked_fedavg_heatmaps(df)
+    elif args.plot == 'annotation_cent_box_plt': # Probably not used
         metrics = {}
         print("[FedscGPT]: Best results found ")
         fedscgpt = find_best_fed(args.param_tuning_df, args.metric)

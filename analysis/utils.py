@@ -256,6 +256,93 @@ def plot_tuning_heatmap(file_path, plot_name, file_format='png'):
     cbar.ax.tick_params(labelsize=14)
     plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{plot_name}.{file_format}", dpi=300)
 
+def plot_stacked_fedavg_heatmaps(df, save_path="fedavg_stacked_heatmap", file_format='png'):
+    """
+    Plot heatmaps where each row is a metric (e.g., Accuracy, F1)
+    and each column is a federated scenario (e.g., FedAvg on HP, etc.).
+    """
+    configs = [
+        ("hp", "weighted-FedAvg", "HP (FedAvg)"),
+        ("hp", "SMPC-weighted-FedAvg", "HP (SMPC-FedAvg)"),
+        ("ms", "SMPC-weighted-FedAvg", "MS (SMPC-FedAvg)")
+    ]
+
+    # Clean and restrict data
+    df = df.dropna(subset=['Round', 'n_epochs'])
+    df.Round = df.Round.astype(int)
+    df.n_epochs = df.n_epochs.astype(int)
+    df = df[df['Round'].between(1, 15) & df['n_epochs'].between(1, 5)]
+
+    metrics = df['Metric'].unique()
+    num_rows = len(metrics)
+    num_cols = len(configs)
+
+    fig, axs = plt.subplots(num_rows, num_cols, figsize=(num_cols * 3, num_rows * 1.), squeeze=False)
+    fig.subplots_adjust(left=0.08, right=0.86, top=0.92, bottom=0.1, wspace=0.02, hspace=0.05)
+
+    # Blue-white color map
+    norm = colors.Normalize(vmin=0, vmax=1)
+    cmap = cm.get_cmap('Blues')
+    mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+
+    for row_idx, metric in enumerate(metrics):
+        for col_idx, (dataset, agg, label) in enumerate(configs):
+            ax = axs[row_idx][col_idx]
+            subset = df[(df['Dataset'] == dataset) &
+                        (df['Aggregation'] == agg) &
+                        (df['Metric'] == metric)]
+
+            if subset.empty:
+                ax.set_title("No data", fontsize=10)
+                ax.axis('off')
+                continue
+
+            pivot = subset.pivot(index='n_epochs', columns='Round', values='Value')
+            sns.heatmap(
+                pivot, ax=ax, cmap=cmap, cbar=False, center=0.5,
+                vmin=0, vmax=1, square=True, linewidths=0.1, linecolor='gray', annot=False
+            )
+
+            # Annotate best
+            max_row = subset.loc[subset['Value'].idxmax()]
+            ax.text(
+                max_row['Round'], max_row['n_epochs'] - 0.5,
+                f"{max_row['Value']:.2f}".lstrip("0"),
+                color='black', ha='left', va='center', fontsize=8
+            )
+
+            # Titles and axis labels
+            if row_idx == 0:
+                ax.set_title(label, fontsize=12)
+            if col_idx == 0:
+                # ax.set_ylabel(metric, fontsize=12)
+                ax.text(-0.22, 0.15, metric, transform=ax.transAxes, fontsize=10, va='bottom', ha='left',
+                        rotation=90)
+                ax.set_ylabel("Epochs", fontsize=8)
+            else:
+                ax.set_ylabel('')
+                ax.set_yticklabels([], visible=False)
+
+            if row_idx < num_rows - 1:
+                ax.set_xticklabels([], visible=False)
+            else:
+                ax.set_xlabel("Round", fontsize=10)
+
+            # Custom ticks
+            ax.set_xticks(range(len(pivot.columns)))
+            ax.set_xticklabels(pivot.columns.tolist(), fontsize=8, rotation=0)
+            ax.set_yticks(range(len(pivot.index)))
+            ax.set_yticklabels(pivot.index.tolist(), fontsize=8, rotation=0)
+
+    # Add common colorbar (small & thin)
+    cbar_ax = fig.add_axes([0.87, 0.3, 0.01, 0.4])
+    cbar = plt.colorbar(mappable, cax=cbar_ax)
+    cbar.ax.tick_params(labelsize=9)
+
+    plt.savefig(f"{save_path}.{file_format}", dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 
 def plot_communication_efficiency(fedscgpt_param_tuning, fedscgpt_smpc_param_tuning):
     fedscgpt_table = analyze_communication_efficiency(fedscgpt_param_tuning, 'clients_cent.csv')
@@ -1653,3 +1740,363 @@ def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, 
     plt.tight_layout()
     fig_bt.savefig(f"{out_prefix}_legend_batch.png", dpi=300)
     plt.close(fig_bt)
+
+def investigate_general(df):
+    # Filter utility functions
+    def get_fedavg(df, smpc):
+        method = "SMPC-weighted-FedAvg" if smpc else "weighted-FedAvg"
+        return df[df['Aggregation'] == method]
+
+    def get_fedprox(df, smpc):
+        method = "SMPC-weighted-FedProx" if smpc else "weighted-FedProx"
+        return df[df['Aggregation'] == method]
+
+    # Initialize Excel writer
+    output_path = "federated_vs_central_analysis.xlsx"
+    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+
+    # -----------------------------------------------
+    # Question 1: Federated without SMPC vs Federated with SMPC
+    results_q1 = []
+    datasets = df['Dataset'].unique()
+    metrics = df['Metric'].unique()
+
+    for dataset in datasets:
+        for metric in metrics:
+            smpc_df = get_fedavg(df, smpc=True)
+            nosmpc_df = get_fedavg(df, smpc=False)
+
+            smpc_score = smpc_df[(smpc_df['Dataset'] == dataset) & (smpc_df['Metric'] == metric)].sort_values("Value", ascending=False)
+            nosmpc_score = nosmpc_df[(nosmpc_df['Dataset'] == dataset) & (nosmpc_df['Metric'] == metric)].sort_values("Value", ascending=False)
+
+            if not smpc_score.empty and not nosmpc_score.empty:
+                best_smpc = smpc_score.iloc[0]['Value']
+                best_nosmpc = nosmpc_score.iloc[0]['Value']
+                if best_nosmpc > best_smpc:
+                    results_q1.append([dataset, metric, best_nosmpc, best_smpc])
+
+    df_q1 = pd.DataFrame(results_q1, columns=['Dataset', 'Metric', 'No SMPC FedAvg', 'SMPC FedAvg'])
+    print("Q1: Datasets where Federated without SMPC outperforms with SMPC:")
+    print(df_q1.round(2))
+    df_q1.round(2).to_excel(writer, sheet_name='Q1_NoSMPC_vs_SMPC', index=False)
+
+    # -----------------------------------------------
+    # Question 2: FedProx (SMPC) vs FedAvg (SMPC)
+    results_q2 = []
+
+    for dataset in datasets:
+        for metric in metrics:
+            fedprox = get_fedprox(df, smpc=True)
+            fedavg = get_fedavg(df, smpc=True)
+
+            fprox = fedprox[(fedprox['Dataset'] == dataset) & (fedprox['Metric'] == metric)].sort_values("Value", ascending=False)
+            favg = fedavg[(fedavg['Dataset'] == dataset) & (fedavg['Metric'] == metric)].sort_values("Value", ascending=False)
+
+            if not fprox.empty and not favg.empty:
+                if fprox.iloc[0]['Value'] > favg.iloc[0]['Value']:
+                    results_q2.append([dataset, metric, fprox.iloc[0]['Value'], favg.iloc[0]['Value']])
+
+    df_q2 = pd.DataFrame(results_q2, columns=['Dataset', 'Metric', 'FedProx SMPC', 'FedAvg SMPC'])
+    print("\nQ2: Datasets where FedProx (SMPC) > FedAvg (SMPC):")
+    print(df_q2.round(2))
+    df_q2.round(2).to_excel(writer, sheet_name='Q2_Prox_vs_Avg_SMP', index=False)
+
+    # -----------------------------------------------
+    # Question 3: FedProx (No SMPC) vs FedAvg (No SMPC)
+    results_q3 = []
+
+    for dataset in datasets:
+        for metric in metrics:
+            fedprox = get_fedprox(df, smpc=False)
+            fedavg = get_fedavg(df, smpc=False)
+
+            fprox = fedprox[(fedprox['Dataset'] == dataset) & (fedprox['Metric'] == metric)].sort_values("Value", ascending=False)
+            favg = fedavg[(fedavg['Dataset'] == dataset) & (fedavg['Metric'] == metric)].sort_values("Value", ascending=False)
+
+            if not fprox.empty and not favg.empty:
+                if fprox.iloc[0]['Value'] > favg.iloc[0]['Value']:
+                    results_q3.append([dataset, metric, fprox.iloc[0]['Value'], favg.iloc[0]['Value']])
+
+    df_q3 = pd.DataFrame(results_q3, columns=['Dataset', 'Metric', 'FedProx', 'FedAvg'])
+    print("\nQ3: Datasets where FedProx > FedAvg (no SMPC):")
+    print(df_q3.round(2))
+    df_q3.round(2).to_excel(writer, sheet_name='Q3_Prox_vs_Avg_NoSMP', index=False)
+
+    # -----------------------------------------------
+    # Question 4: Max federated shortcoming vs centralized
+    results_q4 = []
+    centralized = df[df['Aggregation'] == 'centralized']
+
+    for dataset in datasets:
+        for metric in metrics:
+            central = centralized[(centralized['Dataset'] == dataset) & (centralized['Metric'] == metric)]
+            fed = df[(df['Round'].notna()) & (df['Dataset'] == dataset) & (df['Metric'] == metric)]
+            if not central.empty and not fed.empty:
+                max_diff = central.iloc[0]['Value'] - fed['Value'].max()
+                results_q4.append([dataset, metric, central.iloc[0]['Value'], fed['Value'].max(), max_diff])
+
+    df_q4 = pd.DataFrame(results_q4, columns=['Dataset', 'Metric', 'Centralized', 'Best Federated', 'Shortcoming'])
+    print("\nQ4: Max shortcoming of best federated vs centralized:")
+    print(df_q4.sort_values('Shortcoming', ascending=False).round(2))
+    df_q4.round(2).to_excel(writer, sheet_name='Q4_Fed_vs_Central', index=False)
+
+    # -----------------------------------------------
+    # Question 5: Max shortcoming of *any* federated method vs centralized
+    results_q5 = []
+
+    for dataset in datasets:
+        for metric in metrics:
+            central = centralized[(centralized['Dataset'] == dataset) & (centralized['Metric'] == metric)]
+            any_fed = df[(df['Aggregation'].str.contains('Fed')) & (df['Dataset'] == dataset) & (df['Metric'] == metric)]
+            if not central.empty and not any_fed.empty:
+                max_diff = central.iloc[0]['Value'] - any_fed['Value'].max()
+                results_q5.append([dataset, metric, central.iloc[0]['Value'], any_fed['Value'].max(), max_diff])
+
+    df_q5 = pd.DataFrame(results_q5, columns=['Dataset', 'Metric', 'Centralized', 'Best FedAny', 'Shortcoming'])
+    print("\nQ5: Max shortcoming of any federated method vs centralized:")
+    print(df_q5.sort_values('Shortcoming', ascending=False).round(2))
+    df_q5.round(2).to_excel(writer, sheet_name='Q5_FedAny_vs_Central', index=False)
+
+    # -----------------------------------------------
+    # Question 6: Any client reaches centralized performance
+    results_q6 = []
+    client_df = df[df['Aggregation'].str.startswith("client_")]
+
+    for dataset in datasets:
+        for metric in metrics:
+            central = centralized[(centralized['Dataset'] == dataset) & (centralized['Metric'] == metric)]
+            clients = client_df[(client_df['Dataset'] == dataset) & (client_df['Metric'] == metric)]
+
+            if not central.empty and not clients.empty:
+                best_client = clients.sort_values('Value', ascending=False).iloc[0]
+                if best_client['Value'] >= central.iloc[0]['Value']:
+                    results_q6.append([
+                        dataset, metric, best_client['Aggregation'],
+                        best_client['Value'], central.iloc[0]['Value']
+                    ])
+
+    df_q6 = pd.DataFrame(results_q6, columns=['Dataset', 'Metric', 'Client', 'Client Value', 'Centralized Value'])
+    print("\nQ6: Clients that reach or outperform centralized:")
+    print(df_q6.round(2))
+    df_q6.round(2).to_excel(writer, sheet_name='Q6_Client_vs_Central', index=False)
+
+    # Save all results
+    writer.close()
+    print(f"\n✅ Results saved to {output_path}")
+
+
+
+
+def investigate_detailed(df):
+    def get_fedavg(df, smpc):
+        method = "SMPC-weighted-FedAvg" if smpc else "weighted-FedAvg"
+        return df[df['Aggregation'] == method]
+
+    def get_fedprox(df, smpc):
+        method = "SMPC-weighted-FedProx" if smpc else "weighted-FedProx"
+        return df[df['Aggregation'] == method]
+
+    def safe_sheet_name(name):
+        return name[:31]  # Excel limit
+
+    output_path = "federated_vs_central_analysis_detailed.xlsx"
+    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+
+    datasets = df['Dataset'].unique()
+    metrics = df['Metric'].unique()
+    centralized = df[df['Aggregation'] == 'centralized']
+    client_df = df[df['Aggregation'].str.startswith("client_")]
+
+    for metric in metrics:
+        # 1. FedAvg No SMPC > FedAvg SMPC
+        results = []
+        for dataset in datasets:
+            smpc_df = get_fedavg(df, True)
+            nosmpc_df = get_fedavg(df, False)
+            smpc_score = smpc_df[(smpc_df['Dataset'] == dataset) & (smpc_df['Metric'] == metric)]
+            nosmpc_score = nosmpc_df[(nosmpc_df['Dataset'] == dataset) & (nosmpc_df['Metric'] == metric)]
+            if not smpc_score.empty and not nosmpc_score.empty:
+                best_smpc = smpc_score['Value'].max()
+                best_nosmpc = nosmpc_score['Value'].max()
+                if best_nosmpc > best_smpc:
+                    results.append([dataset, round(best_nosmpc, 2), round(best_smpc, 2)])
+        df1 = pd.DataFrame(results, columns=['Dataset', 'No SMPC FedAvg', 'SMPC FedAvg'])
+        print(f"\n🟢 Metric: {metric} | FedAvg (No SMPC) > FedAvg (SMPC):")
+        print(df1)
+        df1.to_excel(writer, sheet_name=safe_sheet_name(f'FedAvg_NoSmpc_gt_Smpc_{metric}'), index=False)
+
+        # 2. FedProx SMPC > FedAvg SMPC
+        results = []
+        for dataset in datasets:
+            prox = get_fedprox(df, True)
+            avg = get_fedavg(df, True)
+            fprox = prox[(prox['Dataset'] == dataset) & (prox['Metric'] == metric)]
+            favg = avg[(avg['Dataset'] == dataset) & (avg['Metric'] == metric)]
+            if not fprox.empty and not favg.empty:
+                max_prox = fprox['Value'].max()
+                max_avg = favg['Value'].max()
+                if max_prox > max_avg:
+                    results.append([dataset, round(max_prox, 2), round(max_avg, 2)])
+        df2 = pd.DataFrame(results, columns=['Dataset', 'FedProx SMPC', 'FedAvg SMPC'])
+        print(f"\n🟢 Metric: {metric} | FedProx (SMPC) > FedAvg (SMPC):")
+        print(df2)
+        df2.to_excel(writer, sheet_name=safe_sheet_name(f'FedProx_gt_FedAvg_SMPC_{metric}'), index=False)
+
+        # 3. FedProx No SMPC > FedAvg No SMPC
+        results = []
+        for dataset in datasets:
+            prox = get_fedprox(df, False)
+            avg = get_fedavg(df, False)
+            fprox = prox[(prox['Dataset'] == dataset) & (prox['Metric'] == metric)]
+            favg = avg[(avg['Dataset'] == dataset) & (avg['Metric'] == metric)]
+            if not fprox.empty and not favg.empty:
+                max_prox = fprox['Value'].max()
+                max_avg = favg['Value'].max()
+                if max_prox > max_avg:
+                    results.append([dataset, round(max_prox, 2), round(max_avg, 2)])
+        df3 = pd.DataFrame(results, columns=['Dataset', 'FedProx', 'FedAvg'])
+        print(f"\n🟢 Metric: {metric} | FedProx (No SMPC) > FedAvg (No SMPC):")
+        print(df3)
+        df3.to_excel(writer, sheet_name=safe_sheet_name(f'FedProx_gt_FedAvg_NoSMPC_{metric}'), index=False)
+
+        # 4. Federated best vs Centralized
+        results = []
+        for dataset in datasets:
+            central = centralized[(centralized['Dataset'] == dataset) & (centralized['Metric'] == metric)]
+            fed = df[(df['Round'].notna()) & (df['Dataset'] == dataset) & (df['Metric'] == metric)]
+            if not central.empty and not fed.empty:
+                best_central = central.iloc[0]['Value']
+                best_fed = fed['Value'].max()
+                shortcoming = round(best_central - best_fed, 2)
+                results.append([dataset, round(best_central, 2), round(best_fed, 2), shortcoming])
+        df4 = pd.DataFrame(results, columns=['Dataset', 'Centralized', 'Best Federated', 'Shortcoming'])
+        print(f"\n📉 Metric: {metric} | Shortcomings of Best Federated vs Centralized:")
+        print(df4.sort_values('Shortcoming', ascending=False))
+        df4.to_excel(writer, sheet_name=safe_sheet_name(f'Fed_vs_Central_{metric}'), index=False)
+
+        # 5. Any Fed method vs Centralized
+        results = []
+        for dataset in datasets:
+            central = centralized[(centralized['Dataset'] == dataset) & (centralized['Metric'] == metric)]
+            any_fed = df[(df['Aggregation'].str.contains("Fed")) & (df['Dataset'] == dataset) & (df['Metric'] == metric)]
+            if not central.empty and not any_fed.empty:
+                best_central = central.iloc[0]['Value']
+                best_any = any_fed['Value'].max()
+                shortcoming = round(best_central - best_any, 2)
+                results.append([dataset, round(best_central, 2), round(best_any, 2), shortcoming])
+        df5 = pd.DataFrame(results, columns=['Dataset', 'Centralized', 'Best FedAny', 'Shortcoming'])
+        print(f"\n📉 Metric: {metric} | Shortcomings of Any Fed method vs Centralized:")
+        print(df5.sort_values('Shortcoming', ascending=False))
+        df5.to_excel(writer, sheet_name=safe_sheet_name(f'AnyFed_vs_Central_{metric}'), index=False)
+
+        # 6. Clients matching Centralized
+        results = []
+        for dataset in datasets:
+            central = centralized[(centralized['Dataset'] == dataset) & (centralized['Metric'] == metric)]
+            clients = client_df[(client_df['Dataset'] == dataset) & (client_df['Metric'] == metric)]
+            if not central.empty and not clients.empty:
+                best_client = clients.sort_values('Value', ascending=False).iloc[0]
+                if best_client['Value'] >= central.iloc[0]['Value']:
+                    results.append([
+                        dataset,
+                        best_client['Aggregation'],
+                        round(best_client['Value'], 2),
+                        round(central.iloc[0]['Value'], 2)
+                    ])
+        df6 = pd.DataFrame(results, columns=['Dataset', 'Client', 'Client Value', 'Centralized Value'])
+        print(f"\n📈 Metric: {metric} | Clients matching or outperforming Centralized:")
+        print(df6)
+        df6.to_excel(writer, sheet_name=safe_sheet_name(f'Client_vs_Central_{metric}'), index=False)
+
+    writer.close()
+    print(f"\n✅ Excel report saved to: {output_path}")
+
+
+def summarize_best_hyperparams_by_metric(df):
+    output_path = "best_hyperparams_per_federated_setting.xlsx"
+    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+
+    metrics = ['Accuracy', 'Precision', 'Recall', 'Macro_F1']
+    federated_aggs = df[df['Round'].notna()]['Aggregation'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        rows = []
+        for dataset in datasets:
+            for agg in federated_aggs:
+                subdf = df[
+                    (df['Dataset'] == dataset) &
+                    (df['Aggregation'] == agg) &
+                    (df['Metric'] == metric)
+                ]
+                if not subdf.empty:
+                    best_row = subdf.loc[subdf['Value'].idxmax()]
+                    rows.append({
+                        'Dataset': dataset,
+                        'Aggregation': agg,
+                        'Best Value': round(best_row['Value'], 4),
+                        'n_epochs': int(best_row['n_epochs']) if not pd.isna(best_row['n_epochs']) else 'NA',
+                        'mu': round(best_row['mu'], 4) if not pd.isna(best_row['mu']) else 'NA',
+                        'Round': int(best_row['Round']) if not pd.isna(best_row['Round']) else 'NA'
+                    })
+
+        result_df = pd.DataFrame(rows)
+        print(f"\n📊 Best hyperparameters for metric: {metric}")
+        print(result_df)
+        sheet_name = f"BestParams_{metric}"[:31]
+        result_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    writer.close()
+    print(f"\n✅ Saved hyperparameter summary to: {output_path}")
+
+
+def communication_efficiency_table(df):
+    output_path = "communication_efficiency_summary.xlsx"
+    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+
+    thresholds = [0.70, 0.80, 0.90, 0.95, 0.99]
+    metrics = df['Metric'].unique()
+    datasets = df['Dataset'].unique()
+
+    for metric in metrics:
+        results = []
+        for dataset in datasets:
+            central_df = df[(df['Aggregation'] == 'centralized') &
+                            (df['Dataset'] == dataset) &
+                            (df['Metric'] == metric)]
+            if central_df.empty:
+                continue
+            central_value = central_df.iloc[0]['Value']
+
+            fed_df = df[(df['Dataset'] == dataset) &
+                        (df['Metric'] == metric) &
+                        (df['Round'].notna())]
+
+            if fed_df.empty:
+                continue
+
+            for agg in fed_df['Aggregation'].unique():
+                sub_df = fed_df[fed_df['Aggregation'] == agg]
+                for threshold in thresholds:
+                    cutoff = central_value * threshold
+                    reached = sub_df[sub_df['Value'] >= cutoff]
+                    if not reached.empty:
+                        min_round = int(reached.sort_values('Round').iloc[0]['Round'])
+                        results.append({
+                            'Dataset': dataset,
+                            'Metric': metric,
+                            'Aggregation': agg,
+                            'Threshold': f"{int(threshold * 100)}%",
+                            'Min Round': min_round,
+                            'Centralized Value': round(central_value, 4),
+                            'Achieved Value': round(reached.sort_values('Round').iloc[0]['Value'], 4)
+                        })
+
+        df_metric = pd.DataFrame(results)
+        print(f"\n📊 Communication efficiency for metric: {metric}")
+        print(df_metric)
+        sheet_name = f"CommEff_{metric}"[:31]
+        df_metric.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    writer.close()
+    print(f"\n✅ Saved communication efficiency summary to: {output_path}")
