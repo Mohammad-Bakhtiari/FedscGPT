@@ -251,12 +251,13 @@ class BaseMixin:
             setattr(model, name, attr)
 
         del temp
+
+        for buffer_name, buffer in model.named_buffers():
+            if buffer.device.type == 'cuda':
+                print(f"📦 Moving buffer {buffer_name} to CPU")
+                buffer.data = buffer.data.cpu()
         if next(model.parameters()).device != torch.device("cpu"):
             model = model.to("cpu")
-            for buffer_name, buffer in model.named_buffers():
-                if buffer.device.type == 'cuda':
-                    print(f"📦 Moving buffer {buffer_name} to CPU")
-                    buffer.data = buffer.data.cpu()
         else:
             self.log("Provided model is already on CPU, no need to move it.")
 
