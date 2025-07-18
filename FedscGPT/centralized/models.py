@@ -481,7 +481,7 @@ class ScGPT(BaseMixin):
                 if isinstance(val, torch.Tensor) and val.device.type == 'cuda':
                     print(f"📦 Found tensor: {name}, shape={val.shape}, dtype={val.dtype}")
 
-        deep_scan(self.model)
+        deep_scan(self)
         for name, attr in vars(self.model).items():
             if isinstance(attr, torch.Tensor) and attr.shape == (60697, 512):
                 print(f"🎯 Suspect tensor found: {name}")
