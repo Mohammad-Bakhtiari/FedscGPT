@@ -1419,4 +1419,4 @@ def list_gpu_objects(print_summary=True):
             print(f"   🔍 {obj['type']} on {obj['device']}, shape: {obj['shape']}, "
                   f"dtype: {obj['dtype']}, size: {obj['size_MB']} MB")
 
-    exit()
+
