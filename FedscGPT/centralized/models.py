@@ -470,8 +470,31 @@ class ScGPT(BaseMixin):
                     if val_loss < best_val_loss:
                         self.update_best_model(val_loss, epoch)
                 self.lr_schedulers_step()
-        # self.move_to_cpu()
 
+        def find_model_gpu_attrs(model):
+            print("📦 Scanning model attributes for stray GPU tensors (excluding parameters and buffers)...")
+
+            param_ids = {id(p) for p in model.parameters()}
+            buffer_ids = {id(b) for b in model.buffers()}
+
+            found = False
+            for attr_name in dir(model):
+                if attr_name.startswith("_"):
+                    continue
+                try:
+                    attr = getattr(model, attr_name)
+                except Exception as e:
+                    continue  # Skip problematic attributes
+
+                if isinstance(attr, torch.Tensor) and attr.device.type == "cuda":
+                    if id(attr) not in param_ids and id(attr) not in buffer_ids:
+                        print(
+                            f"🔍 model.{attr_name}: shape={tuple(attr.shape)}, dtype={attr.dtype}, device={attr.device}, size={attr.element_size() * attr.numel() / 1e6:.2f} MB")
+                        found = True
+            if not found:
+                print("✅ No stray GPU tensors found in model attributes.")
+
+        find_model_gpu_attrs(self.model)
     def update_best_model(self, val_loss, epoch):
         self.best_model = copy.deepcopy(self.model.to('cpu'))
         self.model.to(self.device)

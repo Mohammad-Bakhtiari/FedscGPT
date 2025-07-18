@@ -101,38 +101,6 @@ class ClientAnnotator(Client, Training):
         else:
             self.model.load_state_dict(global_weights)
         self.train()
-
-        def report_gpu_locals(locals_dict):
-            print("📦 Scanning locals for GPU tensors:")
-            for name, val in locals_dict.items():
-                try:
-                    if isinstance(val, torch.Tensor) and val.device.type == "cuda":
-                        size_mb = val.element_size() * val.nelement() / (1024 ** 2)
-                        print(f"🔍 {name}: shape={tuple(val.shape)}, size={size_mb:.2f} MB, device={val.device}")
-                    elif isinstance(val, dict):
-                        for k, v in val.items():
-                            if isinstance(v, torch.Tensor) and v.device.type == "cuda":
-                                size_mb = v.element_size() * v.nelement() / (1024 ** 2)
-                                print(
-                                    f"🔍 {name}[{k}]: shape={tuple(v.shape)}, size={size_mb:.2f} MB, device={v.device}")
-                except Exception as e:
-                    print(f"⚠️ Skipped {name} due to error: {e}")
-        report_gpu_locals(self.model.__dict__)
-
-        def scan_model_for_gpu_tensors(model):
-            print("📦 Scanning model for GPU tensors...")
-            for name, param in model.named_parameters():
-                if param.device.type == 'cuda':
-                    size_mb = param.element_size() * param.nelement() / (1024 ** 2)
-                    print(
-                        f"🔍 Parameter: {name}, shape={tuple(param.shape)}, size={size_mb:.2f} MB, device={param.device}")
-            for name, buffer in model.named_buffers():
-                if buffer.device.type == 'cuda':
-                    size_mb = buffer.element_size() * buffer.nelement() / (1024 ** 2)
-                    print(
-                        f"🔍 Buffer: {name}, shape={tuple(buffer.shape)}, size={size_mb:.2f} MB, device={buffer.device}")
-        scan_model_for_gpu_tensors(self.model)
-        # scan_model_for_gpu_tensors(self.best_model)
         from FedscGPT.utils import list_gpu_objects
         list_gpu_objects()
         exit()
