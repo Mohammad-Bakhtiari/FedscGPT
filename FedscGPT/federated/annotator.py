@@ -101,8 +101,6 @@ class ClientAnnotator(Client, Training):
         else:
             self.model.load_state_dict(global_weights)
         self.train()
-
-
         return self.get_local_updates()
 
     def centralized_training(self, init_weights=None):
