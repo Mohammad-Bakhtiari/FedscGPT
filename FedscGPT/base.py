@@ -260,26 +260,6 @@ class BaseMixin:
         else:
             self.log("Provided model is already on CPU, no need to move it.")
 
-        # if model is None:
-        #     if next(self.model.parameters()).device != torch.device("cpu"):
-        #         self.model = self.model.to("cpu")
-        #         for buffer_name, buffer in self.model.named_buffers():
-        #             if buffer.device.type == 'cuda':
-        #                 print(f"📦 Moving buffer {buffer_name} to CPU")
-        #                 buffer.data = buffer.data.cpu()
-        #     else:
-        #         self.log("Model is already on CPU, no need to move it.")
-        #     model = self.model
-        # else:
-        #     if next(model.parameters()).device != torch.device("cpu"):
-        #         model = model.to("cpu")
-        #         for buffer_name, buffer in model.named_buffers():
-        #             if buffer.device.type == 'cuda':
-        #                 print(f"📦 Moving buffer {buffer_name} to CPU")
-        #                 buffer.data = buffer.data.cpu()
-        #     else:
-        #         self.log("Provided model is already on CPU, no need to move it.")
-
         if self.discriminator is not None:
             if next(self.discriminator.parameters()).device != torch.device("cpu"):
                 self.discriminator = self.discriminator.to("cpu")

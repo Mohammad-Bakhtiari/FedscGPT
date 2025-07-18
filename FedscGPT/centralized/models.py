@@ -207,7 +207,6 @@ class ScGPT(BaseMixin):
                 batch_labels=batch_labels if self.config.train.INPUT_BATCH_LABELS or self.config.train.DSBN else None,
                 **self.train_kwarg
             )
-            return
 
             masked_positions = input_values.eq(self.config.preprocess.mask_value)  # the postions to predict
             args_dict = {"batch_labels": batch_labels,
