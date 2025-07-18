@@ -118,13 +118,22 @@ class ClientAnnotator(Client, Training):
                 except Exception as e:
                     print(f"⚠️ Skipped {name} due to error: {e}")
         report_gpu_locals(self.model.__dict__)
+
+        def scan_model_for_gpu_tensors(model):
+            print("📦 Scanning model for GPU tensors...")
+            for name, param in model.named_parameters():
+                if param.device.type == 'cuda':
+                    size_mb = param.element_size() * param.nelement() / (1024 ** 2)
+                    print(
+                        f"🔍 Parameter: {name}, shape={tuple(param.shape)}, size={size_mb:.2f} MB, device={param.device}")
+            for name, buffer in model.named_buffers():
+                if buffer.device.type == 'cuda':
+                    size_mb = buffer.element_size() * buffer.nelement() / (1024 ** 2)
+                    print(
+                        f"🔍 Buffer: {name}, shape={tuple(buffer.shape)}, size={size_mb:.2f} MB, device={buffer.device}")
+        scan_model_for_gpu_tensors(self.model)
+        scan_model_for_gpu_tensors(self.best_model)
         from FedscGPT.utils import list_gpu_objects
-        list_gpu_objects()
-        if hasattr(self, "optimizer"):
-            for group in self.optimizer.state.values():
-                for k, v in group.items():
-                    if isinstance(v, torch.Tensor) and v.device.type == 'cuda':
-                        group[k] = v.cpu()
         list_gpu_objects()
         exit()
 
