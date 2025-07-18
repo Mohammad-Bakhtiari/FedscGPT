@@ -101,6 +101,10 @@ class ClientAnnotator(Client, Training):
         else:
             self.model.load_state_dict(global_weights)
         self.train()
+        from FedscGPT.utils import list_gpu_objects
+        list_gpu_objects()
+        exit()
+
         return self.get_local_updates()
 
     def centralized_training(self, init_weights=None):
