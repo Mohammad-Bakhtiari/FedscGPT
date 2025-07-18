@@ -451,6 +451,7 @@ class ScGPT(BaseMixin):
                 del self.losses, self.optimizers, self.scaler, self.lr_schedulers
                 self.losses = {}
                 self.optimizers = {}
+                self.lr_schedulers = {}
                 self.setup_losses()
                 self.scaler = torch.cuda.amp.GradScaler(enabled=self.config.train.amp)
                 break
