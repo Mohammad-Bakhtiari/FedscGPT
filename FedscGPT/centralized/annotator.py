@@ -194,6 +194,8 @@ class Inference(Base):
             self.load_test_loader()
         with EfficientGPUContext(self, model=self.best_model):
             predictions = self.evaluate(self.best_model, loader=self.test_loader, return_raw=True)
+        from FedscGPT.utils import list_gpu_objects
+        list_gpu_objects()
         accuracy = accuracy_score(self.celltypes_labels, predictions)
         precision = precision_score(self.celltypes_labels, predictions, average="macro")
         recall = recall_score(self.celltypes_labels, predictions, average="macro")
@@ -242,8 +244,6 @@ class Inference(Base):
 
     def inference(self, plot_results=False, round_num=None, n_epochs=None, mu=None):
         predictions, labels, results = self.test(round_num, n_epochs, mu)
-        from FedscGPT.utils import list_gpu_objects
-        list_gpu_objects()
         self.adata_test_raw.obs["predictions"] = [self.cell_id2type[p] for p in predictions]
         if plot_results:
             plot(self.adata_test_raw, self.unique_cell_types, self.celltype_key, self.plot_dir)
