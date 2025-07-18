@@ -1333,10 +1333,14 @@ def dump_predictions(preds, path):
 
 
 class EfficientGPUContext:
-    def __init__(self, outer_self, model=None, debug=False):
+    def __init__(self, outer_self, model=None, reset=False, debug=False):
         self.obj = outer_self
         self.debug = debug
         self.model = model
+        self.reset = lambda: None
+        if reset and hasattr(self.obj, 'reset') and callable(self.obj.reset):
+            self.reset = self.obj.reset
+
 
     def __enter__(self):
         if self.debug:
@@ -1353,8 +1357,7 @@ class EfficientGPUContext:
     def __exit__(self, exc_type, exc_value, traceback):
         if self.debug:
             self.obj.log("🔄 Exiting EfficientGPUContext: moving model to CPU.")
-        if self.model is None:
-            self.obj.reset()
+        self.reset()
         self.obj.move_to_cpu(self.model)
         if hasattr(self.obj, 'best_model') and self.obj.best_model is not None:
             print("Moving best_model to CPU.")
