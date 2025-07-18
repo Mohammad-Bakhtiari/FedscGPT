@@ -447,8 +447,9 @@ class ScGPT(BaseMixin):
                                                          intra_domain_shuffle=True,
                                                          drop_last=False)
 
-                break
+
                 self.train_for_epoch(train_loader, epoch)
+                break
                 if self.config.log.retain_best_model:
                     num_eval_data = len(valid_data_pt["gene_ids"])
                     if self.config.train.eval_batch_size <= num_eval_data:
