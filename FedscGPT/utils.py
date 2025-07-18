@@ -253,7 +253,6 @@ def print_config(config: dict or tuple, level=0):
 
 def get_cuda_device(device_index: int):
     if torch.cuda.is_available():
-        # torch.cuda.set_device(device_index)  # Set the device globally
         return torch.device(f"cuda")
     else:
         return torch.device("cpu")
