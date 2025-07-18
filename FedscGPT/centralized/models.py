@@ -214,7 +214,7 @@ class ScGPT(BaseMixin):
                          "target_values": target_values,
                          **output_dict}
             self.apply_loss(**args_dict)
-            self.fedprox()
+            # self.fedprox()
 
         self.model.zero_grad()
         self.scaler.scale(self.loss_meter.batch_loss).backward()
