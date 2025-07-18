@@ -330,7 +330,7 @@ class ScGPT(BaseMixin):
                 total_num += len(input_gene_ids)
                 preds = output_dict["cls_output"].argmax(1).cpu().numpy()
                 predictions.append(preds)
-        del output_dict, loss
+        del batch_data
         if return_raw:
             return np.concatenate(predictions, axis=0)
         return total_loss / total_num, total_error / total_num
