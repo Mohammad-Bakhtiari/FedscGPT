@@ -95,4 +95,7 @@ fi
 
 
 # Execute the command
+CUDA_VISIBLE_DEVICES=$gpu \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128 \
 eval $cmd

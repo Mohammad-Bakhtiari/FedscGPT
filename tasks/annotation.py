@@ -13,8 +13,8 @@ if __name__ == '__main__':
     add_annotation_args(parser)
     add_federated_annotation_args(parser)
     args = parser.parse_args()
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    args.gpu = 0
+    # os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+    # args.gpu = 0
     from tasks import utils as annotation_utils
     annotation_utils.set_seed(args.seed)
     create_output_dir(args)
