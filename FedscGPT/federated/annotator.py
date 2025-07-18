@@ -132,7 +132,7 @@ class ClientAnnotator(Client, Training):
                     print(
                         f"🔍 Buffer: {name}, shape={tuple(buffer.shape)}, size={size_mb:.2f} MB, device={buffer.device}")
         scan_model_for_gpu_tensors(self.model)
-        scan_model_for_gpu_tensors(self.best_model)
+        # scan_model_for_gpu_tensors(self.best_model)
         from FedscGPT.utils import list_gpu_objects
         list_gpu_objects()
         exit()
