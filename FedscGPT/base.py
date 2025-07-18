@@ -149,6 +149,14 @@ class BaseMixin:
         if self.config.train.CCE:
             self.set_cce()
 
+    def reset(self):
+        del self.losses, self.optimizers, self.scaler, self.lr_schedulers
+        self.losses = {}
+        self.optimizers = {}
+        self.lr_schedulers = {}
+        self.setup_losses()
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.config.train.amp)
+
     def apply_loss(self, **kwargs):
         self.loss_meter.update_count(kwargs["target_values"].size(0))
         for loss_name in self.losses.keys():
