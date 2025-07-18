@@ -117,6 +117,7 @@ class ClientAnnotator(Client, Training):
                                     f"🔍 {name}[{k}]: shape={tuple(v.shape)}, size={size_mb:.2f} MB, device={v.device}")
                 except Exception as e:
                     print(f"⚠️ Skipped {name} due to error: {e}")
+        report_gpu_locals(locals())
         from FedscGPT.utils import list_gpu_objects
         list_gpu_objects()
         if hasattr(self, "optimizer"):
