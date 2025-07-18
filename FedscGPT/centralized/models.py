@@ -448,12 +448,11 @@ class ScGPT(BaseMixin):
 
 
                 self.train_for_epoch(train_loader, epoch)
-                del self.losses, self.optimizers, self.scaler
+                del self.losses, self.optimizers, self.scaler, self.lr_schedulers
                 self.losses = {}
                 self.optimizers = {}
                 self.setup_losses()
                 self.scaler = torch.cuda.amp.GradScaler(enabled=self.config.train.amp)
-                del self.lr_schedulers
                 break
                 if self.config.log.retain_best_model:
                     num_eval_data = len(valid_data_pt["gene_ids"])
