@@ -239,7 +239,7 @@ class BaseMixin:
         return model
 
     def move_to_cpu(self, model=None):
-        for name, attr in vars(self.model).items():
+        for name, attr in list(vars(self.model).items()):
             if isinstance(attr, torch.Tensor) and attr.device.type == 'cuda':
                 setattr(self.model, name, attr.cpu())
                 delattr(self.model, name)
