@@ -1385,3 +1385,38 @@ class EfficientGPUContext:
                 self.obj.log(f"   🔍 {obj_type} on {device}, shape: {shape}")
         else:
             self.obj.log("✅ No residual objects on GPU detected.")
+
+
+def list_gpu_objects(print_summary=True):
+    """
+    Lists all Python objects (tensors and models) currently allocated on CUDA devices.
+    Optionally prints a summary.
+    Returns a list of dicts with object info.
+    """
+    gpu_objects = []
+    total_bytes = 0
+
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj) or (hasattr(obj, "data") and torch.is_tensor(obj.data)):
+                tensor = obj.data if hasattr(obj, "data") else obj
+                if tensor.device.type == "cuda":
+                    nbytes = tensor.element_size() * tensor.nelement()
+                    total_bytes += nbytes
+                    gpu_objects.append({
+                        "type": type(obj).__name__,
+                        "device": tensor.device,
+                        "shape": tuple(tensor.shape),
+                        "dtype": tensor.dtype,
+                        "size_MB": round(nbytes / (1024**2), 2)
+                    })
+        except Exception:
+            pass  # Ignore objects that raise errors on inspection
+
+    if print_summary:
+        print(f"\n📦 Found {len(gpu_objects)} tensors on GPU, total {round(total_bytes / (1024**2), 2)} MB.")
+        for obj in gpu_objects:
+            print(f"   🔍 {obj['type']} on {obj['device']}, shape: {obj['shape']}, "
+                  f"dtype: {obj['dtype']}, size: {obj['size_MB']} MB")
+
+    exit()

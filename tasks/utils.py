@@ -97,6 +97,7 @@ def centralized_inference(annotator=None,
                                     )
     return annotator
 
+from FedscGPT.utils import list_gpu_objects
 
 def federated_finetune(**kwargs):
     annotator = fed_prep(**kwargs)
@@ -105,6 +106,7 @@ def federated_finetune(**kwargs):
     cent_inf = partial(centralized_inference, agg_method="federated", logger=annotator.logger, load_model=False, **kwargs)
     inference_model = cent_inf(weights=annotator.global_weights, save_results=False, round_number=0)
     n_local_samples = [client.n_samples for client in annotator.clients]
+    list_gpu_objects()
     for round in range(1, annotator.fed_config.n_rounds + 1):
         annotator.logger.federated(f"Round {round}")
         local_weights = annotator.update_clients_model(round_num=round)
