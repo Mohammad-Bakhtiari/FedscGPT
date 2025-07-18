@@ -188,7 +188,6 @@ class ScGPT(BaseMixin):
             self.log(f"Setting log_interval to {num_batches}")
         for batch, batch_data in enumerate(loader, 1):
             self.train_on_batch(batch_data)
-            break
             if batch % self.config.log.log_interval == 0 and batch > 0:
                 lr = self.lr_schedulers['main'].get_last_lr()[0]
                 log_txt = self.loss_meter.log(self.config.log.log_interval)
