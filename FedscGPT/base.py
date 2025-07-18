@@ -245,7 +245,7 @@ class BaseMixin:
                 temp[name] = attr.cpu()
         for name, attr in temp.items():
             setattr(self.model, name, attr)
-            delattr(self.model, name)
+            # delattr(self.model, name)
         del temp
         if model is None:
             if next(self.model.parameters()).device != torch.device("cpu"):
