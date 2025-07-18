@@ -242,7 +242,7 @@ class BaseMixin:
         for name, attr in list(vars(self.model).items()):
             if isinstance(attr, torch.Tensor) and attr.device.type == 'cuda':
                 setattr(self.model, name, attr.cpu())
-                delattr(self.model, name)
+                # delattr(self.model, name)
         if model is None:
             if next(self.model.parameters()).device != torch.device("cpu"):
                 self.model = self.model.to("cpu")
