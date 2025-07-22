@@ -108,7 +108,7 @@ run_job() {
     fi
 
     # 6) Finally, run it
-    CUDA_VISIBLE_DEVICES=$gpu \
+    CUDA_VISIBLE_DEVICES=$GPU \
     CUBLAS_WORKSPACE_CONFIG=:4096:8 \
     PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128 \
     eval "$base_cmd"
