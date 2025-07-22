@@ -78,7 +78,6 @@ run_job() {
     output="${root_dir}/output/annotation/${args[0]}/${subdir}${smpc_subdir}"
     mkdir -p "$output"
 
-    export CUBLAS_WORKSPACE_CONFIG=:4096:8
     base_cmd="python \"${root_dir}/tasks/annotation.py\" \
   --dataset_name \"${args[0]}\" \
   --data-dir \"$data_dir\" \
@@ -109,6 +108,9 @@ run_job() {
     fi
 
     # 6) Finally, run it
+    CUDA_VISIBLE_DEVICES=$gpu \
+    CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+    PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128 \
     eval "$base_cmd"
 }
 
