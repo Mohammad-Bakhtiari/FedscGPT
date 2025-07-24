@@ -75,16 +75,15 @@ def centralized_inference(annotator=None,
                           round_number=None,
                           **kwargs,
                           ):
-    instantiate = False
     if annotator is None:
         annotator = Inference(log_id="inference", logger=logger, load_model=load_model, model_name=model_name, **kwargs)
-        instantiate = True
+
     if not load_model:
         if weights is None:
             raise Warning("Inferencing cell types using random network!")
         else:
             annotator.best_model.load_state_dict(weights)
-    if (not instantiate) or (round_number is not None):
+    if round_number !=0:
         predictions, labels = annotator.inference(plot_results=plot_results,
                                                   round_num=round_number,
                                                   n_epochs=kwargs['n_epochs'],
