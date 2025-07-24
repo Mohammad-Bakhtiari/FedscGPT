@@ -90,14 +90,14 @@ def centralized_inference(annotator=None,
                                                   n_epochs=kwargs['n_epochs'],
                                                   mu=kwargs['mu'] if kwargs['use_fedprox'] else None)
 
-    if plot_results:
-        confusion_matrix_evaluation(annotator.unique_cell_types,
-                                    predictions,
-                                    labels,
-                                    annotator.cell_id2type,
-                        f"{kwargs['output_dir']}/plots",
+        if plot_results:
+            confusion_matrix_evaluation(annotator.unique_cell_types,
+                                        predictions,
+                                        labels,
+                                        annotator.cell_id2type,
+                            f"{kwargs['output_dir']}/plots",
 
-                                    )
+                                        )
     return annotator
 
 from FedscGPT.utils import list_gpu_objects
