@@ -35,7 +35,6 @@ if [ ! -d "$output" ]; then
     mkdir -p "$output"
 fi
 
-export CUBLAS_WORKSPACE_CONFIG=:4096:8
 cmd="python ${root_dir}/tasks/embedding.py \
  --dataset_name $dataset \
  --data-dir $data_dir \
@@ -56,5 +55,6 @@ if [ "$smpc" == "true" ]; then
     cmd="$cmd --smpc"
 fi
 
-# Execute the command
+CUDA_VISIBLE_DEVICES=$gpu \
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
 eval $cmd
