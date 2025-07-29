@@ -2,9 +2,7 @@
 
 declare -A datasets
 datasets["MS"]="ms|reference_annot.h5ad|query_annot.h5ad|Factor Value[inferred cell type - authors labels]|split_label|index"
-datasets["HP"]="hp|reference_refined.h5ad|query.h5ad|Celltype|batch|index"
 datasets["HP5"]="hp5|reference.h5ad|query.h5ad|Celltype|batch_name|index"
-datasets["MYELOID-top4+rest"]="myeloid|reference_adata.h5ad|query_adata.h5ad|combined_celltypes|top4+rest|index"
 datasets["LUNG"]="lung|reference_annot.h5ad|query_annot.h5ad|cell_type|sample|gene_name"
 datasets["CellLine"]="cl|reference.h5ad|query.h5ad|cell_type|batch|index"
 datasets["COVID"]="covid|reference-raw.h5ad|query-raw.h5ad|celltype|batch_group|gene_name"
