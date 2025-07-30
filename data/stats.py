@@ -100,7 +100,7 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
 
 
 # Dataset configuration list
-rootdir = "scgpt/benchmark"
+rootdir = "scgpt/benchmar"
 datasets = {
     "ms": {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
@@ -119,6 +119,11 @@ datasets = {
         "h5ad_file": "reference_refined.h5ad|query.h5ad",
         "celltype_key": "Celltype",
         "batch_key": "batch",
+    },
+    "hp5": {
+        "h5ad_file": "reference.h5ad|query.h5ad",
+        "celltype_key": "Celltype",
+        "batch_key": "batch_name",
     },
     "lung": {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
@@ -144,6 +149,26 @@ datasets = {
         "h5ad_file": "reference_fed_corrected.h5ad|query_fed_corrected.h5ad",
         "celltype_key": "celltype",
         "batch_key": "batch_group",
+    },
+    "myeloid-top5": {
+        "h5ad_file": "reference.h5ad|query.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "combined_batch",
+    },
+    "myeloid-top10": {
+        "h5ad_file": "reference.h5ad|query.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "combined_batch",
+    },
+    "myeloid-top20": {
+        "h5ad_file": "reference.h5ad|query.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "combined_batch",
+    },
+    "myeloid-top30": {
+        "h5ad_file": "reference.h5ad|query.h5ad",
+        "celltype_key": "cell_type",
+        "batch_key": "combined_batch",
     },
 }
 
