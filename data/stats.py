@@ -100,7 +100,7 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
 
 
 # Dataset configuration list
-rootdir = "scgpt/benchmar"
+rootdir = "scgpt/benchmark"
 datasets = {
     "ms": {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
