@@ -48,59 +48,73 @@ batch_map = {
     },
     "hp": {
         '0': 'Baron',
-        '1': 'Mutaro',
+        '1': 'Muraro',
         '2': 'Segerstolpe',
         '3': 'Wang',
         '4': 'Xin'
     },
+    "hp5": {
+        'Baron': 'Baron',
+        'Mutaro': 'Muraro',
+        'Segerstolpe': 'Segerstolpe',
+        'Wang': 'Wang',
+        'Xin': 'Xin'
+    }
 
 }
 batch_map['covid-corrected'] = batch_map['covid']
 batch_map['covid-fed-corrected'] = batch_map['covid']
 
-def get_stats(df, celltype_key, batch_key, celltype_mapping, batch_map):
+def get_stats(df, celltype_key, batch_key, celltype_mapping=None, batch_map=None):
     """
-    Generates a summary of cell type counts across Reference and Query batches.
-
-    Parameters:
-    - df: pandas DataFrame (e.g., `adata.obs`)
-    - celltype_key: column name for cell type annotations
-    - batch_key: column name for sample IDs or batch identifiers (e.g., 'sample')
-    - celltype_mapping: dictionary to rename cell types (optional)
-    - batch_map: dictionary to rename batch keys (optional)
-
-    Returns:
-    - summary_df: pandas DataFrame with hierarchical columns (Reference/Query → Sample IDs),
-                  with Query batches ordered after Reference batches.
+    Build a summary table of cell type counts across batches grouped by Reference/Query,
+    using explicit construction to avoid mapping issues.
     """
-    # Step 1: Rename cell types and batch names using mappings
     df = df.copy()
-    df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x))
-    df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x))
 
-    # Step 2: Group by cell type and batch, then pivot to wide format
-    summary = df.groupby(["cell type", "batch"]).size().unstack(fill_value=0)
+    # Step 1: Apply mappings
+    df["cell type"] = df[celltype_key].map(lambda x: celltype_mapping.get(x, x)) if celltype_mapping else df[celltype_key]
+    df["batch"] = df[batch_key].map(lambda x: batch_map.get(x, x)) if batch_map else df[batch_key]
 
-    # Step 3: Map each batch to 'Reference' or 'Query'
-    batch_to_split = df.drop_duplicates(subset="batch").set_index("batch")["query_ref_split_label"].to_dict()
+    # Step 2: Extract original batch and split info
+    df["original_batch"] = df[batch_key]
+    if "query_ref_split_label" not in df.columns:
+        raise ValueError("Column 'query_ref_split_label' is missing.")
+    df["split"] = df["original_batch"].map(df.drop_duplicates(subset="original_batch").set_index("original_batch")["query_ref_split_label"])
 
-    # Step 4: Assign hierarchical columns and sort with Query batches last
-    new_cols = [(batch_to_split.get(col, "Unknown"), col) for col in summary.columns]
-    sorted_cols = sorted(new_cols, key=lambda x: (0 if x[0] == "Reference" else 1, x[1]))
-    summary.columns = pd.MultiIndex.from_tuples(sorted_cols)
+    # Step 3: Get unique sorted batches by split type
+    batch_order = df.drop_duplicates(["batch", "split"])[["batch", "split"]]
+    batch_order = batch_order.sort_values(by=["split", "batch"])
+    batch_tuples = [(row["split"], row["batch"]) for _, row in batch_order.iterrows()]
 
-    # Step 5: Add total column per cell type
+    # Step 4: Pivot counts manually
+    counts = df.groupby(["cell type", "batch"]).size().unstack(fill_value=0)
+
+    # Step 5: Create final DataFrame with hierarchical columns
+    all_celltypes = sorted(counts.index.tolist())
+    summary = pd.DataFrame(index=all_celltypes)
+
+    for split, batch in batch_tuples:
+        if batch in counts.columns:
+            summary[(split, batch)] = counts[batch]
+        else:
+            summary[(split, batch)] = 0
+
+    # Step 6: Add total column and row
     summary[("", "Total")] = summary.sum(axis=1)
+    summary.loc["Total"] = summary.select_dtypes(include="number").sum()
 
-    # Step 6: Add total row at bottom
-    summary.loc["Total"] = summary.sum(numeric_only=True)
+    # Step 7: Apply column hierarchy
+    summary.columns = pd.MultiIndex.from_tuples(summary.columns)
 
     return summary
 
 
 
+
+
 # Dataset configuration list
-rootdir = "scgpt/benchmark"
+rootdir = "/home/mohammad/PycharmProjects/FedscGPT/data/"
 datasets = {
     "ms": {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
@@ -113,13 +127,6 @@ datasets = {
         "celltype_key": "celltype",
         "batch_key": "batch_group",
     },
-
-    "hp": {
-
-        "h5ad_file": "reference_refined.h5ad|query.h5ad",
-        "celltype_key": "Celltype",
-        "batch_key": "batch",
-    },
     "hp5": {
         "h5ad_file": "reference.h5ad|query.h5ad",
         "celltype_key": "Celltype",
@@ -130,25 +137,10 @@ datasets = {
         "celltype_key": "cell_type",
         "batch_key": "sample",
     },
-    "myeloid": {
-        "h5ad_file": "reference_adata.h5ad|query_adata.h5ad",
-        "celltype_key": "combined_celltypes",
-        "batch_key": "top4+rest",
-    },
     "cl": {
         "h5ad_file": "reference.h5ad|query.h5ad",
         "celltype_key": "cell_type",
         "batch_key": "batch",
-    },
-    "covid-corrected": {
-        "h5ad_file": "reference_corrected.h5ad|query_corrected.h5ad",
-        "celltype_key": "celltype",
-        "batch_key": "batch_group",
-    },
-    "covid-fed-corrected": {
-        "h5ad_file": "reference_fed_corrected.h5ad|query_fed_corrected.h5ad",
-        "celltype_key": "celltype",
-        "batch_key": "batch_group",
     },
     "myeloid-top5": {
         "h5ad_file": "reference.h5ad|query.h5ad",
@@ -195,7 +187,6 @@ def read_adata(files, ds_path):
 
         reference = sc.read_h5ad(reference_path)
         query = sc.read_h5ad(query_path)
-
         return reference.concatenate(query, batch_key="query_ref_split_label", batch_categories=["Reference", "Query"])
 
     else:
@@ -204,47 +195,20 @@ def read_adata(files, ds_path):
 
 if __name__ == '__main__':
     with pd.ExcelWriter(output_excel_path) as writer:
-        for dataset in datasets.keys():
+        for dataset in ['myeloid-top5']:#datasets.keys():
             folder = datasets[dataset].get("folder", dataset)
             ctm = celltype_mapping.get(folder, {})
             bm = batch_map.get(folder, {})
             print(folder, dataset)
-            if dataset == "myeloid":
-                ref_file, q_file = datasets[dataset]["h5ad_file"].split("|")
-                ref = sc.read_h5ad(os.path.join(rootdir, folder, ref_file))
-                ref.obs["query_ref_split_label"] = "Reference"
-                stats_df = get_stats(ref.obs,
-                                     celltype_key=datasets[dataset]["celltype_key"],
-                                     batch_key=datasets[dataset]["batch_key"],
-                                     celltype_mapping=ctm,
-                                     batch_map=bm
-                                     )
-                stats_df.to_excel(writer, sheet_name=dataset + " Reference")
-                print(f"######### Statistics for {dataset}: Reference #########")
-                print(stats_df)
-                print("#" * 50)
-                query = sc.read_h5ad(os.path.join(rootdir, folder, q_file))
-                query.obs["query_ref_split_label"] = "Query"
-                stats_df_query = get_stats(query.obs,
-                                           celltype_key=datasets[dataset]["celltype_key"],
-                                           batch_key=datasets[dataset]["batch_key"],
-                                           celltype_mapping=ctm,
-                                           batch_map=bm
-                                           )
-                stats_df_query.to_excel(writer, sheet_name=dataset + " Query")
-                print(f"######### Statistics for {dataset}: Query #########")
-                print(stats_df_query)
-                print("#" * 50)
-            else:
-                adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
-                stats_df = get_stats(adata.obs,
-                                     celltype_key=datasets[dataset]["celltype_key"],
-                                     batch_key=datasets[dataset]["batch_key"],
-                                     celltype_mapping=ctm,
-                                     batch_map=bm
-                                     )
-                stats_df.to_excel(writer, sheet_name=dataset)
-                print(f"######### Statistics for {dataset}: #########")
-                print(stats_df)
-                print("#" * 50)
+            adata = read_adata(datasets[dataset]["h5ad_file"].split("|"), os.path.join(rootdir, folder))
+            stats_df = get_stats(adata.obs,
+                                 celltype_key=datasets[dataset]["celltype_key"],
+                                 batch_key=datasets[dataset]["batch_key"],
+                                 celltype_mapping=ctm,
+                                 batch_map=bm
+                                 )
+            stats_df.to_excel(writer, sheet_name=dataset)
+            print(f"######### Statistics for {dataset}: #########")
+            print(stats_df)
+            print("#" * 50)
 

@@ -1,3 +1,5 @@
+from sympy.geometry.entity import rotate
+
 import __init__
 import os
 import pickle
@@ -15,10 +17,21 @@ import anndata
 import scanpy as sc
 import random
 from pathlib import Path
-
+import matplotlib.colors as mcolors
+from matplotlib.patches import Patch
 from data.stats import datasets as datasets_details
-from data.stats import batch_map
+from data.stats import batch_map, celltype_mapping
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
+arial_fp = "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"
+arial_prop = fm.FontProperties(fname=arial_fp)
+import matplotlib.font_manager as fm
+import matplotlib.font_manager as fm
+
+arial_fp = "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"
+fm.fontManager.addfont(arial_fp)
+plt.rcParams['font.family'] = fm.FontProperties(fname=arial_fp).get_name()
 
 SEED = 42
 def set_seed(seed=SEED):
@@ -28,8 +41,14 @@ def set_seed(seed=SEED):
 set_seed(SEED)
 image_format = 'svg'
 ANNOTATION_PLOTS_DIR = 'plots/annotation'
+EMBEDDING_PLOTS_DIR = 'plots/embedding'
 FEDSCGPT_MARKER = 'D'
 FEDSCGPT_SMPC_MARKER = '*'
+
+FEDAVG_MARKER = "D"
+FEDAVG_SMPC_MARKER = "s"
+FEDPROX_MARKER = "P"
+FEDPROX_SMPC_MARKER = "X"
 
 def print_config(config: dict or tuple, level=0):
     for k, v in config.items():
@@ -76,6 +95,58 @@ def generate_palette(unique_celltypes):
             palette_[cat] = '#%02x%02x%02x' % tuple(int(255 * c) for c in rgba[:3])
 
     return palette_
+
+
+DATASETS_DETAILS = {'ms': {'reference': 'reference_annot.h5ad',
+                   'query': 'query_annot.h5ad',
+                   'cell_type_key': 'Factor Value[inferred cell type - authors labels]',
+                   'batch_key': 'split_label',},
+    'hp5': {'reference': 'reference.h5ad',
+           'query': 'query.h5ad',
+           'cell_type_key': 'Celltype',
+           'batch_key': 'batch_name'},
+    'myeloid': {'reference': 'reference_adata.h5ad',
+                'query': 'query_adata.h5ad',
+                'cell_type_key': 'combined_celltypes',
+                'batch_key': 'top4+rest'},
+    'lung': {'reference': 'reference_annot.h5ad',
+                'query': 'query_annot.h5ad',
+                'cell_type_key': 'cell_type',
+                'batch_key': 'sample'},
+    'cl': {'reference': 'reference.h5ad',
+                'query': 'query.h5ad',
+                'cell_type_key': 'cell_type',
+                'batch_key': 'batch'},
+    'covid': {'reference': 'reference-raw.h5ad',
+                'query': 'query-raw.h5ad',
+                'cell_type_key': 'celltype',
+                'batch_key': 'batch_group'},
+    'covid-corrected': {'reference': 'reference_corrected.h5ad',
+                        'query': 'query_corrected.h5ad',
+                        'cell_type_key': 'celltype',
+                        'batch_key': 'batch_group'},
+    'covid-fed-corrected': {'reference': 'reference_fed_corrected.h5ad',
+                            'query': 'query_fed_corrected.h5ad',
+                            'cell_type_key': 'celltype',
+                            'batch_key': 'batch_group'},
+    'myeloid-top5': {'reference': 'reference.h5ad',
+                        'query': 'query.h5ad',
+                        'cell_type_key': 'cell_type',
+                        'batch_key': 'combined_batch'},
+    'myeloid-top10': {'reference': 'reference.h5ad',
+                        'query': 'query.h5ad',
+                        'cell_type_key': 'cell_type',
+                        'batch_key': 'combined_batch'},
+    'myeloid-top20': {'reference': 'reference.h5ad',
+                        'query': 'query.h5ad',
+                        'cell_type_key': 'cell_type',
+                        'batch_key': 'combined_batch'},
+    'myeloid-top30': {'reference': 'reference.h5ad',
+                        'query': 'query.h5ad',
+                        'cell_type_key': 'cell_type',
+                        'batch_key': 'combined_batch'},
+    }
+
 
 
 def load_metric(filepath, metric):
@@ -262,9 +333,10 @@ def plot_stacked_fedavg_heatmaps(df, save_path="fedavg_stacked_heatmap", file_fo
     and each column is a federated scenario (e.g., FedAvg on HP, etc.).
     """
     configs = [
-        ("hp", "weighted-FedAvg", "HP (FedAvg)"),
-        ("hp", "SMPC-weighted-FedAvg", "HP (SMPC-FedAvg)"),
-        ("ms", "SMPC-weighted-FedAvg", "MS (SMPC-FedAvg)")
+        ("hp5", "weighted-FedAvg", "HP (FedAvg)"),
+        ("hp5", "SMPC-weighted-FedAvg", "HP (SMPC-FedAvg)"),
+        ("ms", "SMPC-weighted-FedAvg", "MS (SMPC-FedAvg)"),
+        ("myeloid-top5", "SMPC-weighted-FedAvg", "Myeloid (SMPC-FedAvg)"),
     ]
 
     # Clean and restrict data
@@ -291,12 +363,11 @@ def plot_stacked_fedavg_heatmaps(df, save_path="fedavg_stacked_heatmap", file_fo
             subset = df[(df['Dataset'] == dataset) &
                         (df['Aggregation'] == agg) &
                         (df['Metric'] == metric)]
-
             if subset.empty:
                 ax.set_title("No data", fontsize=10)
                 ax.axis('off')
                 continue
-
+            subset = subset.drop_duplicates(subset=['Round', 'n_epochs', 'Metric', 'Aggregation', 'Dataset'], keep='last')
             pivot = subset.pivot(index='n_epochs', columns='Round', values='Value')
             sns.heatmap(
                 pivot, ax=ax, cmap=cmap, cbar=False, center=0.5,
@@ -305,8 +376,9 @@ def plot_stacked_fedavg_heatmaps(df, save_path="fedavg_stacked_heatmap", file_fo
 
             # Annotate best
             max_row = subset.loc[subset['Value'].idxmax()]
+            print(metric, dataset, max_row['Round'], max_row['n_epochs'])
             ax.text(
-                max_row['Round'], max_row['n_epochs'] - 0.5,
+                max_row['Round'] - 1, max_row['n_epochs'] - 0.5,
                 f"{max_row['Value']:.2f}".lstrip("0"),
                 color='black', ha='left', va='center', fontsize=8
             )
@@ -339,14 +411,13 @@ def plot_stacked_fedavg_heatmaps(df, save_path="fedavg_stacked_heatmap", file_fo
     cbar = plt.colorbar(mappable, cax=cbar_ax)
     cbar.ax.tick_params(labelsize=9)
 
-    plt.savefig(f"{save_path}.{file_format}", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{save_path}.{file_format}", dpi=300, bbox_inches='tight')
     plt.close()
 
 
 
-def plot_communication_efficiency(fedscgpt_param_tuning, fedscgpt_smpc_param_tuning):
-    fedscgpt_table = analyze_communication_efficiency(fedscgpt_param_tuning, 'clients_cent.csv')
-    fedscgpt_smpc_table = analyze_communication_efficiency(fedscgpt_smpc_param_tuning, 'clients_cent.csv', smpc=True)
+def plot_communication_efficiency(df):
+
     plot_communication_comparison(
         fedscgpt_table,
         fedscgpt_smpc_table,
@@ -411,107 +482,248 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path,
         table_data.append(row)
     return table_data
 
-import matplotlib.pyplot as plt
-
-def plot_communication_comparison(fedscgpt_table, fedscgpt_smpc_table, out_path):
+def filter_and_export_metrics(
+        xls,
+        output_excel_path: str,
+        dataset_name_map: dict
+):
     """
-    Plot two vertically stacked tables comparing FedscGPT and FedscGPT-SMPC,
-    with zero cell padding, larger font, and a compact layout.
+    Combines all metric sheets into one table with rows as a combined (Approach, Dataset)
+    column and columns as threshold levels (70%, 80%, 90%, 95%, 99%).
+
+    Parameters:
+    - xls: pd.ExcelFile
+    - output_excel_path: str
+    - dataset_name_map: dict mapping original names to display names
     """
+    combined = None
 
-    def _label_block(tbl, lbl):
-        # prepend header
-        header = ["Approach"] + tbl[0]
-        rows = []
-        for i, row in enumerate(tbl[1:]):
-            # only the first data row gets the label; the rest are blank
-            prefix = lbl if i == 1 else ""
-            rows.append([prefix] + row)
-        return [header] + rows
+    # Define threshold levels
+    threshold_levels = ['70%', '80%', '90%', '95%', '99%']
+    writer = pd.ExcelWriter(f"{ANNOTATION_PLOTS_DIR}/efficiency/{output_excel_path}", engine='xlsxwriter')
+    for sheet_name in xls.sheet_names:
+        df = pd.read_excel(xls, sheet_name=sheet_name)
+        metric = df.Metric.unique()
+        assert len(metric) == 1, f"Expected 1 metric, got {len(metric)}"
+        metric = metric[0]
+        if not {'Aggregation', 'Dataset', 'Min Round', 'Epoch', 'mu'}.issubset(df.columns):
+            print(f"Skipping sheet {sheet_name} (missing columns)")
+            continue
 
-    block1 = _label_block(fedscgpt_table,"FedscGPT")
-    block2 = _label_block(fedscgpt_smpc_table, "FedscGPT-SMPC")
-    combined = block1 + block2[1:]  # skip second header
-    n_cols = len(combined[0])
-    col_widths = []
-    for c in range(n_cols):
-        max_len = max(len(str(r[c])) for r in combined)
-        col_widths.append(max_len * 0.06)
+        # Filter & rename datasets
+        df = df[df['Dataset'].isin(dataset_name_map.keys())].copy()
+        df['Dataset'] = df['Dataset'].map(dataset_name_map)
 
-    fig, ax = plt.subplots(figsize=(sum(col_widths) + 1, len(combined) * 0.4))
-    ax.axis('off')
-    tbl = ax.table(cellText=combined, cellLoc='center', loc='center')
-    tbl.auto_set_font_size(False)
-    tbl.set_fontsize(14)
-    for (row, col), cell in tbl.get_celld().items():
-        cell.PAD = 0
-        cell.set_width(col_widths[col] + 0.1)
-        cell.set_height(0.3)
-    tbl[(1, 0)].visible_edges = 'TLR'
-    tbl[(2, 0)].visible_edges = 'LR'
-    tbl[(3, 0)].visible_edges = 'LRB'
-    tbl[(4, 0)].visible_edges = 'TLR'
-    tbl[(5, 0)].visible_edges = 'LR'
-    tbl[(6, 0)].visible_edges = 'LRB'
-    plt.savefig(out_path, dpi=300, bbox_inches='tight')
-    plt.close()
+        # Filter for SMPC entries and rename aggregations
+        df = df[df['Aggregation'].str.contains('SMPC')]
+        agg_map = {"SMPC-weighted-FedAvg": "FedAvg-SMPC",
+                   "SMPC-weighted-FedProx": "FedProx-SMPC"}
+        df['Aggregation'] = df['Aggregation'].replace(agg_map)
 
-def plot_metric_cahnges_over_ER(file_path, epochs_list=[1, 2, 3, 4, 5], target_metric='Accuracy', img_format='svg'):
-    df = pd.read_csv(file_path)
-    df = df[df.Round < 11]
-    df.Round = df.Round.astype(int)
-    df.n_epochs = df.n_epochs.astype(int)
-    datasets = df.Dataset.unique()
+        # Combine Aggregation and Dataset into a single column
+        df['Combined'] = df['Dataset'] + '(' + df['Aggregation'] + ')'
+        df = df.drop(columns=['Aggregation', 'Dataset'])
 
-    # Set up the figure and subplots
+        # Pivot data to get threshold levels with rounds, epochs, and mu
+        pivot_df = df.pivot_table(index='Combined',
+                                columns='Threshold',
+                                values=['Min Round', 'Epoch', 'mu'],
+                                aggfunc='first',
+                                fill_value='NR').reset_index()
+
+        # Restore NaN for 'mu' where it was filled with 'NR'
+        for level in threshold_levels:
+            if ('mu', level) in pivot_df.columns:
+                pivot_df[('mu', level)] = pivot_df[('mu', level)].replace('NR', np.nan)
+
+        # Combine Min Round, Epoch, and mu into a single string with pipe separator
+        for level in threshold_levels:
+            if (('Min Round', level) in pivot_df.columns and ('Epoch', level) in pivot_df.columns and ('mu', level) in pivot_df.columns):
+                pivot_df[level] = pivot_df.apply(
+                    lambda row: f"{row[('Min Round', level)]}|{row[('Epoch', level)]}|{row[('mu', level)]}" if pd.notna(row[('Min Round', level)]) and pd.notna(row[('Epoch', level)]) and pd.notna(row[('mu', level)]) else
+                               f"{row[('Min Round', level)]}|{row[('Epoch', level)]}" if pd.notna(row[('Min Round', level)]) and pd.notna(row[('Epoch', level)]) else 'NR',
+                    axis=1
+                )
+            else:
+                pivot_df[level] = 'NR'
+
+        # Replace 'NR|NR' and 'NR|NR|NR' with 'NR'
+        for level in threshold_levels:
+            pivot_df[level] = pivot_df[level].replace('NR|NR', 'NR').replace('NR|NR|NR', 'NR')
+
+        # Drop the multi-level columns for Min Round, Epoch, and mu
+        pivot_df = pivot_df.drop(columns=[('Min Round', lvl) for lvl in threshold_levels] + [('Epoch', lvl) for lvl in threshold_levels] + [('mu', lvl) for lvl in threshold_levels])
+
+        # Reorder columns to match figure format
+        cols = ['Combined'] + threshold_levels
+        pivot_df = pivot_df[cols]
+        pivot_df = pivot_df.sort_values(by='Combined')
+        pivot_df.columns = [
+            '_'.join(str(c) for c in col).strip('_') if isinstance(col, tuple) else col
+            for col in pivot_df.columns
+        ]
+        pivot_df.rename(columns={'Combined': 'Dataset (Aggregation)'}, inplace=True)
+        pivot_df.to_excel(writer, sheet_name=metric, index=False)
+        worksheet = writer.sheets[metric]  # same sheet name you wrote above
+
+        # Step 2: Define formats
+        red_fmt = writer.book.add_format({'font_color': 'red'})
+        black_fmt = writer.book.add_format({'font_color': 'black'})
+
+        # Step 3: Loop over the written DataFrame and rewrite rich strings
+        for row_idx in range(1, len(pivot_df) + 1):  # skip header row
+            for col_idx in range(1, len(threshold_levels) + 1):  # skip "Dataset (Aggregation)"
+                cell_text = str(pivot_df.iloc[row_idx - 1, col_idx])
+
+                if '|' in cell_text and cell_text != 'NR':
+                    parts = []
+                    for i, chunk in enumerate(cell_text.split('|')):
+                        if i > 0:
+                            parts.append(red_fmt)
+                            parts.append('|')
+                        parts.append(black_fmt)
+                        parts.append(chunk)
+                    worksheet.write_rich_string(row_idx, col_idx, *parts)
+
+        print(pivot_df)
+        fig, ax = plt.subplots(figsize=(10, len(pivot_df) * 0.3))  # Adjust figsize based on data
+        ax.axis('off')  # Hide axes
+        table = ax.table(cellText=pivot_df.values, colLabels=pivot_df.columns, loc='center')
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1.2, 1.2)  # Adjust scale for readability
+        plt.savefig(f'{ANNOTATION_PLOTS_DIR}/efficiency/{sheet_name}_table.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    writer.close()
+
+
+import pandas as pd
+import os
+
+def export_optimal_params_by_metric(xls, dataset_name_map):
+    """
+    Exports the best parameters for each federated scenario, organized by metric into separate sheets
+    in an XLSX file. Combines Dataset and Aggregation, removes 'weighted-' from Aggregation,
+    and incorporates mu into Aggregation where applicable.
+
+    Parameters:
+    - xls: pd.ExcelFile
+    - dataset_name_map: dict mapping original names to display names
+    """
+    output_file = os.path.join(ANNOTATION_PLOTS_DIR, "efficiency", "best_params.xlsx")
+    writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
+
+    for sheet_name in xls.sheet_names:
+        df = pd.read_excel(xls, sheet_name=sheet_name)
+        # Extract metric from sheet name (e.g., "Accuracy" from "sheet_Accuracy")
+        metric = "-".join(sheet_name.split('_')[1:])
+        print(f"Processing metric: {metric}")
+
+        # Filter and rename datasets
+        df = df[df['Dataset'].isin(dataset_name_map.keys())].copy()
+        df['Dataset'] = df['Dataset'].map(dataset_name_map)
+
+        # Ensure all required columns are present
+        required_columns = {'Dataset', 'Aggregation', 'Best Value', 'n_epochs', 'mu', 'Round'}
+        if not required_columns.issubset(df.columns):
+            print(f"Skipping sheet {sheet_name} (missing required columns)")
+            continue
+
+        # Combine Dataset and Aggregation, remove 'weighted-', and incorporate mu
+        df['Aggregation'] = df['Aggregation'].str.replace('weighted-', '')
+        df['Aggregation'] = df['Aggregation'].apply(lambda x: f"{x[5:]}-SMPC" if x.startswith('SMPC-') else x)
+        df['Combined'] = df['Dataset'] + ' (' + df['Aggregation'] + df['mu'].apply(lambda x: f", μ={x}" if pd.notna(x) else '') + ')'
+        df = df.drop(columns=['Dataset', 'Aggregation', 'mu'])
+
+        # Reorder and select relevant columns
+        df = df[['Combined', 'Best Value', 'n_epochs', 'Round']]
+        df['Best Value'] = df['Best Value'].astype(float).round(3)  # Round to 3 decimal places
+        df.rename(columns={'Combined': 'Dataset (Aggregation)'}, inplace=True)
+        # Create a sheet for this metric
+        df.to_excel(writer, sheet_name=metric, index=False)
+        print(f"Exported data for metric {metric} to sheet: {metric}")
+        print(df)
+
+    # Save the Excel file
+    writer.close()
+    print(f"Best parameters exported to: {output_file}")
+
+
+
+
+
+def plot_metric_changes_over_ER(df, dataset_name_map, epochs_list, target_metric='Accuracy', img_format='svg'):
+    """
+    Plots how a target metric changes over communication rounds for different epoch settings.
+
+    Parameters:
+    - df: pandas DataFrame with ['Round', 'n_epochs', 'Dataset', 'Metric', 'Value']
+    - dataset_name_map: dict, mapping raw dataset names to pretty labels
+    - epochs_list: list of ints, which epochs to plot (e.g., [1, 5, 10])
+    - target_metric: str, metric to plot (e.g., 'Accuracy')
+    - img_format: str, file format to save (e.g., 'svg', 'png')
+    """
+    df = df[df.Dataset.isin(dataset_name_map.keys())]
+    df = df[df.Aggregation == "SMPC-weighted-FedAvg"]
+    # Filter and cast
+    df = df[df['Round'] < 11].copy()
+    df['Round'] = df['Round'].astype(int)
+    df['n_epochs'] = df['n_epochs'].astype(int)
+
+    # Map dataset names
+    df['Dataset'] = df['Dataset'].map(dataset_name_map)
+
+    datasets = df['Dataset'].unique()
     num_datasets = len(datasets)
+
     fig, axs = plt.subplots(1, num_datasets, figsize=(3 * num_datasets, 3), sharey=True)
     if num_datasets == 1:
-        axs = [axs]  # Ensure axs is iterable if there's only one subplot
+        axs = [axs]
 
-    # Set common x and y limits
+    font_properties = {'fontsize': 12}
     xlim = (df['Round'].min(), df['Round'].max())
 
-    # Set font properties
-    font_properties = {'fontsize': 12}
-
-    # Iterate over datasets
     for i, dataset in enumerate(datasets):
         ax = axs[i]
+        r_zero = df[(df['Dataset'] == dataset) & (df['Round'] == 0) & (df['Metric'] == target_metric)].Value.values[0]
         for n_epochs in epochs_list:
-            # Filter data for the current dataset and number of epochs
-            data = df[(df['Dataset'] == dataset) & (df['n_epochs'] == n_epochs) & (df['Metric'] == target_metric)]
+            data = df[
+                (df['Dataset'] == dataset) &
+                (df['n_epochs'] == n_epochs) &
+                (df['Metric'] == target_metric)
+            ].sort_values(by='Round')
+            if 0 not in data.Round.unique():
+                # Add a row for Round 0 with the initial value
+                data = pd.concat([pd.DataFrame({'Round': [0], 'Value': [r_zero], 'n_epochs': [n_epochs], 'Dataset': [dataset], 'Metric': [target_metric]}), data])
 
-            # Sort data by rounds for proper line plotting
-            data = data.sort_values(by='Round')
 
             sns.lineplot(data=data, x='Round', y='Value', label=f'{n_epochs} Epochs', marker='o', ax=ax)
 
-        # Set title and labels
-        ax.set_title(handle_ds_name(dataset), **font_properties)
+        ax.set_title(dataset, **font_properties)
         ax.set_xlim(xlim)
-        ax.set_ylim((0,1))
+        ax.set_ylim((0, 1))
+        ax.set_xlabel('Rounds', **font_properties)
+        ax.set_xticks(list(range(1, int(xlim[1]) + 1)))
 
         if i == 0:
             ax.set_ylabel(target_metric, **font_properties)
         else:
             ax.set_ylabel('')
 
+        ax.grid(True)
+        ax.legend().set_visible(False)
 
-        ax.set_xlabel('Rounds', **font_properties)
-        ax.set_xticks(list(range(1, int(max(ax.get_xticks())) + 1, 1)))
-
-
-
-        ax.grid(True, which='both')
-        ax.legend().set_visible(False)  # Hide individual legends
-
-    # Add one common legend outside of the subplots
+    # Add shared legend
     handles, labels = axs[-1].get_legend_handles_labels()
     fig.legend(handles, labels, loc='center', bbox_to_anchor=(0.5, 0.94), ncol=len(epochs_list), fontsize=12)
+
     plt.tight_layout()
-    plt.subplots_adjust(top=0.8, wspace=0.051)  # Adjust top for the legend
-    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{target_metric}_changes_over_ER.{img_format}", format=img_format, dpi=300)
+    plt.subplots_adjust(top=0.8, wspace=0.051)
+
+    output_path = f"{ANNOTATION_PLOTS_DIR}/efficiency/{target_metric}_changes_over_ER.{img_format}"
+    plt.savefig(output_path, format=img_format, dpi=300)
+    print(f"Saved plot to {output_path}")
+
 
 
 def find_best_fed(file_path, metric):
@@ -544,6 +756,8 @@ def handle_image_format(start=True, img_frmt=None):
 def handle_ds_name(name):
     if name.lower() == "hp":
         return "HP"
+    if name.lower() == "hp5":
+        return "HP"
     if name.lower() == "ms":
         return "MS"
     if name.lower() == "ms-corrected":
@@ -552,10 +766,15 @@ def handle_ds_name(name):
         return "MS-Fed-Corrected"
     if name.lower() == "myeloid":
         return "Myeloid"
+    if name.lower() == "myeloid-top5":
+        return "Myeloid"
     if name.lower() == "covid":
         return "Covid-19"
     if name.lower() == "lung":
         return "Lung-Kim"
+    if name.lower() == "cl":
+        return "CL"
+    return name.split("-")[-1]
 
 DS_NAME_MAP = {
     "hp": "HP",
@@ -682,31 +901,989 @@ def plot_confusion_matrices(dataset, results, color_mapping):
     plt.close()
     return color_mapping
 
-def plot_umap_and_conf_matrix(root_dir, data_dir, res_pkl_file, res_df_file):
-    df = pd.read_csv(res_df_file)
-    best_fed = {ds: df.loc[df[(df.Dataset==ds) & (df.Metric == 'Accuracy')]["Value"].idxmax()] for ds in df.Dataset.unique()}
-    results = load_results_pkl(root_dir, res_pkl_file, best_fed)
 
-    for dataset in results.keys():
-        adata = load_query_datasets(data_dir, dataset)
-        predictions_centralized = results[dataset]['centralized']['predictions']
-        predictions_federated = results[dataset]['federated']['predictions']
-        labels = results[dataset]['centralized']['labels']  # Assuming the labels are the same for all modes
-        unique_celltypes = results[dataset]['centralized']['unique_celltypes']
-        assert results[dataset]['federated']['id_maps'] == results[dataset]['centralized']['id_maps']
-        id_maps = results[dataset]['federated']['id_maps']
-        labels = [id_maps[c] for c in labels]
-        predictions_federated = [id_maps[c] for c in predictions_federated]
-        predictions_centralized = [id_maps[c] for c in predictions_centralized]
-        palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-        palette_ = palette_ * 3  # Extend the palette if needed
-        color_mapping = {c: palette_[i] for i, c in enumerate(unique_celltypes)}
-        color_mapping = plot_confusion_matrices(dataset, results, color_mapping)
+import os
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import anndata
+from sklearn.metrics import confusion_matrix
+from matplotlib.colors import Normalize
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
-        plot_umaps(adata, predictions_centralized, predictions_federated, labels, unique_celltypes,
-                   f"{dataset}_umap_plots.png", f"{dataset}_legend.png", color_mapping)
-        plot_umaps(adata, predictions_centralized, predictions_federated, labels, unique_celltypes,
-                   f"{dataset}_umap_plots.png", f"{dataset}_legend.png", color_mapping, plot_legend=True)
+def evaluate_and_print_metrics(labels, cent_preds, fed_preds, unique_ct, average='weighted'):
+    # print(f"Evaluating {average} average with {'Other in' if 'Other' in unique_ct else 'all'} unique cell types...")
+    accuracy_cent = round(accuracy_score(labels, cent_preds), 2)
+    precision_cent = round(precision_score(labels, cent_preds, labels=unique_ct, average=average, zero_division=0), 2)
+    recall_cent = round(recall_score(labels, cent_preds, labels=unique_ct, average=average, zero_division=0), 2)
+    f1_cent = round(f1_score(labels, cent_preds, labels=unique_ct, average=average, zero_division=0), 2)
+
+    # Federated metrics
+    accuracy_fed = round(accuracy_score(labels, fed_preds), 2)
+    precision_fed = round(precision_score(labels, fed_preds, labels=unique_ct, average=average, zero_division=0), 2)
+    recall_fed = round(recall_score(labels, fed_preds, labels=unique_ct, average=average, zero_division=0), 2)
+    f1_fed = round(f1_score(labels, fed_preds, labels=unique_ct, average=average, zero_division=0), 2)
+
+
+    print(f"[Centralized] Accuracy: {accuracy_cent}, Precision: {precision_cent}, Recall: {recall_cent}, F1: {f1_cent}")
+    print(f"[Federated]   Accuracy: {accuracy_fed}, Precision: {precision_fed}, Recall: {recall_fed}, F1: {f1_fed}")
+
+
+
+def plot_confusion_with_deltas(dataset, cent_preds, fed_preds, labels, id_maps, color_mapping, save_path):
+    labels = [id_maps[c] for c in labels]
+    cent_preds = [id_maps[c] for c in cent_preds]
+    fed_preds = [id_maps[c] for c in fed_preds]
+    unique_ct = list(color_mapping.keys())
+    evaluate_and_print_metrics(labels, cent_preds, fed_preds, unique_ct=None, average='macro')
+    # assert labels are in color_mapping keys
+    assert set(cent_preds) - set(unique_ct) == set(), \
+        f" Centralized predictions {set(cent_preds) - set(unique_ct)} are not in color mapping keys"
+    assert set(fed_preds) - set(unique_ct) == set(), \
+        f" Federated predictions {set(fed_preds) - set(unique_ct)} are not in color mapping keys"
+
+    cm_centralized = confusion_matrix(labels, cent_preds, labels=unique_ct)
+    cm_federated = confusion_matrix(labels, fed_preds, labels=unique_ct)
+
+    # Normalize by row (i.e., per ground truth cell type), handling division by zero
+    with np.errstate(invalid='ignore', divide='ignore'):
+        cm_centralized = cm_centralized.astype("float") / cm_centralized.sum(axis=1, keepdims=True)
+        cm_federated = cm_federated.astype("float") / cm_federated.sum(axis=1, keepdims=True)
+
+    # Replace NaNs (from division by zero) with 0
+    cm_centralized = np.nan_to_num(cm_centralized)
+    cm_federated = np.nan_to_num(cm_federated)
+
+    # Compute difference matrix (delta between federated and centralized)
+    diff = cm_federated - cm_centralized
+
+    # Prepare empty annotation matrix for superscript deltas
+    annot = np.full(diff.shape, "", dtype=object)
+
+
+
+    # Annotate only when difference is non-zero
+    # diff = cm_federated - cm_centralized
+    # annot = np.full(diff.shape, "", dtype=object)
+    for i in range(cm_federated.shape[0]):
+        for j in range(cm_federated.shape[1]):
+            base = cm_federated[i, j]
+            delta = diff[i, j]
+
+            # Format base value
+            if base < 0.005:
+                base_str = ""
+            elif base > 0.995:
+                base_str = "1"
+            else:
+                base_str = f"{base:.2f}".lstrip("0")
+            annot[i, j] = base_str
+            # Format diff as superscript only if non-zero
+            sign = "+" if delta > 0 else "-"
+            delta_str = f"{abs(delta):.2f}".lstrip("0")
+            delta_str = f"{sign}{delta_str}"
+            annot[i, j] = ""
+            if base_str == "":
+                if delta_str != "-.00" and delta_str != "+.00":
+                    annot[i, j] = f"$0^{{{delta_str}}}$"
+            else:
+                if delta_str == "-.00" or delta_str == "+.00":
+                    annot[i, j] = base_str
+                else:
+                    annot[i, j] = f"${base_str}^{{{delta_str}}}$"
+
+    df_cm = pd.DataFrame(cm_federated, index=unique_ct, columns=unique_ct)
+    print("Diagonal entries with Δ differences (Federated vs Centralized):")
+    for i in range(len(unique_ct)):
+        print(f"{unique_ct[i]:<25}: {annot[i, i]}")
+
+    # fig_width = len(unique_ct)
+    # fig_height = len(unique_ct)
+    # fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    # sns_heatmap = sns.heatmap(df_cm, annot=annot, fmt='', cmap='Blues', cbar=False, square=True,
+    #                           annot_kws={"fontsize": 18})
+    #
+    # ax = plt.gca()
+    # ax.set_xticks(np.arange(len(df_cm.columns)) + 0.5)
+    # ax.set_yticks(np.arange(len(df_cm.index)) + 0.5)
+    # ax.set_xticklabels([])
+    # ax.set_yticklabels([])
+    # ax.tick_params(axis='both', which='both', length=0)
+    #
+    # # Color tick boxes
+    # for ytick, label in zip(ax.get_yticks(), df_cm.index):
+    #     color = color_mapping.get(label, 'black')
+    #     rect = plt.Rectangle((-0.02, ytick - 0.5), 0.02, 1, color=color,
+    #                          transform=ax.get_yaxis_transform(), clip_on=False)
+    #     ax.add_patch(rect)
+    #
+    # for xtick, label in zip(ax.get_xticks(), df_cm.columns):
+    #     color = color_mapping.get(label, 'black')
+    #     rect = plt.Rectangle((xtick - 0.5, 1.0), 1, 0.02, color=color,
+    #                          transform=ax.get_xaxis_transform(), clip_on=False)
+    #     ax.add_patch(rect)
+    # plt.tight_layout()
+    # plt.savefig(save_path, dpi=300)
+    # plt.close()
+
+
+def find_best_macro_f1(dataset, df, fed_aggregations, summary):
+    folder = 'myeloid-top30' if 'myeloid' in dataset else dataset
+    cent = summary[folder]['centralized'][20][None][None]['predictions']
+    labels = summary[folder]['centralized'][20][None][None]['labels']
+    cent_f1 = df[(df.Aggregation == 'centralized') & (df.Dataset == dataset) & (df.Metric == 'Macro_F1') & (
+            df.n_epochs == 20)]
+    assert len(cent_f1) == 1, f"There should be only one row for centralized macro F1\n {cent_f1}"
+    cent_f1 = cent_f1.Value.values[0]
+    best_macro_f1_idx = df[
+        (df.Aggregation.isin(fed_aggregations)) & (df.Dataset == dataset) & (
+                df.Metric == 'Macro_F1')].Value.idxmax()
+    best_f1 = df.iloc[best_macro_f1_idx]['Value']
+    best_agg = df.iloc[best_macro_f1_idx]['Aggregation']
+    best_epoch = df.iloc[best_macro_f1_idx]['n_epochs']
+    best_round = df.iloc[best_macro_f1_idx]['Round']
+    best_mu = df.iloc[best_macro_f1_idx]['mu']
+    best_mu = None if np.isnan(best_mu) else best_mu
+    fed = summary[dataset][best_agg][best_epoch][best_round][best_mu]['predictions']
+    id_maps = summary[dataset]['id_maps']
+    filename = '{}_{}_E{}_R{}_MU{}_F1{}_CentF1{}'.format(dataset, best_agg, best_epoch, best_round, best_mu,
+                                                         best_f1, cent_f1)
+    return cent, fed, filename, id_maps, labels
+
+
+def find_best_by_metric(
+    dataset: str,
+    df: pd.DataFrame,
+    fed_aggregations: list[str],
+    summary: dict,
+    metric: str = "Macro_F1",
+    centralized_epochs: int = 20
+):
+    """
+    Selects the best federated run by `metric` and returns (centralized_preds, best_fed_preds, filename, id_maps, labels).
+
+    Assumptions:
+      - df has columns: ['Aggregation','Dataset','Metric','Value','n_epochs','Round','mu']
+      - summary structure: summary[dataset][agg][epochs][round][mu]['predictions'|'labels']
+      - centralized stored under summary[folder]['centralized'][centralized_epochs][None][None]
+      - 'myeloid-top30' folder special-casing preserved
+    """
+    # Resolve folder naming convention
+    folder = 'myeloid-top30' if 'myeloid' in dataset.lower() else dataset
+
+    # Pull centralized refs
+    cent_block = summary[folder]['centralized'][centralized_epochs][None][None]
+    cent_preds = cent_block['predictions']
+    labels = cent_block['labels']
+
+    # Centralized metric value (optional but handy in filename)
+    cent_row = df[
+        (df['Aggregation'] == 'centralized') &
+        (df['Dataset'] == dataset) &
+        (df['Metric'] == metric) &
+        (df['n_epochs'] == centralized_epochs)
+    ]
+    if len(cent_row) != 1:
+        raise ValueError(f"Expected exactly one centralized row for {metric} @ {centralized_epochs} epochs; got:\n{cent_row}")
+    cent_val = float(cent_row['Value'].iloc[0])
+
+    # Candidate federated rows for the chosen metric
+    mask = (
+        df['Aggregation'].isin(fed_aggregations) &
+        (df['Dataset'] == dataset) &
+        (df['Metric'] == metric)
+    )
+    cand = df.loc[mask].copy()
+
+    if cand.empty:
+        raise ValueError(f"No federated rows found for dataset='{dataset}', metric='{metric}'.")
+
+    # Prefer higher-is-better (F1/Recall/Precision/Accuracy). If you ever pass a loss, invert first.
+    # Drop NaNs in Value to avoid idxmax errors
+    cand = cand.dropna(subset=['Value'])
+
+    # Break ties deterministically: higher Value, then more rounds, then more epochs (or tweak as you like)
+    cand = cand.sort_values(by=['Value', 'Round', 'n_epochs'], ascending=[False, False, False])
+    best_row = cand.iloc[0]
+
+    best_agg  = best_row['Aggregation']
+    best_val  = float(best_row['Value'])
+    best_ep   = int(best_row['n_epochs'])
+    best_rd   = best_row['Round']
+    best_mu   = best_row.get('mu', np.nan)
+    best_mu   = None if pd.isna(best_mu) else best_mu
+
+    # Fetch federated predictions
+    fed_preds = summary[dataset][best_agg][best_ep][best_rd][best_mu]['predictions']
+
+    id_maps = summary[dataset]['id_maps']
+
+    # Build filename tag
+    fname = f"{dataset}_{best_agg}_E{best_ep}_R{best_rd}_MU{best_mu}_{metric}{best_val:.3f}_Cent{metric}{cent_val:.3f}"
+    print(f"Best {metric} for {dataset}: {best_val}: \n\t Aggregation: {best_agg}\n\tepochs: {best_ep}\n\tRounds{best_rd}\n\tMU: {best_mu}) ")
+
+    return cent_preds, fed_preds, fname, id_maps, labels
+
+def best_perf_table(df):
+    dropp_ds = ['myeloid', 'hp', 'covid', 'covid-fed-corrected']
+    df = df[~df['Dataset'].isin(dropp_ds)]
+
+    fed_aggs = ['FedAvg', 'FedAvg-SMPC', 'FedProx', 'FedProx-SMPC']
+    fed_agg_map = {
+        'SMPC-weighted-FedAvg': 'FedAvg-SMPC',
+        'SMPC-weighted-FedProx': 'FedProx-SMPC'
+    }
+    df['Aggregation'] = df['Aggregation'].apply(lambda x: fed_agg_map.get(x, x))
+    ds_map = {'hp5': 'HP', 'ms': 'MS', 'myeloid-top5': 'Myeloid-Top5', 'myeloid-top10': 'Myeloid-Top10',
+              'myeloid-top20': 'Myeloid-Top20', 'myeloid-top30': 'Myeloid-Top30', 'covid-corrected': 'Covid-Corrected',
+              'cl': 'CL', 'lung': 'Lung-Kim', }
+    df['Dataset'] = df['Dataset'].map(ds_map)
+
+
+    def format_agg_with_params(row):
+        params = []
+        if not pd.isna(row.get("n_epochs")):
+            params.append(f"E={int(row['n_epochs'])}")
+        if not pd.isna(row.get("Round")):
+            params.append(f"R={int(row['Round'])}")
+        if not pd.isna(row.get("mu")):
+            params.append(f"Mu={row['mu']:.2f}")
+        return f"{row['Aggregation']} ({', '.join(params)})" if params else row['Aggregation']
+
+    metrics = df['Metric'].unique()
+    output_excel = 'best_federated_vs_centralized.xlsx'
+
+    with pd.ExcelWriter(f"{ANNOTATION_PLOTS_DIR}/summary/{output_excel}", engine='xlsxwriter') as writer:
+        for metric in metrics:
+            rows = []
+            df_metric = df[df['Metric'] == metric]
+
+            for dataset in df_metric['Dataset'].unique():
+                df_dataset = df_metric[df_metric['Dataset'] == dataset]
+
+                # Centralized value
+                df_central = df_dataset[df_dataset['Aggregation'] == 'centralized']
+                if df_central.empty:
+                    continue
+                centralized_val = df_central['Value'].values[0]
+
+                # Federated subset
+                df_fed = df_dataset[df_dataset['Aggregation'].isin(fed_aggs)]
+                if df_fed.empty:
+                    continue
+
+                # Best federated
+                idx_best = df_fed['Value'].idxmax()
+                best_row = df.loc[idx_best].copy()
+
+                rows.append({
+                    'Dataset': dataset,
+                    'Aggregation': format_agg_with_params(best_row),
+                    'Federated': best_row['Value'].round(2),
+                    'Centralized': centralized_val.round(2),
+                    'Difference': (best_row['Value'] - centralized_val).round(2),
+                })
+
+            # Save to Excel
+            df_result = pd.DataFrame(rows)
+            df_result['Dataset'] = pd.Categorical(df_result['Dataset'],
+                                                  categories=['CL', 'Covid-Corrected', 'HP', 'Lung-Kim', 'MS',
+                                                              'Myeloid-Top5', 'Myeloid-Top10', 'Myeloid-Top20',
+                                                              'Myeloid-Top30'], ordered=True)
+            df_result.sort_values('Dataset', ascending=True, inplace=True)
+            print(df_result)
+            df_result.to_excel(writer, sheet_name=metric[:31], index=False)
+
+
+def best_perf_table_reference_mapping(df):
+    df = df[df['Aggregation'].isin(['smpc', 'centralized'])]
+    ds_map = {
+        'hp5': 'HP', 'ms': 'MS', 'myeloid-top5': 'Myeloid-Top5', 'myeloid-top10': 'Myeloid-Top10',
+        'myeloid-top20': 'Myeloid-Top20', 'myeloid-top30': 'Myeloid-Top30',
+        'covid-corrected': 'Covid-Corrected', 'cl': 'CL', 'lung': 'Lung-Kim',
+    }
+    df['Dataset'] = df['Dataset'].map(ds_map)
+
+    # Define dataset order
+    dataset_order = ['CL', 'Covid-Corrected', 'HP', 'Lung-Kim', 'MS',
+                     'Myeloid-Top5', 'Myeloid-Top10', 'Myeloid-Top20', 'Myeloid-Top30']
+
+    # Output file
+    output_excel = 'best_ref_mapping_vs_centralized.xlsx'
+    metrics = [ 'Macro-F1', 'Accuracy', 'Precision', 'Recall']
+
+    with pd.ExcelWriter(output_excel, engine='xlsxwriter') as writer:
+        for metric in metrics:
+            rows = []
+
+            for dataset in df['Dataset'].unique():
+                df_dataset = df[df['Dataset'] == dataset]
+
+                df_central = df_dataset[df_dataset['Aggregation'] == 'centralized']
+                df_smpc = df_dataset[df_dataset['Aggregation'] == 'smpc']
+
+                if df_central.empty or df_smpc.empty:
+                    continue
+
+                centralized_val = df_central[metric].values[0]
+                smpc_val = df_smpc[metric].max()
+
+                rows.append({
+                    'Dataset': dataset,
+                    'Federated (SMPC)': round(smpc_val, 2),
+                    'Centralized': round(centralized_val, 2),
+                    'Difference': round(smpc_val - centralized_val, 2)
+                })
+
+            df_result = pd.DataFrame(rows)
+            df_result['Dataset'] = pd.Categorical(df_result['Dataset'], categories=dataset_order, ordered=True)
+            df_result.sort_values('Dataset', inplace=True)
+
+            print(df_result)
+            df_result.to_excel(writer, sheet_name=metric[:31], index=False)
+
+
+
+def plot_umap_and_conf_matrix(df, summary, data_dir):
+    target_datasets = ['lung', 'cl', 'hp5', 'ms', 'myeloid-top5', 'myeloid-top10', 'myeloid-top20', 'myeloid-top30', 'covid', 'covid-corrected']
+    fed_aggregations = ['SMPC-weighted-FedAvg', 'SMPC-weighted-FedProx']
+    for dataset in target_datasets:
+        print(dataset)
+        cent, fed, filename, id_maps, labels = find_best_by_metric(dataset, df, fed_aggregations, summary, metric='Recall')
+
+        query = anndata.read_h5ad(os.path.join(data_dir, dataset, DATASETS_DETAILS[dataset]['query']))
+        ref = anndata.read_h5ad(os.path.join(data_dir, dataset, DATASETS_DETAILS[dataset]['reference']))
+        batch_key = DATASETS_DETAILS[dataset]['batch_key']
+        celltype_key = DATASETS_DETAILS[dataset]['cell_type_key']
+        # Convert numeric predictions to label names
+        label_names = [id_maps[i] for i in labels]
+        fed_names = [id_maps[i] for i in fed]
+        cent_names = [id_maps[i] for i in cent]
+
+        label_set = sorted(set(label_names), key=str)
+        extra_labels = sorted(set(fed_names + cent_names) - set(label_set), key=str)
+        unique_celltypes = label_set + extra_labels
+
+        color_mapping = generate_palette(unique_celltypes)
+
+        plot_confusion_with_deltas(
+            dataset, cent, fed, labels, id_maps,
+            color_mapping,
+            os.path.join(ANNOTATION_PLOTS_DIR, 'confusion_matrix', f"{filename}.png")
+        )
+
+        # query.obs['split'] = "query"
+        # query.obs['prediction_federated'] = fed_names
+        # query.obs['prediction_centralized'] = cent_names
+        # ref.obs['split'] = "reference"
+        # ref.obs['prediction_federated'] = None
+        # ref.obs['prediction_centralized'] = None
+        # adata = anndata.concat([query, ref], label='split_fake')
+        # ref_only_celltypes = sorted(set(ref.obs[celltype_key].values) - set(unique_celltypes))
+        # all_colors = generate_palette(unique_celltypes + ref_only_celltypes)
+        # all_colors.update(generate_palette(sorted(set(adata.obs[batch_key].values))))
+        #
+        # # Compute UMAP once
+        # if 'X_umap' not in adata.obsm:
+        #     raise ValueError
+        # umap_dir = f"{ANNOTATION_PLOTS_DIR}/UMAPs/{dataset}"
+        # sc.settings.figdir = umap_dir
+        # plot_entire_ds_umap(adata, all_colors, batch_key, celltype_key, dataset)
+        # plot_reference_umap(adata, all_colors, batch_key, celltype_key, dataset)
+        # plot_query_pre_umap(adata, celltype_key, color_mapping, dataset, filename)
+
+
+
+
+def plot_batch_effect(dataset, data_dir):
+    query = anndata.read_h5ad(os.path.join(data_dir, dataset, DATASETS_DETAILS[dataset]['query']))
+    ref = anndata.read_h5ad(os.path.join(data_dir, dataset, DATASETS_DETAILS[dataset]['reference']))
+    batch_key = DATASETS_DETAILS[dataset]['batch_key']
+    celltype_key = DATASETS_DETAILS[dataset]['cell_type_key']
+    query.obs['split'] = "query"
+    ref.obs['split'] = "reference"
+    adata = anndata.concat([query, ref], label='split_fake')
+    top10 = adata.obs[celltype_key].value_counts().nlargest(10).index
+    adata = adata[adata.obs[celltype_key].isin(top10)].copy()
+    unique_celltypes = sorted(set(adata.obs[celltype_key].values), key=str)
+    color_mapping = generate_palette(unique_celltypes)
+    batch_color_map = generate_palette(sorted(set(adata.obs[batch_key].values)))
+    color_mapping.update(batch_color_map)
+
+    # Compute UMAP once
+    if 'X_umap' not in adata.obsm:
+        raise ValueError
+    umap_dir = f"{ANNOTATION_PLOTS_DIR}/UMAPs/batch-effect-{dataset}"
+    sc.settings.figdir = umap_dir
+    plot_entire_ds_umap(adata, color_mapping, batch_key, celltype_key, dataset)
+
+def plot_query_pre_umap(adata, celltype_key, color_mapping, dataset, filename):
+    # Query
+    plot_umap_and_legend(adata[adata.obs['split'] == 'query'], color_mapping,
+                         color=[celltype_key, "prediction_centralized", "prediction_federated"],
+                         title=["Query: Ground Truth", "Centralized", "Federated"], filename=f"_{dataset}_query.png")
+    plot_umap_and_legend(adata[adata.obs['split'] == 'query'], color_mapping,
+                         color=[celltype_key],
+                         title=["Query: Ground Truth"],
+                         filename=f"_{dataset}_query_celltype.png")
+    plot_umap_and_legend(adata[adata.obs['split'] == 'query'], color_mapping,
+                         color=["prediction_centralized"],
+                         title=["Centralized"],
+                         filename=f"_{dataset}_query_centralized.png")
+    plot_umap_and_legend(adata[adata.obs['split'] == 'query'], color_mapping,
+                         color=["prediction_federated"],
+                         title=["Federated"],
+                         filename=f"_{dataset}_query_federated_{filename}.png")
+
+def plot_best_fed_vs_centralized(df, subdir='efficiency'):
+    sns.set(style='whitegrid')
+    metrics = df['Metric'].unique()
+    aggregations = {
+        "weighted-FedAvg": "FedAvg",
+        "SMPC-weighted-FedAvg": "FedAvg-SMPC",
+        "SMPC-weighted-FedProx": "FedProx-SMPC",
+        "weighted-FedProx": "FedProx"
+    }
+    palette = generate_palette(aggregations.values())
+    df.sort_values("Dataset", ascending=False, inplace=True)
+    n_datasets = len(df['Dataset'].unique())
+    for metric in metrics:
+        metric_df = df[df['Metric'] == metric]
+
+        # Centralized perf at n_epochs == 20
+        central_df = metric_df[(metric_df['n_epochs'] == 20) & (metric_df['Aggregation'] == "centralized")]
+        central_df.sort_values("Dataset", ascending=False, inplace=True)
+        assert len(central_df) == n_datasets, f"Expected {n_datasets} datasets for centralized, got {len(central_df)}"
+        centralized = dict(zip(central_df['Dataset'], central_df['Value']))
+
+        # Best federated
+        fed_df = metric_df[metric_df['Aggregation'].isin(aggregations.keys())].copy()
+        fed_df['Aggregation'] = fed_df['Aggregation'].map(aggregations)
+        best_df = (
+            fed_df.groupby(['Dataset', 'Aggregation'])['Value']
+            .max()
+            .reset_index()
+        )
+        best_df.sort_values("Dataset", ascending=False, inplace=True)
+        # Plot
+        plt.figure(figsize=(7, 4))
+        ax = sns.barplot(data=best_df, x='Dataset', y='Value', hue='Aggregation', dodge=True, palette=palette)
+        group_width = 0.8  # seaborn default
+        for i, (dataset, value) in enumerate(centralized.items()):
+            center = i  # x-axis location of dataset group
+            left = center - group_width / 2
+            right = center + group_width / 2
+            ax.hlines(y=value, xmin=left, xmax=right, colors='black', linestyles='--', linewidth=1)
+            ax.text(center, value + 0.01, f'{value:.2f}', ha='center', fontsize=12  , color='black')
+
+        ax.set_ylabel(metric, fontsize=16)
+        ax.set_xlabel('Dataset', fontsize=16)
+        ax.tick_params(axis='y', labelsize=10)
+        ax.tick_params(axis='x', labelsize=10)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=0, fontsize=14)
+        ax.set_ylim(0.2, 1.05)
+        ax.legend_.remove()
+        plt.tight_layout()
+        plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/best_fed_vs_central_{metric}.png", dpi=300)
+        plt.close()
+        legend_elements = [Patch(facecolor=palette[agg], label=agg) for agg in aggregations.values()]
+
+        fig, ax = plt.subplots(figsize=(6, 1))
+        ax.axis('off')
+        legend = ax.legend(handles=legend_elements, loc='center', ncol=len(legend_elements), frameon=False, fontsize=20)
+        plt.tight_layout()
+        plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/federated_methods_legend.png", dpi=300, bbox_inches='tight',
+                    transparent=True)
+        plt.close()
+
+def plot_best_fed_myeloid_vs_centralized(df, subdir='efficiency'):
+    sns.set(style='whitegrid')
+    os.makedirs(f"{ANNOTATION_PLOTS_DIR}/{subdir}", exist_ok=True)
+
+    target_agg = "SMPC-weighted-FedProx"
+    cent_dataset = 'myeloid-top30'
+    methods = ['Top5', 'Top10', 'Top20', 'Top30']
+    metrics = df['Metric'].unique()
+    plot_data = []
+    legend_labels = {}
+
+    for ds in methods:
+        best_row_idx = df[
+            (df['Dataset'] == ds) &
+            (df['Aggregation'] == target_agg) &
+            (df['Metric'] == 'Macro-F1') &
+            (df['n_epochs'] == 1) &
+            (df['mu'] == 0.01)
+        ].Value.idxmax()
+        best_row = df.loc[best_row_idx]
+        best_round = best_row['Round']
+        best_epoch = 1
+        best_mu = 0.01
+        print(ds, best_round, best_epoch, best_mu)
+        legend_labels[ds] = f"{ds} ({int(best_round)} rounds)"
+
+        for metric in metrics:
+            val = df[
+                (df['Dataset'] == ds) &
+                (df['Aggregation'] == target_agg) &
+                (df['Round'] == best_round) &
+                (df['n_epochs'] == best_epoch) &
+                (df['mu'] == best_mu) &
+                (df['Metric'] == metric)
+            ]['Value']
+            assert len(val) == 1, f"Expected one value for {ds} {metric}, got {len(val)}"
+            val = val.values[0]
+            plot_data.append({
+                'Metric': metric,
+                'Method': ds,
+                'Value': val
+            })
+
+    # Centralized
+    central_row = df[
+        (df['Dataset'] == 'Top30') &
+        (df['Aggregation'] == 'centralized') &
+        (df['n_epochs'] == 20)
+    ]
+    assert len(central_row) == len(metrics), f"Expected {len(metrics)} metrics for centralized, got {len(central_row)}"
+
+    for metric in metrics:
+        val = central_row[central_row['Metric'] == metric]['Value'].values[0]
+        plot_data.append({
+            'Metric': metric,
+            'Method': 'centralized',
+            'Value': val
+        })
+
+    legend_labels['centralized'] = 'Centralized'
+
+    plot_df = pd.DataFrame(plot_data)
+
+    plot_df['Method'] = pd.Categorical(
+        plot_df['Method'],
+        categories=['centralized'] + methods,
+        ordered=True
+    )
+
+    palette = generate_palette(plot_df['Method'].unique())
+    palette['centralized'] = 'black'  # Ensure centralized is black
+
+    # --- Bar Plot (No Legend) ---
+    plt.figure(figsize=(10, 4))
+    ax = sns.barplot(data=plot_df, x='Metric', y='Value', hue='Method', palette=palette)
+    ax.set_ylabel("Score", fontsize=20)
+    ax.set_xlabel("")
+    ax.set_ylim(0, 0.7)
+    ax.tick_params(axis='y', labelsize=16)
+    ax.tick_params(axis='x', labelsize=18)
+    ax.legend_.remove()
+    plt.tight_layout()
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/grouped_fedprox_smpc_vs_central.png", dpi=300, bbox_inches='tight')
+    plt.close()
+
+    # --- Legends ---
+    handles = [Patch(facecolor=palette[m], label=legend_labels[m]) for m in plot_df['Method'].cat.categories]
+
+    # Horizontal Legend
+    fig, ax = plt.subplots(figsize=(6, 1))
+    ax.axis('off')
+    ax.legend(handles=handles, loc='center', ncol=len(handles), frameon=False,
+              fontsize=30, handletextpad=0.4, columnspacing=0.8)
+    plt.tight_layout()
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/legend_horizontal.png", dpi=300, bbox_inches='tight', transparent=True)
+    plt.close()
+
+    # Vertical Legend
+    fig, ax = plt.subplots(figsize=(4, len(handles) * 0.5))
+    ax.axis('off')
+    ax.legend(handles=handles, loc='center', ncol=1, frameon=False, fontsize=11, title="Method (Best Params)", title_fontsize=12)
+    plt.tight_layout()
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/legend_vertical.png", dpi=300, bbox_inches='tight', transparent=True)
+    plt.close()
+
+
+def plot_myeloid_over_rounds_vs_central(df, subdir='myeloid'):
+    sns.set(style='whitegrid')
+    os.makedirs(f"{ANNOTATION_PLOTS_DIR}/{subdir}", exist_ok=True)
+
+    target_agg = "SMPC-weighted-FedProx"
+    selected_datasets = ['Top5', 'Top10', 'Top20', 'Top30']
+    palette = generate_palette(selected_datasets)
+
+    # Use linestyles instead of markers
+    linestyles = {'Top5': 'dashdot', 'Top10': 'dotted', 'Top20': 'dashed', 'Top30': 'solid'}
+    metrics = df['Metric'].unique()
+
+    for metric in metrics:
+        plt.figure(figsize=(6, 4))
+        found_any = False
+
+        for ds in selected_datasets:
+            sub_df = df[
+                (df['Dataset'] == ds) &
+                (df['Aggregation'] == target_agg) &
+                (df['n_epochs'] == 1) &
+                (df['mu'] == 0.01) &
+                (df['Metric'] == metric)
+            ].sort_values("Round")
+
+            if sub_df.empty:
+                continue
+
+            found_any = True
+            plt.plot(sub_df['Round'], sub_df['Value'],
+                     label=ds,
+                     color=palette[ds],
+                     linestyle=linestyles.get(ds, 'solid'),
+                     linewidth=2)
+
+        if not found_any:
+            raise ValueError(f"No data found for metric '{metric}' across datasets")
+
+        # Centralized horizontal line
+        central_val = df[
+            (df['Dataset'] == 'Top30') &
+            (df['Aggregation'] == 'centralized') &
+            (df['n_epochs'] == 20) &
+            (df['Metric'] == metric)
+        ]['Value'].values[0]
+
+        plt.axhline(y=central_val, linestyle='solid', color='black', linewidth=2, label='Centralized')
+
+        plt.xlabel("Round", fontsize=22)
+        plt.ylabel(metric, fontsize=22)
+        plt.xticks(fontsize=18)
+        plt.yticks(fontsize=16)
+        plt.ylim(0, 0.7)
+        plt.xlim(0, 200)
+        plt.tight_layout()
+
+        out_path = f"{ANNOTATION_PLOTS_DIR}/{subdir}/fedprox_smpc_line_{metric}.png"
+        plt.savefig(out_path, dpi=300)
+        plt.close()
+
+
+def plot_myeloid_over_rounds(df, subdir='myeloid'):
+    sns.set(style='whitegrid')
+    os.makedirs(f"{ANNOTATION_PLOTS_DIR}/{subdir}", exist_ok=True)
+
+    target_agg = "SMPC-weighted-FedProx"
+    selected_datasets = ['Top5', 'Top10', 'Top20', 'Top30']
+    palette = generate_palette(selected_datasets)
+    linestyles = {'Top5': 'dashdot', 'Top10': 'dotted', 'Top20': 'dashed', 'Top30': 'solid'}
+
+    metrics = df['Metric'].unique()
+    n_metrics = len(metrics)
+
+    fig, ax = plt.subplots(n_metrics, 1, figsize=(4, 2 * n_metrics), sharex=True)
+
+    for i, metric in enumerate(metrics):
+        ax_i = ax[i]
+        found_any = False
+
+        for ds in selected_datasets:
+            sub_df = df[
+                (df['Dataset'] == ds) &
+                (df['Aggregation'] == target_agg) &
+                (df['n_epochs'] == 1) &
+                (df['mu'] == 0.01) &
+                (df['Metric'] == metric)
+            ].sort_values("Round")
+
+            if sub_df.empty:
+                continue
+
+            found_any = True
+            ax_i.plot(sub_df['Round'], sub_df['Value'],
+                      color=palette[ds],
+                      linestyle=linestyles.get(ds, 'solid'),
+                      linewidth=2)
+
+        if not found_any:
+            raise ValueError(f"No data found for metric '{metric}' across datasets")
+
+        # Centralized line for Top30
+        central_val = df[
+            (df['Dataset'] == 'Top30') &
+            (df['Aggregation'] == 'centralized') &
+            (df['n_epochs'] == 20) &
+            (df['Metric'] == metric)
+        ]['Value'].values[0]
+        ax_i.axhline(y=central_val, linestyle='solid', color='black', linewidth=2)
+
+        # Y-axis styling
+        ax_i.set_ylabel(metric, fontsize=16)
+        ax_i.set_ylim(0, 0.69)
+        ax_i.tick_params(axis='y', labelsize=12)
+
+        ax_i.set_xlim(-1, 200)
+        ax_i.set_xticks(range(0, 201, 50))
+        ax_i.tick_params(axis='x', labelbottom=True, bottom=True, labelsize=0 if i < n_metrics - 1 else 18)
+
+    plt.subplots_adjust(hspace=0.02)  # Tighter vertical spacing
+    plt.tight_layout(h_pad=0.03)
+    plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/myeloid_over_rounds.png", dpi=300)
+    plt.close()
+
+
+
+
+def plot_reference_umap(adata, all_colors, batch_key, celltype_key, dataset):
+    ref_adata = adata[adata.obs['split'] == 'reference']
+
+    plot_umap_and_legend(
+        ref_adata,
+        all_colors,
+        color=[celltype_key, batch_key],
+        title=["Reference: Cell Type", "Reference: Batch"],
+        filename=f"_{dataset}_reference.png"
+    )
+
+    plot_umap_and_legend(
+        ref_adata,
+        all_colors,
+        color=[celltype_key],
+        title=["Reference: Cell Type"],
+        filename=f"_{dataset}_reference_celltype.png"
+    )
+
+    if dataset in ['myeloid-top5', 'myeloid-top10', 'myeloid-top20', 'myeloid-top30']:
+        plot_batch_umap_with_legend(
+            ref_adata,
+            color_key=batch_key,
+            title="Reference: Batch",
+            umap_filename=f"{sc.settings.figdir}/_{dataset}_reference_batch_colorbar.png",
+            legend_filename=f"{sc.settings.figdir}/_{dataset}_reference_batch_legend.png",
+            colormap='turbo'  # or 'nipy_spectral', 'tab20', etc.
+        )
+    else:
+        plot_umap_and_legend(
+            ref_adata,
+            all_colors,
+            color=[batch_key],
+            title=["Reference: Batch"],
+            filename=f"_{dataset}_reference_batch.png"
+        )
+
+
+def plot_entire_ds_umap(adata, all_colors, batch_key, celltype_key, dataset):
+    # Entir datasets
+    plot_umap_and_legend(adata, all_colors, [celltype_key, batch_key],
+                         title=["Cell Type", "Batch"], filename=f"_{dataset}.png")
+    plot_umap_and_legend(adata, all_colors, [celltype_key],
+                         title=["Cell Type"], filename=f"_{dataset}_celltype.png")
+    plot_umap_and_legend(adata, all_colors, [batch_key],
+                         title=["Batch"], filename=f"_{dataset}_batch.png")
+
+
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+import scanpy as sc
+import numpy as np
+
+def plot_batch_umap_with_legend(
+        adata,
+        color_key='batch',
+        title='UMAP by Batch',
+        umap_filename='umap_batches.png',
+        legend_filename='umap_batches_legend.png',
+        colormap='turbo'
+):
+    # Step 1: Prepare batch labels
+    adata.obs[color_key] = adata.obs[color_key].astype(str)
+    unique_batches = adata.obs[color_key].unique().tolist()
+    print(f"num batches: {len(unique_batches)}")
+    print(f"unique batches: {unique_batches}")
+    # unique_batches = sorted(unique_batches, key=lambda x: int(x) if x.isdigit() else len(unique_batches))
+
+    # Replace 'rest' with len(unique_batches)
+    if 'rest' in unique_batches:
+        unique_batches.append(str(len(unique_batches)))
+        unique_batches.remove('rest')
+        adata.obs[color_key] = adata.obs[color_key].replace('rest', str(len(unique_batches)))
+    unique_batches = sorted(unique_batches, key=lambda x: int(x))
+    # unique_batches = [int(b) for b in unique_batches]
+    print(unique_batches)
+    # Step 2: Map batch labels to integers for coloring
+    batch_to_index = {b: i for i, b in enumerate(unique_batches)}
+    # adata.obs['color_idx'] = adata.obs[color_key].astype(int)
+    adata.obs['color_idx'] = adata.obs[color_key].map(batch_to_index).astype(int)
+    # Step 3: Generate discrete colors using a colormap
+    cmap = cm.get_cmap(colormap, len(unique_batches))
+    color_list = [cmap(i) for i in range(len(unique_batches))]
+
+    # Step 4: Plot UMAP using Scanpy with fixed colors
+    # color_palette = {str(b): color_list[b-1] for b in unique_batches}
+    color_palette = {b: color_list[i] for i, b in enumerate(unique_batches)}
+    print(color_palette)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sc.pl.umap(
+        adata,
+        color=color_key,
+        palette=color_palette,
+        show=False,
+        ax=ax,
+        frameon=False,
+        title=title
+    )
+    plt.tight_layout()
+    plt.savefig(umap_filename, dpi=300)
+    plt.close()
+
+    # Step 5: Plot standalone circle legend
+    fig_legend, ax_legend = plt.subplots(figsize=(3, 12))
+    handles = [
+        plt.Line2D([0], [0], marker='o', color='w', label=str(b),
+                   markerfacecolor=color_palette[b], markersize=8)
+        for b in unique_batches
+    ]
+    ax_legend.legend(
+        handles,
+        unique_batches,
+        loc='center',
+        fontsize='small',
+        frameon=False,
+        handletextpad=0.5,  # space between marker and text
+        borderaxespad=0.2,  # space around the legend box
+        labelspacing=0.05,  # space between legend entries (rows)
+        handlelength=1.5,  # length of the legend markers
+        ncol=1
+    )
+
+    ax_legend.axis('off')
+    plt.tight_layout()
+    plt.savefig(legend_filename, dpi=300)
+    plt.close()
+
+
+
+def plot_batch_legend_only(adata, color_key='batch', colormap='turbo', filename='batch_legend.png'):
+    unique_batches = sorted(adata.obs[color_key].unique())
+    batch_to_index = {b: i for i, b in enumerate(unique_batches)}
+    cmap = cm.get_cmap(colormap, len(unique_batches))
+
+    colors = [cmap(batch_to_index[b]) for b in unique_batches]
+
+    fig_legend, ax_legend = plt.subplots(figsize=(3, 12))
+    handles = [plt.Line2D([0], [0], marker='o', color='w', label=str(b), markerfacecolor=c, markersize=8) for b, c in
+               zip(unique_batches, colors)]
+    ax_legend.legend(handles, unique_batches, loc='center', fontsize='small', frameon=False)
+    ax_legend.axis('off')
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300)
+    plt.close()
+
+def plot_umap_and_legend(adata, color_mapping, color, title, filename):
+    # 1. UMAP for Reference Subset
+    sc.pl.umap(
+        adata,
+        color=color,
+        title=title,
+        palette=color_mapping,
+        frameon=False,
+        ncols=len(color),
+        legend_loc=None,  # <- disable inline legend
+        show=False,
+        save=filename
+    )
+    plt.close('all')
+    for c, t in zip(color, title):
+        umap_legend_plot(adata, c, color_mapping , filename=f"{sc.settings.figdir}/{filename.replace('.png', f'-{t}-legend.png')}")
+        plt.close('all')
+
+
+def umap_legend_plot(adata, color, color_mapping, filename):
+    fig = plt.figure(figsize=(15, 5))
+    sc.pl.umap(adata, color=color, palette=color_mapping, show=False)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.close()
+    unique_celltypes = sorted(set(adata.obs[color].values))
+    sorted_handles_labels = sorted(zip(handles, labels), key=lambda x: unique_celltypes.index(x[1]))
+    sorted_handles, sorted_labels = zip(*sorted_handles_labels)
+
+    fig_legend, ax_legend = plt.subplots(figsize=(3, 9))  # Separate figure for the legend
+    # ax_legend.legend(sorted_handles, sorted_labels, loc='center', fontsize='small', frameon=False, ncol=1)
+    ax_legend.legend(
+        sorted_handles,
+        sorted_labels,
+        loc='center',
+        fontsize='small',
+        frameon=False,
+        handletextpad=0.5,  # space between marker and text
+        borderaxespad=0.2,  # space around the legend box
+        labelspacing=0.05,  # space between legend entries (rows)
+        handlelength=1.5,  # length of the legend markers
+        ncol=1
+    )
+    ax_legend.axis('off')
+    plt.savefig(filename, dpi=300)
+    plt.close()
+
+
+# def plot_umap_and_conf_matrix(dataset, adata, id_maps, labels, cent, fed):
+#         # Convert IDs to string labels for plotting
+#         label_names = [id_maps[i] for i in labels]
+#         fed_names = [id_maps[i] for i in fed]
+#         cent_names = [id_maps[i] for i in cent]
+#         # unique_celltypes = sorted(set(label_names + fed_names + cent_names), key=lambda x: str(x))
+#         label_set = sorted(set(label_names), key=lambda x: str(x))
+#         extra_labels = sorted(set(fed_names + cent_names) - set(label_set), key=lambda x: str(x))
+#         unique_celltypes = label_set + extra_labels
+#
+#         color_mapping = generate_palette(unique_celltypes)
+#
+#
+#         # Plot UMAP
+#         plot_umaps(
+#             adata, cent_names, fed_names, label_names, unique_celltypes,
+#             f"{dataset}_umap.png",
+#             f"{dataset}_legend.png",
+#             color_mapping,
+#             plot_legend=True
+#         )
+#         plot_umaps(
+#             adata, cent_names, fed_names, label_names, unique_celltypes,
+#             f"{dataset}_umap.png",
+#             f"{dataset}_legend.png",
+#             color_mapping,
+#             plot_legend=False
+#         )
+#
+#         # Plot Confusion Matrix
+#         plot_confusion_with_deltas(
+#             dataset, cent, fed, labels, id_maps,
+#             color_mapping,
+#             os.path.join(ANNOTATION_PLOTS_DIR, f"{dataset}_confusion_delta.svg")
+#         )
+
+
+# def plot_umap_and_conf_matrix(root_dir, data_dir, res_pkl_file, res_df_file):
+#     df = pd.read_csv(res_df_file)
+#     best_fed = {ds: df.loc[df[(df.Dataset==ds) & (df.Metric == 'Accuracy')]["Value"].idxmax()] for ds in df.Dataset.unique()}
+#     results = load_results_pkl(root_dir, res_pkl_file, best_fed)
+#
+#     for dataset in results.keys():
+#         adata = load_query_datasets(data_dir, dataset)
+#         predictions_centralized = results[dataset]['centralized']['predictions']
+#         predictions_federated = results[dataset]['federated']['predictions']
+#         labels = results[dataset]['centralized']['labels']  # Assuming the labels are the same for all modes
+#         unique_celltypes = results[dataset]['centralized']['unique_celltypes']
+#         assert results[dataset]['federated']['id_maps'] == results[dataset]['centralized']['id_maps']
+#         id_maps = results[dataset]['federated']['id_maps']
+#         labels = [id_maps[c] for c in labels]
+#         predictions_federated = [id_maps[c] for c in predictions_federated]
+#         predictions_centralized = [id_maps[c] for c in predictions_centralized]
+#         palette_ = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+#         palette_ = palette_ * 3  # Extend the palette if needed
+#         color_mapping = {c: palette_[i] for i, c in enumerate(unique_celltypes)}
+#         color_mapping = plot_confusion_matrices(dataset, results, color_mapping)
+#
+#         plot_umaps(adata, predictions_centralized, predictions_federated, labels, unique_celltypes,
+#                    f"{dataset}_umap_plots.png", f"{dataset}_legend.png", color_mapping)
+#         plot_umaps(adata, predictions_centralized, predictions_federated, labels, unique_celltypes,
+#                    f"{dataset}_umap_plots.png", f"{dataset}_legend.png", color_mapping, plot_legend=True)
 
 
 def plot_umaps(adata, predictions_centralized, predictions_federated, labels, unique_celltypes, file_name, legend_file_name, color_mapping, plot_legend=False):
@@ -715,9 +1892,8 @@ def plot_umaps(adata, predictions_centralized, predictions_federated, labels, un
         sc.pp.neighbors(adata, n_neighbors=30, use_rep='X')
         sc.tl.umap(adata)
     adata.obs['cell_type'] = labels
-
     if not plot_legend:
-        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        fig, axes = plt.subplots(3, 1, figsize=(4, 12))
         for ax, (key, title) in zip(axes, [('cell_type', 'Annotated'), ('centralized', 'Centralized'), ('federated', 'Federated')]):
             if key != 'cell_type':
                 adata.obs[key] = predictions_centralized if key == 'centralized' else predictions_federated
@@ -907,66 +2083,202 @@ def best_metrics_report(df):
         f"Dataset: {worst_case_row['Dataset']}, Metric: {worst_case_row['Metric']}, Percentage Achieved: {worst_case_row['Percentage Achieved']}%")
 
 
-def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
+# def embedding_boxplot(data_dir, datasets, plots_dir, img_format='svg'):
+#
+#     metrics = ['accuracy', 'precision', 'recall', 'macro_f1']
+#
+#     # Initialize an empty DataFrame to hold all results
+#     df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
+#
+#     fedscgpt_file_path = {ds: f"{data_dir}/{ds}/federated/evaluation_metrics.csv" for ds in datasets}
+#     fedscgpt_smpc_file_path = {ds: f"{data_dir}/{ds}/federated/smpc/evaluation_metrics.csv" for ds in datasets}
+#     scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
+#
+#     for ds in datasets:
+#         adata_path = Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0]
+#         ref = anndata.read_h5ad(adata_path)
+#         batches = list(sorted(ref.obs[datasets_details[ds]['batch_key']].unique()))
+#         # Load centralized and federated results
+#         scgpt = pd.read_csv(scgpt_file_path[ds])
+#         fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
+#         fedscgpt_smpc = pd.read_csv(fedscgpt_smpc_file_path[ds])
+#         rows = []
+#         # Append centralized and federated results to the DataFrame
+#         for metric in metrics:
+#             rows.append({
+#                 'Dataset': ds,
+#                 'Type': 'Centralized',
+#                 'Metric': metric,
+#                 'Value': scgpt[metric].values[0]
+#             })
+#             rows.append({
+#                 'Dataset': ds,
+#                 'Type': 'Federated',
+#                 'Metric': metric,
+#                 'Value': fedscgpt[metric].values[0]
+#             })
+#             rows.append({
+#                 'Dataset': ds,
+#                 'Type': 'Federated-SMPC',
+#                 'Metric': metric,
+#                 'Value': fedscgpt_smpc[metric].values[0]
+#             })
+#         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+#         # Collect and append client results
+#         client_dir_path = os.path.join(data_dir, ds, "centralized")
+#         rows = []
+#         for client_dir in os.listdir(client_dir_path):
+#             if client_dir.startswith("client"):
+#                 client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
+#                 client_num = int(os.path.basename(client_dir).split("_")[1])
+#                 client_batch_value = batches[client_num]
+#                 for metric in metrics:
+#                     rows.append({
+#                         'Dataset': ds,
+#                         'Type': 'Client',
+#                         'Metric': metric,
+#                         'Value': client_metrics[metric].values[0],
+#                         'Batch': client_batch_value
+#                     })
+#         df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+#     # display_federated_performance_report(df)
+#     per_metric_annotated_scatterplot(df, plots_dir, img_format)
 
-    metrics = ['accuracy', 'precision', 'recall', 'macro_f1']
-
-    # Initialize an empty DataFrame to hold all results
-    df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value'])
-
-    fedscgpt_file_path = {ds: f"{data_dir}/{ds}/federated/evaluation_metrics.csv" for ds in datasets}
-    fedscgpt_smpc_file_path = {ds: f"{data_dir}/{ds}/federated/smpc/evaluation_metrics.csv" for ds in datasets}
-    scgpt_file_path = {ds: f"{data_dir}/{ds}/centralized/evaluation_metrics.csv" for ds in datasets}
+def embedding_boxplot(df_all_metrics, datasets, subdir, img_format='svg'):
+    metrics = ['Accuracy', 'Precision', 'Recall', 'Macro-F1']
+    output_df = pd.DataFrame(columns=['Dataset', 'Type', 'Metric', 'Value', 'Batch'])
 
     for ds in datasets:
-        adata_path = Path(data_dir).parents[1]/'data/scgpt/benchmark'/ds/datasets_details[ds]['h5ad_file'].split("|")[0]
-        ref = anndata.read_h5ad(adata_path)
-        batches = list(sorted(ref.obs[datasets_details[ds]['batch_key']].unique()))
-        # Load centralized and federated results
-        scgpt = pd.read_csv(scgpt_file_path[ds])
-        fedscgpt = pd.read_csv(fedscgpt_file_path[ds])
-        fedscgpt_smpc = pd.read_csv(fedscgpt_smpc_file_path[ds])
-        rows = []
-        # Append centralized and federated results to the DataFrame
-        for metric in metrics:
-            rows.append({
-                'Dataset': ds,
-                'Type': 'Centralized',
-                'Metric': metric,
-                'Value': scgpt[metric].values[0]
-            })
-            rows.append({
-                'Dataset': ds,
-                'Type': 'Federated',
-                'Metric': metric,
-                'Value': fedscgpt[metric].values[0]
-            })
-            rows.append({
-                'Dataset': ds,
-                'Type': 'Federated-SMPC',
-                'Metric': metric,
-                'Value': fedscgpt_smpc[metric].values[0]
-            })
-        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-        # Collect and append client results
-        client_dir_path = os.path.join(data_dir, ds, "centralized")
-        rows = []
-        for client_dir in os.listdir(client_dir_path):
-            if client_dir.startswith("client"):
-                client_metrics = pd.read_csv(os.path.join(client_dir_path, client_dir, "evaluation_metrics.csv"))
-                client_num = int(os.path.basename(client_dir).split("_")[1])
-                client_batch_value = batches[client_num]
-                for metric in metrics:
-                    rows.append({
-                        'Dataset': ds,
-                        'Type': 'Client',
-                        'Metric': metric,
-                        'Value': client_metrics[metric].values[0],
-                        'Batch': client_batch_value
-                    })
-        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-    # display_federated_performance_report(df)
-    per_metric_annotated_scatterplot(df, plots_dir, img_format)
+        # Filter rows for this dataset
+        df_ds = df_all_metrics[df_all_metrics['Dataset'] == ds]
+
+        for _, row in df_ds.iterrows():
+            aggregation = row['Aggregation']
+            if aggregation == "centralized":
+                agg_type = "Centralized"
+            elif aggregation == "federated":
+                agg_type = "Federated"
+            elif "smpc" in row['Source']:
+                agg_type = "Federated-SMPC"
+            elif aggregation.startswith("client_"):
+                agg_type = "Client"
+            else:
+                agg_type = "Unknown"
+
+            for metric in metrics:
+                new_row = {
+                    "Dataset": ds,
+                    "Type": agg_type,
+                    "Aggregation": row['Aggregation'],
+                    "Metric": metric,
+                    "Value": row[metric],
+                    "Batch": None  # optional
+                }
+
+                # Add batch name as 'client_X' for client results
+                if aggregation.startswith("client_"):
+                    new_row["Batch"] = aggregation
+
+                output_df = pd.concat([output_df, pd.DataFrame([new_row])], ignore_index=True)
+    if subdir == 'covid':
+        figsize = (7, 5)
+    else:
+        figsize = (5, 5)
+    ylim = 0.7 if subdir == 'myeloid' else 1
+    per_metric_ref_map_scatterplot(output_df, f"{EMBEDDING_PLOTS_DIR}/{subdir}", img_format, figsize, ylim=ylim)
+
+
+def per_metric_ref_map_scatterplot(df, plots_dir, img_format='png', figsize=(7,5), x_spacing=0.8, ylim=1):
+    """
+    Plot annotated scatterplots per metric, with adjustable horizontal spacing.
+
+    Parameters:
+    - df: DataFrame with ['Dataset', 'Type', 'Metric', 'Value', 'Aggregation', 'Batch']
+    - plots_dir: output directory for plots
+    - img_format: format for saved plots
+    - proximity_threshold: (not used in this version, retained for compatibility)
+    - x_spacing: float, space between datasets on x-axis (default: 1.0)
+    """
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    datasets = df['Dataset'].unique()
+    metrics = df['Metric'].unique()
+
+    client_mask = df['Type'].str.lower() == 'client'
+    cmap = safe_extended_palette
+
+    # Aggregation marker, label, and x-offset
+    agg_map = {
+        'federated': (FEDSCGPT_MARKER, 'Federated', -0.15),
+        'smpc': (FEDSCGPT_SMPC_MARKER, 'Federated-SMPC', 0.15),
+    }
+
+    for metric in metrics:
+        plt.figure(figsize=figsize)
+
+        for i, ds in enumerate(datasets):
+            x_base = i * x_spacing
+            df_ds = df[(df['Dataset'] == ds) & (df['Metric'] == metric)]
+
+            # --- Plot client points with jitter ---
+            clients = df_ds[df_ds['Type'].str.lower() == 'client']
+            if not clients.empty:
+                vals = clients['Value'].values
+                jitter = np.random.uniform(-0.05, 0.05, size=len(vals))
+                x_vals = x_base + jitter
+                plt.scatter(x_vals, vals,
+                            color=cmap[i % len(cmap)],
+                            edgecolor='black',
+                            s=50, alpha=0.7,
+                            label="Client" if i == 0 else None)
+
+            # --- Centralized as horizontal dashed line ---
+            centralized = df_ds[df_ds['Type'] == 'Centralized']
+            if not centralized.empty:
+                val = centralized['Value'].values[0]
+                plt.hlines(val, x_base - 0.3, x_base + 0.3,
+                           color=cmap[i % len(cmap)],
+                           linestyle='--', linewidth=2,
+                           label="Centralized" if i == 0 else None)
+
+            # --- Plot federated variants with marker + x-offset ---
+            for agg_key, (marker, label_text, offset) in agg_map.items():
+                sub = df_ds[df_ds['Aggregation'].str.lower() == agg_key]
+                if not sub.empty:
+                    val = sub['Value'].values[0]
+                    x_pos = x_base + offset
+                    color = cmap[i % len(cmap)]
+                    fill = color if 'smpc' in agg_key else 'white'
+
+                    plt.scatter(x_pos, val,
+                                marker=marker,
+                                s=100,
+                                facecolors=fill,
+                                edgecolors='black',
+                                zorder=5,
+                                label=label_text if i == 0 else None)
+
+        # --- Plot settings ---
+        plt.xlabel('')
+        plt.ylim(0, ylim)
+        plt.ylabel(metric, fontsize=24)
+        plt.xticks(
+            ticks=[i * x_spacing for i in range(len(datasets))],
+            labels=[DS_NAME_MAP.get(d, d) for d in datasets],
+            fontsize=22
+        )
+        plt.yticks(fontsize=18)
+        plt.tight_layout()
+
+        out_path = os.path.join(plots_dir, f"{metric}_scatterplot_annotated.{img_format}")
+        plt.savefig(out_path, dpi=300, format=img_format, bbox_inches='tight')
+        plt.close()
+        # Regenerate external legend
+        plot_legend_embedding(plots_dir, img_format)
+
+
+
 
 def find_federated_performance_comparison(df, federated_types=None):
     """
@@ -1280,50 +2592,58 @@ def plot_legend(plots_dir, img_format='svg'):
     plt.close()
 
 
-def plot_legend_embedding(plots_dir, img_format='svg'):
+def plot_legend_embedding(plots_dir, img_format='svg', layout='row'):
     """
     Plot a separate figure containing only the legend for:
       – scGPT (centralized)
       – FedscGPT (federated)
       – FedscGPT-SMPC (federated + SMPC)
       – Clients
-      – Other approaches
+
+    Args:
+        plots_dir (str): Directory to save the legend image.
+        img_format (str): File format (e.g., 'svg', 'png').
+        layout (str): 'row' for horizontal, 'column' for vertical layout.
     """
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
-
-    plt.figure(figsize=(6, 1.5))
-
     legend_elements = [
-        Line2D([0], [0],
-               color='black', lw=2, linestyle='--',
-               label='Centralized'),
-        Line2D([0], [0],
-               marker=FEDSCGPT_MARKER, color='w', markersize=10,
-               markeredgecolor='black',
-               label='Federated'),
-        Line2D([0], [0],
-               marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10,
-               markeredgecolor='black',
-               label='Federated-SMPC'),
-        Line2D([0], [0],
-               marker='o', color='w', markersize=8,
-               markeredgecolor='black',
-               label='Clients'),
+        Line2D([0], [0], color='black', lw=2, linestyle='--', label='Centralized'),
+        Line2D([0], [0], marker=FEDSCGPT_MARKER, color='w', markersize=10,
+               markeredgecolor='black', label='Federated'),
+        Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10,
+               markeredgecolor='black', label='Federated-SMPC'),
+        Line2D([0], [0], marker='o', color='w', markersize=8,
+               markeredgecolor='black', label='Clients'),
     ]
 
-    plt.legend(handles=legend_elements,
-               loc='center', fontsize=12,
-               ncol=len(legend_elements),
-               frameon=False,
-               columnspacing=1.0)
+    if layout == 'row':
+        fig, ax = plt.subplots(figsize=(6, 1.5))
+        ax.legend(
+            handles=legend_elements,
+            loc='center',
+            ncol=len(legend_elements),
+            fontsize=12,
+            frameon=False,
+            handletextpad=0.4,
+            columnspacing=0.8,
+        )
+    elif layout == 'column':
+        fig, ax = plt.subplots(figsize=(2.5, len(legend_elements)))
+        ax.legend(
+            handles=legend_elements,
+            loc='center',
+            ncol=1,
+            fontsize=12,
+            frameon=False,
+            handletextpad=0.4
+        )
+    else:
+        raise ValueError("layout must be either 'row' or 'column'")
 
-    plt.axis('off')
-    plt.savefig(f"{plots_dir}/legend.{img_format}",
-                format=img_format, dpi=300,
-                bbox_inches='tight')
+    ax.axis('off')
+    plt.tight_layout()
+    plt.savefig(f"{plots_dir}/legend.{img_format}", format=img_format, dpi=300, bbox_inches='tight', transparent=True)
     plt.close()
+
 
 def plot_embedding_boxplot(df, img_format='svg'):
     """
@@ -1569,113 +2889,632 @@ def plot_umap_legend(
     plt.close()
     print(f"  → saved batch legend {bt_fp}")
 
-def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.2):
+# def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.2):
+#     """
+#     Plot data using Matplotlib from a pandas DataFrame, with each scatter point annotated by its corresponding 'Batch' value.
+#     Adjusts the text to the left or right dynamically to avoid overlap for points with close y-values.
+#
+#     Parameters:
+#     - df: DataFrame containing the data to plot.
+#     - plots_dir: Directory to save the plots.
+#     - img_format: Format to save the images (e.g., 'svg').
+#     - proximity_threshold: Defines the closeness of y-values to consider them overlapping (default = 0.1).
+#     - legend_inside: Boolean flag indicating whether to place the legend inside the figure (default = False).
+#     """
+#     if not os.path.exists(plots_dir):
+#         os.makedirs(plots_dir)
+#
+#     metrics = df['Metric'].unique()
+#     datasets = df['Dataset'].unique()
+#     print(datasets)
+#
+#     for metric in metrics:
+#         plt.figure(figsize=(5, 5))
+#
+#         # Separate client data and centralized/federated data
+#         df_metric = df[df['Metric'] == metric]
+#         scgpt = df_metric[df_metric['Type'] == 'scGPT']
+#         fedscgpt_smpc = df_metric[df_metric['Type'] == 'FedscGPT-SMPC']
+#         fedscgpt = df_metric[df_metric['Type'] == 'FedscGPT']
+#         client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'FedscGPT-SMPC', 'FedscGPT'])]
+#
+#         # Scatter plot for client data
+#         colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
+#         scatter_plots = []
+#         for i, dataset in enumerate(datasets):
+#             dataset_clients = client_data[client_data['Dataset'] == dataset]
+#             client_values = dataset_clients['Value'].values
+#             client_batches = dataset_clients['Type'].values
+#             # Scatter each client point with a slight horizontal offset to avoid overlap
+#             jitter = 0.05  # Add some horizontal jitter to avoid overlap
+#             x_jitter = np.random.uniform(-jitter, jitter, size=client_values.shape)
+#             scatter = plt.scatter([i + 1 + x for x in x_jitter], client_values,
+#                                   color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7,
+#                                   label=f"Client Data - {dataset}")
+#             scatter_plots.append(scatter)
+#
+#             # Determine proximity of y-values to decide label positions
+#             for j, (x, y, batch) in enumerate(zip([i + 1 + x for x in x_jitter], client_values, client_batches)):
+#                 batch_label = shorten_batch_value(batch)
+#
+#                 # Check if other points are "close enough" in y-value using the proximity threshold
+#                 close_points = np.sum(np.abs(client_values - y) < proximity_threshold)
+#                 annotation_font_size = 12
+#                 if close_points > 1:  # If there are other points within the threshold range
+#                     # Alternate placement of labels for overlapping points
+#                     if j % 2 == 0:
+#                         plt.text(x + 0.1, y, batch_label, fontsize=annotation_font_size, ha='left', va='center')
+#                     else:
+#                         plt.text(x - 0.1, y, batch_label, fontsize=annotation_font_size, ha='right', va='center')
+#                 else:
+#                     plt.text(x + 0.1, y, batch_label, fontsize=annotation_font_size, ha='left', va='center')
+#
+#         # Overlay centralized and federated data points
+#         for i, dataset in enumerate(datasets):
+#             # Centralized as horizontal lines only within the dataset range
+#             if not scgpt[scgpt['Dataset'] == dataset].empty:
+#                 scgpt_value = scgpt[scgpt['Dataset'] == dataset]['Value'].values[0]
+#                 plt.hlines(y=scgpt_value, xmin=i + 0.7, xmax=i + 1.3,
+#                            color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3,
+#                            label=f"scGPT")
+#
+#             # Federated as scatter points
+#             if not fedscgpt[fedscgpt['Dataset'] == dataset].empty:
+#                 federated_value = fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0]
+#                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+#                             zorder=5, marker=FEDSCGPT_MARKER, s=100, label=f"FedscGPT")
+#
+#             if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
+#                 federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
+#                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
+#                             zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100, label=f"FedscGPT-SMPC")
+#
+#
+#
+#         # Customize the plot
+#         plt.xlabel('', fontsize=1)
+#         plt.ylabel(metric.capitalize(), fontsize=20)
+#         plt.ylim(0, 1)
+#         plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
+#         plt.yticks(fontsize=18)
+#
+#         # Legend placement based on the flag
+#         custom_handles = [
+#             plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white', markersize=8, linestyle='None',
+#                         label='Clients'),
+#             plt.Line2D([0], [0], marker=FEDSCGPT_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
+#                         label='FedscGPT'),
+#             plt.Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
+#                        label='FedscGPT-SMPC'),
+#             plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='scGPT')
+#         ]
+#         legend = plt.legend(handles=custom_handles, loc='lower left', fontsize=14, frameon=True)
+#         legend.get_frame().set_edgecolor('black')
+#         legend.get_frame().set_facecolor('white')
+#
+#         plt.tight_layout()
+#         plt.savefig(f"{plots_dir}/{metric}_scatterplot_annotated.{img_format}", format=img_format, dpi=300,
+#                     bbox_inches='tight')
+#         plt.close()
+
+def print_best_configurations(df, metrics):
+    for metric in metrics:
+        print(f"\n=== Best configurations for Metric: {metric} ===")
+        sub_df = df[df['Metric'] == metric]
+
+        grouped = sub_df.groupby(['Aggregation', 'Dataset'])
+
+        for (agg, ds), group in grouped:
+            best_row = group.loc[group['Value'].idxmax()]
+            print(
+                f"- {agg} | {ds} -> Value: {best_row['Value']:.4f} | Epochs: {int(best_row['n_epochs'])} | Round: {int(best_row['Round'])}")
+
+
+import matplotlib.pyplot as plt
+
+
+def save_legend_figure(handles, labels, save_path="legend_only.svg", fontsize=14, ncol=1):
     """
-    Plot data using Matplotlib from a pandas DataFrame, with each scatter point annotated by its corresponding 'Batch' value.
-    Adjusts the text to the left or right dynamically to avoid overlap for points with close y-values.
+    Save only the legend as an independent figure in one row.
 
     Parameters:
-    - df: DataFrame containing the data to plot.
-    - plots_dir: Directory to save the plots.
-    - img_format: Format to save the images (e.g., 'svg').
-    - proximity_threshold: Defines the closeness of y-values to consider them overlapping (default = 0.1).
-    - legend_inside: Boolean flag indicating whether to place the legend inside the figure (default = False).
+    - handles: The plot handles (such as from plot, scatter, etc.)
+    - labels: The corresponding labels for each handle
+    - save_path: The path to save the legend figure (default is "legend_only.svg")
+    - fontsize: Font size for the labels in the legend (default is 14)
+    - ncol: Number of columns in the legend (default is 1)
     """
-    if not os.path.exists(plots_dir):
-        os.makedirs(plots_dir)
+    # Adjust the width of the figure based on the number of columns
+    ncol = max(1, ncol)  # Ensure ncol is at least 1
+    fig_width = max(1.5 * len(handles) / ncol, 6)  # Scale width based on ncol
+    fig_legend = plt.figure(figsize=(fig_width, 2))  # Wider but short figure for the legend
+
+    # Create the legend outside of any axes
+    legend = fig_legend.legend(
+        handles,
+        labels,
+        loc='center',
+        frameon=True,
+        fontsize=fontsize,
+        ncol=ncol,  # Use the passed ncol value
+        handletextpad=0.1,
+        columnspacing=0.3,
+        borderaxespad=0.1
+    )
+
+    # Customize legend frame
+    legend.get_frame().set_edgecolor('none')
+    legend.get_frame().set_facecolor('white')
+
+    # Tight layout and save the figure
+    fig_legend.tight_layout()
+    fig_legend.savefig(save_path, format="png", dpi=300, bbox_inches='tight')
+    plt.close(fig_legend)
+
+
+# Example usage:
+# save_legend_figure(handles, labels, ncol=2)  # To save the legend with 2 columns
+
+
+def accuracy_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_threshold=0.1):
+    # Constants
+    valid_datasets = ['hp5', 'ms', 'lung', 'cl', 'myeloid-top5']
+    fed_aggs = ['weighted-FedAvg', 'SMPC-weighted-FedAvg', 'weighted-FedProx', 'SMPC-weighted-FedProx']
+    client_aggs = [agg for agg in df['Aggregation'].unique() if agg.startswith("client_")]
+    all_aggs = ['centralized'] + fed_aggs + client_aggs
+
+    # Filtering
+    df = df[df['Dataset'].isin(valid_datasets) & df['Aggregation'].isin(all_aggs)]
+
+    # df = df.groupby(['Dataset', 'Metric', 'Aggregation'], as_index=False).apply(
+    #     lambda g: g.loc[g['Value'].idxmax()]).reset_index(drop=True)
+
+    fixed_df = df[(df['n_epochs'] == 1) & (df['Round'] == 20)].copy()
+
+    # Step 2: Group and keep one per Dataset-Metric-Aggregation
+    fixed_df = fixed_df.groupby(['Dataset', 'Metric', 'Aggregation'], as_index=False).first()
+
+    # Step 3: Add additional client and centralized rows (if not already in fixed_df)
+    # Select all client_* and centralized entries
+    extra_df = df[df['Aggregation'].str.startswith('client_') | (df['Aggregation'] == 'centralized')]
+
+
+    # Remove duplicates already in fixed_df
+    existing_keys = set(fixed_df[['Dataset', 'Metric', 'Aggregation']].apply(tuple, axis=1))
+    extra_df = extra_df[~extra_df[['Dataset', 'Metric', 'Aggregation']].apply(tuple, axis=1).isin(existing_keys)]
+
+    # Step 4: Concatenate
+    df = pd.concat([fixed_df, extra_df], ignore_index=True)
+
+
+
+    # Output dir
+    os.makedirs(plots_dir, exist_ok=True)
 
     metrics = df['Metric'].unique()
-    datasets = df['Dataset'].unique()
-    print(datasets)
+    # ds_map = {'hp5': 'hp', 'myeloid-top5': 'myeloid'}
+    # df['Dataset'] = df['Dataset'].apply(lambda x: ds_map.get(x, x))
+    datasets = sorted(df['Dataset'].unique())
+    palette = generate_palette(datasets)
+
+    agg_map = {
+        "weighted-FedAvg": ('^', "FedAvg", -0.2),
+        "SMPC-weighted-FedAvg": ('^', "FedAvg-SMPC", -0.1),
+        "weighted-FedProx": ('s', "FedProx", 0.1),
+        "SMPC-weighted-FedProx": ('s', "FedProx-SMPC", 0.2),
+    }
 
     for metric in metrics:
-        plt.figure(figsize=(5, 5))
-
-        # Separate client data and centralized/federated data
+        plt.figure(figsize=(6, 4))
         df_metric = df[df['Metric'] == metric]
-        scgpt = df_metric[df_metric['Type'] == 'scGPT']
-        fedscgpt_smpc = df_metric[df_metric['Type'] == 'FedscGPT-SMPC']
-        fedscgpt = df_metric[df_metric['Type'] == 'FedscGPT']
-        client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'FedscGPT-SMPC', 'FedscGPT'])]
 
-        # Scatter plot for client data
-        colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
-        scatter_plots = []
-        for i, dataset in enumerate(datasets):
-            dataset_clients = client_data[client_data['Dataset'] == dataset]
-            client_values = dataset_clients['Value'].values
-            client_batches = dataset_clients['Type'].values
-            # Scatter each client point with a slight horizontal offset to avoid overlap
-            jitter = 0.05  # Add some horizontal jitter to avoid overlap
-            x_jitter = np.random.uniform(-jitter, jitter, size=client_values.shape)
-            scatter = plt.scatter([i + 1 + x for x in x_jitter], client_values,
-                                  color=colors[i % len(colors)], edgecolor='black', s=50, alpha=0.7,
-                                  label=f"Client Data - {dataset}")
-            scatter_plots.append(scatter)
+        for i, dataset in enumerate(valid_datasets):
+            subset = df_metric[df_metric['Dataset'] == dataset]
+            color = palette[dataset]
+            # Plot client data
+            clients = subset[subset['Aggregation'].str.startswith("client_")]
+            jitter = np.random.uniform(-0.1, 0.1, size=len(clients))
+            x_vals = i + 1 + jitter
+            y_vals = clients['Value'].values
+            labels = clients['Aggregation'].str.replace("client_", "", regex=False).values
 
-            # Determine proximity of y-values to decide label positions
-            for j, (x, y, batch) in enumerate(zip([i + 1 + x for x in x_jitter], client_values, client_batches)):
-                batch_label = shorten_batch_value(batch)
+            plt.scatter(x_vals, y_vals, color=color, edgecolor='black', s=50, alpha=0.7,
+                        label=f"Client Data - {dataset}" if i == 0 else None)
 
-                # Check if other points are "close enough" in y-value using the proximity threshold
-                close_points = np.sum(np.abs(client_values - y) < proximity_threshold)
-                annotation_font_size = 12
-                if close_points > 1:  # If there are other points within the threshold range
-                    # Alternate placement of labels for overlapping points
-                    if j % 2 == 0:
-                        plt.text(x + 0.1, y, batch_label, fontsize=annotation_font_size, ha='left', va='center')
-                    else:
-                        plt.text(x - 0.1, y, batch_label, fontsize=annotation_font_size, ha='right', va='center')
-                else:
-                    plt.text(x + 0.1, y, batch_label, fontsize=annotation_font_size, ha='left', va='center')
+            # for j, (x, y, lab) in enumerate(zip(x_vals, y_vals, labels)):
+            #     offset = 0.1 if j % 2 == 0 else -0.1
+            #     ha = 'left' if offset > 0 else 'right'
+            #     plt.text(x + offset, y, shorten_batch_value(lab), fontsize=11, ha=ha, va='center')
 
-        # Overlay centralized and federated data points
-        for i, dataset in enumerate(datasets):
-            # Centralized as horizontal lines only within the dataset range
-            if not scgpt[scgpt['Dataset'] == dataset].empty:
-                scgpt_value = scgpt[scgpt['Dataset'] == dataset]['Value'].values[0]
-                plt.hlines(y=scgpt_value, xmin=i + 0.7, xmax=i + 1.3,
-                           color=colors[i % len(colors)], linestyle='--', linewidth=2, zorder=3,
-                           label=f"scGPT")
+            # Centralized
+            centralized = subset[subset['Aggregation'] == 'centralized']
+            if not centralized.empty:
+                val = centralized['Value'].values[0]
+                plt.hlines(val, i + 0.7, i + 1.3, color=color, linestyle='--', linewidth=2,
+                           label="Centralized" if i == 0 else None)
 
-            # Federated as scatter points
-            if not fedscgpt[fedscgpt['Dataset'] == dataset].empty:
-                federated_value = fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0]
-                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker=FEDSCGPT_MARKER, s=100, label=f"FedscGPT")
+            for agg, (marker, label_text, offset) in agg_map.items():
+                row = subset[subset['Aggregation'] == agg]
+                if not row.empty:
+                    val = row['Value'].values[0]
+                    epoch = int(row['n_epochs'].values[0])
+                    rnd = int(row['Round'].values[0])
+                    x_pos = i + 1 + offset
 
-            if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
-                federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
-                plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-                            zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100, label=f"FedscGPT-SMPC")
+                    # Use unfilled face for SMPC variants
+                    fill_style = 'white' if 'SMPC' not in agg else color
+                    edge = 'black'
 
+                    plt.scatter(x_pos, val, marker=marker, s=100,
+                                facecolors=fill_style, edgecolors=edge,
+                                zorder=5, label=label_text if i == 0 else None)
 
+                    # Annotate (epoch, round)
+                    # plt.text(x_pos, val + 0.02, f"{epoch}e\n{rnd}r", fontsize=9, ha='center', va='bottom')
 
-        # Customize the plot
-        plt.xlabel('', fontsize=1)
-        plt.ylabel(metric.capitalize(), fontsize=20)
-        plt.ylim(0, 1)
-        plt.xticks(range(1, len(datasets) + 1), [handle_ds_name(d) for d in datasets], fontsize=20)
-        plt.yticks(fontsize=18)
+        # Styling
+        plt.ylim(0.0, 1.1)
+        plt.ylabel(metric.capitalize(), fontsize=16)
+        plt.xticks(ticks=range(1, len(valid_datasets) + 1),
+                   labels=[handle_ds_name(d) for d in valid_datasets],
+                   fontsize=20)
+        plt.yticks(fontsize=13)
 
-        # Legend placement based on the flag
-        custom_handles = [
-            plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white', markersize=8, linestyle='None',
-                        label='Clients'),
-            plt.Line2D([0], [0], marker=FEDSCGPT_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
-                        label='FedscGPT'),
-            plt.Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
-                       label='FedscGPT-SMPC'),
-            plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='scGPT')
-        ]
-        legend = plt.legend(handles=custom_handles, loc='lower left', fontsize=14, frameon=True)
-        legend.get_frame().set_edgecolor('black')
-        legend.get_frame().set_facecolor('white')
-
+        # Save figure
         plt.tight_layout()
-        plt.savefig(f"{plots_dir}/{metric}_scatterplot_annotated.{img_format}", format=img_format, dpi=300,
-                    bbox_inches='tight')
+        plt.savefig(f"{plots_dir}/{metric}_scatterplot.{img_format}", format=img_format, dpi=300)
         plt.close()
+
+        # Save external legend
+        custom_handles = [
+            plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white',
+                       markersize=8, linestyle='None', label='Clients'),
+            plt.Line2D([0], [0], marker='^', color='black', markerfacecolor='white', markersize=9,
+                       linestyle='None', label='FedAvg'),
+            plt.Line2D([0], [0], marker='^', color='black', markerfacecolor='black', markersize=9,
+                       linestyle='None', label='FedAvg-SMPC'),
+            plt.Line2D([0], [0], marker='s', color='black', markerfacecolor='white', markersize=9,
+                       linestyle='None', label='FedProx'),
+            plt.Line2D([0], [0], marker='s', color='black', markerfacecolor='black', markersize=9,
+                       linestyle='None', label='FedProx-SMPC'),
+            plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='Centralized'),
+        ]
+
+        save_legend_figure(custom_handles, [h.get_label() for h in custom_handles],
+                           save_path=f"{plots_dir}/legend_only.{img_format}", fontsize=20)
+
+
+def myeloid_scatterplot(df, plots_dir, img_format='png'):
+    sns.set(style='whitegrid')
+    os.makedirs(plots_dir, exist_ok=True)
+
+    valid_datasets = ['Top5', 'Top10', 'Top20', 'Top30']
+    target_agg = "SMPC-weighted-FedProx"
+    client_aggs = [agg for agg in df['Aggregation'].unique() if agg.startswith("client_")]
+    all_aggs = ['centralized', target_agg] + client_aggs
+
+    # Filter relevant rows
+    df = df[df['Dataset'].isin(valid_datasets) & df['Aggregation'].isin(all_aggs)]
+
+    palette = generate_palette(valid_datasets)
+    agg_map = {
+        target_agg: ('s', "FedProx-SMPC", 0.),
+    }
+
+    metrics = df['Metric'].unique()
+
+    # Find best rounds for each dataset (using Macro_F1)
+    best_rounds = {}
+    for dataset in valid_datasets:
+        best_macro = df[
+            (df['Dataset'] == dataset) &
+            (df['Aggregation'] == target_agg) &
+            (df['Metric'] == 'Macro-F1') &
+            (df['n_epochs'] == 1) &
+            (df['mu'] == 0.01)
+        ]
+        if not best_macro.empty:
+            best_row = best_macro.loc[best_macro['Value'].idxmax()]
+            best_rounds[dataset] = int(best_row['Round'])
+        else:
+            raise ValueError
+    print(best_rounds)
+    for metric in metrics:
+        plt.figure(figsize=(5, 4))
+        df_metric = df[df['Metric'] == metric]
+
+        for i, dataset in enumerate(valid_datasets):
+            subset = df_metric[df_metric['Dataset'] == dataset]
+            color = palette[dataset]
+
+            # --- Client points ---
+            clients = subset[subset['Aggregation'].str.startswith("client_")]
+            jitter = np.random.uniform(-0.1, 0.1, size=len(clients))
+            x_vals = i + 1 + jitter
+            y_vals = clients['Value'].values
+            plt.scatter(x_vals, y_vals, color=color, edgecolor='black', s=50, alpha=0.7)
+
+            # --- FedProx-SMPC (only best round per Macro_F1) ---
+            for agg, (marker, label_text, offset) in agg_map.items():
+                best_rnd = best_rounds.get(dataset)
+                if best_rnd is not None:
+                    fed_row = subset[
+                        (subset['Aggregation'] == agg) &
+                        (subset['Round'] == best_rnd) &
+                        (subset['n_epochs'] == 1) &
+                        (subset['mu'] == 0.01)
+                    ]
+                    if not fed_row.empty:
+                        val = fed_row['Value'].values[0]
+                        x_pos = i + 1 + offset
+                        face_color = color
+
+                        plt.scatter(x_pos, val, marker=marker, s=100,
+                                    facecolors=face_color, edgecolors='black', zorder=5)
+
+        # --- Centralized line for Top30 ---
+        centralized = df_metric[(df_metric['Dataset'] == 'Top30') & (df_metric['Aggregation'] == 'centralized')]
+        if not centralized.empty:
+            val = centralized['Value'].values[0]
+            plt.axhline(val, color='black', linestyle='--', linewidth=2)
+
+        # --- Axes ---
+        plt.ylim(0.0, .7)
+        plt.ylabel(metric, fontsize=16)
+        plt.xticks(
+            ticks=range(1, len(valid_datasets) + 1),
+            labels=[handle_ds_name(d) for d in valid_datasets],
+            fontsize=16
+        )
+        plt.yticks(fontsize=13)
+
+        # --- Save ---
+        plt.tight_layout()
+        plt.savefig(f"{plots_dir}/{metric}_scatterplot.{img_format}", format=img_format, dpi=300)
+        plt.close()
+        custom_handles = [
+            plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white',
+                       markersize=8, linestyle='None', label='Clients'),
+            plt.Line2D([0], [0], marker='s', color='black', markerfacecolor='black', markersize=9,
+                       linestyle='None', label='FedProx-SMPC'),
+            plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='Centralized'),
+        ]
+
+        save_legend_figure(custom_handles, [h.get_label() for h in custom_handles],
+                           save_path=f"{plots_dir}/legend_3_only.{img_format}", fontsize=20,
+                           ncol=3)
+
+
+def covid_scatterplot(df, plots_dir, img_format='png'):
+    os.makedirs(plots_dir, exist_ok=True)
+
+    fed_aggs = ['FedAvg', 'FedAvg-SMPC', 'FedProx', 'FedProx-SMPC']
+    client_aggs = [agg for agg in df['Aggregation'].unique() if agg.startswith("client_")]
+    aggregations = ['centralized'] + fed_aggs + client_aggs
+
+    datasets = df['Dataset'].unique()
+    metrics = df['Metric'].unique()
+    palette = generate_palette(datasets)
+
+    agg_map = {
+        "FedAvg": ('^', "FedAvg", -0.2),
+        "FedAvg-SMPC": ('^', "FedAvg-SMPC", -0.1),
+        "FedProx": ('s', "FedProx", 0.1),
+        "FedProx-SMPC": ('s', "FedProx-SMPC", 0.2),
+    }
+
+    fig, axes = plt.subplots(len(metrics), 1, figsize=(4 , 3 * len(metrics)), sharex=True)
+
+    if len(metrics) == 1:
+        axes = [axes]  # Ensure iterable
+
+    for ax_i, metric in zip(axes, metrics):
+        df_metric = df[df['Metric'] == metric]
+
+        for i, dataset in enumerate(datasets):
+            subset = df_metric[df_metric['Dataset'] == dataset]
+            color = palette[dataset]
+
+            # Clients
+            clients = subset[subset['Aggregation'].str.startswith("client_")]
+            jitter = np.random.uniform(-0.1, 0.1, size=len(clients))
+            x_vals = i + 1 + jitter
+            y_vals = clients['Value'].values
+            ax_i.scatter(x_vals, y_vals, color=color, edgecolor='black', s=50, alpha=0.7)
+
+            # Centralized
+            centralized = subset[subset['Aggregation'] == 'centralized']
+            if not centralized.empty:
+                val = centralized['Value'].values[0]
+                ax_i.hlines(val, i + 0.7, i + 1.3, color=color, linestyle='--', linewidth=2)
+            print(f"Dataset: {dataset}, Metric: {metric}, Centralized Value: {val:.2f}")
+            # Federated methods
+            for agg, (marker, label_text, offset) in agg_map.items():
+                row = subset[(subset['Aggregation'] == agg) & (subset['n_epochs'] == 1) & (subset['Round'] == 20)]
+                assert len(row) == 1, f"Expected one row for {agg} in {dataset}, got {len(row)}: \n{row}"
+                val = row['Value'].values[0]
+                print(f"Dataset: {dataset}, Aggregation: {agg}, Metric: {metric}, Value: {val:.2f}")
+                x_pos = i + 1 + offset
+                fill_style = 'white' if 'SMPC' not in agg else color
+                edge = 'black'
+
+                ax_i.scatter(x_pos, val, marker=marker, s=100,
+                             facecolors=fill_style, edgecolors=edge, zorder=5)
+
+        ax_i.set_ylim(0.01, 1 if metric == 'Accuracy' else 0.8)
+        ax_i.set_ylabel(metric.replace('_', '-'), fontsize=18)
+        ax_i.tick_params(axis='y', labelsize=14)
+
+    # Final adjustments
+    axes[-1].set_xticks(range(1, len(datasets) + 1))
+    axes[-1].set_xticklabels([d for d in datasets], fontsize=18)
+    axes[-1].tick_params(axis='x', labelsize=18)
+
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.02)
+    fig.savefig(f"{plots_dir}/all_metrics_combined.{img_format}", dpi=300, format=img_format)
+    plt.close()
+
+def plot_best_per_metric_covid(df, subdir='efficiency_covid_v2'):
+    import os
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    sns.set(style='whitegrid')
+    os.makedirs(f"{ANNOTATION_PLOTS_DIR}/{subdir}", exist_ok=True)
+
+    aggregations = ['centralized', 'FedAvg', 'FedAvg-SMPC', 'FedProx', 'FedProx-SMPC']
+    metrics = ['Accuracy', 'Precision', 'Recall', 'Macro_F1']
+    datasets = sorted(df['Dataset'].unique())
+
+    palette = generate_palette(aggregations)
+    palette['centralized'] = 'black'
+
+    for metric in metrics:
+        print(f"\n=== Metric: {metric} ===")
+        plot_data = []
+        legend_labels = {}
+
+        for dataset in datasets:
+            for agg in aggregations:
+                sub_df = df[
+                    (df['Dataset'] == dataset) &
+                    (df['Aggregation'] == agg) &
+                    (df['Metric'] == metric)
+                ]
+
+                if sub_df.empty:
+                    print(f"  Skipping {dataset} - {agg} (no data)")
+                    continue
+
+                best_idx = sub_df['Value'].idxmax()
+                best_row = df.loc[best_idx]
+                best_round = best_row['Round']
+                best_epoch = best_row['n_epochs']
+                best_mu = best_row['mu']
+
+                print(f"  {dataset[:25]:25s} | {agg:15s} → Round: {best_round}, Epochs: {int(best_epoch)}, Mu: {best_mu}, Value: {best_row['Value']:.4f}")
+
+                legend_labels[agg] = f"{agg} (round {best_round})"
+
+                plot_data.append({
+                    'Dataset': dataset,
+                    'Aggregation': agg,
+                    'Value': best_row['Value']
+                })
+
+        plot_df = pd.DataFrame(plot_data)
+        plot_df['Aggregation'] = pd.Categorical(plot_df['Aggregation'], categories=aggregations, ordered=True)
+
+        # Barplot for this metric grouped by dataset
+        plt.figure(figsize=(max(8, len(datasets) * 1.2), 5))
+        ax = sns.barplot(data=plot_df, x='Dataset', y='Value', hue='Aggregation', palette=palette)
+        ax.set_title(metric, fontsize=20)
+        ax.set_ylabel("Score", fontsize=18)
+        ax.set_xlabel("")
+        ax.set_ylim(0, 1)
+        ax.tick_params(axis='x', labelsize=12, rotation=25)
+        ax.tick_params(axis='y', labelsize=14)
+        plt.legend().remove()
+        plt.tight_layout()
+        plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/bar_grouped_by_dataset_{metric.lower()}.png", dpi=300, bbox_inches='tight')
+        plt.close()
+
+        # Legend
+        handles = [Patch(facecolor=palette[m], label=legend_labels.get(m, m)) for m in aggregations if m in plot_df['Aggregation'].unique()]
+        fig, ax = plt.subplots(figsize=(6, 1))
+        ax.axis('off')
+        ax.legend(handles=handles, loc='center', ncol=len(handles), frameon=False,
+                  fontsize=20, handletextpad=0.4, columnspacing=0.8)
+        plt.tight_layout()
+        plt.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/legend_horizontal_{metric.lower()}.png", dpi=300, bbox_inches='tight', transparent=True)
+        plt.close()
+
+def plot_combined_metrics_per_dataset(df, subdir='efficiency_covid_combined'):
+    import os
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    sns.set(style='whitegrid')
+    os.makedirs(f"{ANNOTATION_PLOTS_DIR}/{subdir}", exist_ok=True)
+
+    aggregations = ['centralized', 'FedAvg', 'FedAvg-SMPC', 'FedProx', 'FedProx-SMPC']
+    metrics = ['Accuracy', 'Precision', 'Recall', 'Macro_F1']
+    datasets = sorted(df['Dataset'].unique())
+
+    palette = generate_palette(aggregations)
+    palette['centralized'] = 'black'
+
+    fig, axs = plt.subplots(1, len(metrics), figsize=(len(metrics) * 5.5, 5), sharey=True)
+
+    for i, metric in enumerate(metrics):
+        print(f"\n=== Metric: {metric} ===")
+        plot_data = []
+        legend_labels = {}
+
+        for dataset in datasets:
+            for agg in aggregations:
+                sub_df = df[
+                    (df['Dataset'] == dataset) &
+                    (df['Aggregation'] == agg) &
+                    (df['Metric'] == metric)
+                ]
+
+                if sub_df.empty:
+                    print(f"  Skipping {dataset} - {agg} (no data)")
+                    continue
+
+                best_idx = sub_df['Value'].idxmax()
+                best_row = df.loc[best_idx]
+                best_round = best_row['Round']
+                best_epoch = best_row['n_epochs']
+                best_mu = best_row['mu']
+
+                print(f"  {dataset[:25]:25s} | {agg:15s} → Round: {best_round}, Epochs: {int(best_epoch)}, Mu: {best_mu}, Value: {best_row['Value']:.4f}")
+
+                legend_labels[agg] = f"{agg} (round {best_round})"
+
+                plot_data.append({
+                    'Dataset': dataset,
+                    'Aggregation': agg,
+                    'Value': best_row['Value']
+                })
+
+        plot_df = pd.DataFrame(plot_data)
+        plot_df['Aggregation'] = pd.Categorical(plot_df['Aggregation'], categories=aggregations, ordered=True)
+
+        ax = axs[i]
+        sns.barplot(data=plot_df, x='Dataset', y='Value', hue='Aggregation', palette=palette, ax=ax)
+        ax.set_title(metric, fontsize=20)
+        ax.set_xlabel("")
+        if i == 0:
+            ax.set_ylabel("Score", fontsize=18)
+        else:
+            ax.set_ylabel("")
+        ax.set_ylim(0, 1)
+        ax.tick_params(axis='x', labelsize=12, rotation=30)
+        ax.tick_params(axis='y', labelsize=14)
+        ax.legend_.remove()
+
+    plt.tight_layout()
+    fig.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/combined_bar_metrics_by_dataset.png", dpi=300, bbox_inches='tight')
+    plt.close()
+
+    # Save shared legend
+    handles = [Patch(facecolor=palette[m], label=m) for m in aggregations]
+    fig, ax = plt.subplots(figsize=(6, 1))
+    ax.axis('off')
+    ax.legend(handles=handles, loc='center', ncol=len(handles), frameon=False,
+              fontsize=20, handletextpad=0.4, columnspacing=0.8)
+    plt.tight_layout()
+    fig.savefig(f"{ANNOTATION_PLOTS_DIR}/{subdir}/combined_legend_horizontal.png", dpi=300, bbox_inches='tight', transparent=True)
+    plt.close()
+
+
 
 
 def plot_batch_effect_umaps(raw_h5ad, cent_corrected, fed_corrected, batch_key, cell_key, out_prefix, standalone=False):
@@ -1753,7 +3592,7 @@ def investigate_general(df):
 
     # Initialize Excel writer
     output_path = "federated_vs_central_analysis.xlsx"
-    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+    writer = pd.ExcelWriter(f"{ANNOTATION_PLOTS_DIR}/summary/{output_path}", engine='xlsxwriter')
 
     # -----------------------------------------------
     # Question 1: Federated without SMPC vs Federated with SMPC
@@ -1900,7 +3739,7 @@ def investigate_detailed(df):
         return name[:31]  # Excel limit
 
     output_path = "federated_vs_central_analysis_detailed.xlsx"
-    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+    writer = pd.ExcelWriter(f"{ANNOTATION_PLOTS_DIR}/summary/{output_path}", engine='xlsxwriter')
 
     datasets = df['Dataset'].unique()
     metrics = df['Metric'].unique()
@@ -2014,7 +3853,7 @@ def investigate_detailed(df):
 
 def summarize_best_hyperparams_by_metric(df):
     output_path = "best_hyperparams_per_federated_setting.xlsx"
-    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+    writer = pd.ExcelWriter(f"{ANNOTATION_PLOTS_DIR}/summary/{output_path}", engine='xlsxwriter')
 
     metrics = ['Accuracy', 'Precision', 'Recall', 'Macro_F1']
     federated_aggs = df[df['Round'].notna()]['Aggregation'].unique()
@@ -2052,7 +3891,7 @@ def summarize_best_hyperparams_by_metric(df):
 
 def communication_efficiency_table(df):
     output_path = "communication_efficiency_summary.xlsx"
-    writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
+    writer = pd.ExcelWriter(f"{ANNOTATION_PLOTS_DIR}/summary/{output_path}", engine='xlsxwriter')
 
     thresholds = [0.70, 0.80, 0.90, 0.95, 0.99]
     metrics = df['Metric'].unique()
@@ -2082,12 +3921,16 @@ def communication_efficiency_table(df):
                     reached = sub_df[sub_df['Value'] >= cutoff]
                     if not reached.empty:
                         min_round = int(reached.sort_values('Round').iloc[0]['Round'])
+                        epoch = int(reached.sort_values('Round').iloc[0]['n_epochs'])
+                        mu = reached.sort_values('Round').iloc[0]['mu']
                         results.append({
                             'Dataset': dataset,
                             'Metric': metric,
                             'Aggregation': agg,
                             'Threshold': f"{int(threshold * 100)}%",
                             'Min Round': min_round,
+                            'Epoch': epoch,
+                            'mu': mu,
                             'Centralized Value': round(central_value, 4),
                             'Achieved Value': round(reached.sort_values('Round').iloc[0]['Value'], 4)
                         })
@@ -2100,3 +3943,190 @@ def communication_efficiency_table(df):
 
     writer.close()
     print(f"\n✅ Saved communication efficiency summary to: {output_path}")
+
+
+def plot_epoch_round_per_mu(df, metric="Accuracy", save_path="fedprox_epoch_round_by_mu.png"):
+    """
+        For each metric, plot a column of vertically stacked heatmaps (one per mu).
+        Each heatmap is Epoch x Round (15 rounds max). μ is shown on the left.
+        Shared colorbar per metric.
+        """
+    # Pre-filter
+    df = df[
+        (df['Dataset'] == 'ms') &
+        (df['Aggregation'] == 'SMPC-weighted-FedProx')
+        ].dropna(subset=['mu', 'n_epochs', 'Value', 'Round'])
+
+    df['mu'] = df['mu'].astype(float)
+    df['n_epochs'] = df['n_epochs'].astype(int)
+    df['Round'] = df['Round'].astype(int)
+    df = df[(df['Round'] > 0) & (df['Round'] <= 15)]
+
+    metrics = df['Metric'].unique()
+    mu_values = sorted(df['mu'].unique())
+    num_metrics = len(metrics)
+    num_mu = len(mu_values)
+
+    fig, axs = plt.subplots(num_mu, num_metrics, figsize=(5 * num_metrics, 2 * num_mu), sharex='col')
+    fig.subplots_adjust(left=0.08, right=0.92, top=0.93, bottom=0.1, wspace=0.02, hspace=0.05)
+
+    cmap = sns.color_palette("Blues", as_cmap=True)
+
+    for col_idx, metric in enumerate(metrics):
+        sub = df[df['Metric'] == metric]
+        min_v = sub['Value'].min()
+        max_v = 0.90  # or: max_v = sub['Value'].max()
+        norm = colors.Normalize(vmin=min_v, vmax=max_v)
+
+        mappable = None
+        for row_idx, mu in enumerate(mu_values):
+            ax = axs[row_idx][col_idx] if num_metrics > 1 else axs[row_idx]
+            mu_df = sub[sub['mu'] == mu]
+            pivot = mu_df.pivot_table(index='n_epochs', columns='Round', values='Value', aggfunc='mean')
+
+            sns.heatmap(
+                pivot, ax=ax, cmap=cmap, cbar=False,
+                vmin=min_v, vmax=max_v,
+                linewidths=0.1, linecolor='gray',
+                annot=False
+            )
+
+            if mappable is None:
+                mappable = ax.collections[0]
+
+            # Annotate best cell
+            if not pivot.empty:
+                max_val = pivot.max().max()
+                max_pos = np.where(pivot.values == max_val)
+                if max_pos[0].size > 0:
+                    i, j = max_pos[0][0], max_pos[1][0]
+                    ax.text(j + 0.5, i + 0.5, f"{max_val:.2f}".lstrip("0"),
+                            color='black', ha='center', va='center',
+                            fontsize=10)
+
+            # μ label on the left
+            if col_idx == 0:
+                ax.text(-0.22, 0.15, f"μ = {mu}", transform=ax.transAxes,
+                        fontsize=14, va='bottom', ha='left', rotation=90)
+                ax.set_ylabel("Epochs", fontsize=12)
+
+            # Metric title on top
+            if row_idx == 0:
+                ax.set_title(metric, fontsize=14)
+
+            # Remove ticks as needed
+            if row_idx != num_mu - 1:
+                ax.set_xticklabels([])
+                ax.set_xlabel("")
+            else:
+                ax.set_xlabel("Round", fontsize=14)
+
+            ax.set_yticks(range(len(pivot.index)))
+            ax.set_yticklabels(pivot.index.tolist(), fontsize=9, rotation=0)
+            if col_idx != 0:
+                ax.set_ylabel("")
+                ax.set_yticklabels([])
+
+
+
+            if row_idx == num_mu - 1:
+                ax.set_xticks(range(len(pivot.columns)))
+                ax.set_xticklabels(pivot.columns.tolist(), fontsize=9, rotation=0)
+
+    # Shared colorbar for all
+    cbar_ax = fig.add_axes([0.925, 0.3, 0.01, 0.4])
+    cbar = fig.colorbar(mappable, cax=cbar_ax)
+    cbar.ax.tick_params(labelsize=10)
+
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+
+
+
+def find_and_combine_emb_metrics(base_dir="."):
+    DATASETS = {
+    "cl", "covid", "covid-corrected", "covid-fed-corrected", "hp5",
+    "lung", "ms", "myeloid-top10", "myeloid-top20", "myeloid-top30", "myeloid-top5"
+}
+
+    AGGREGATION_CATEGORIES = {"centralized", "federated"}
+    rows = []
+    for root, dirs, files in os.walk(base_dir):
+        if "evaluation_metrics.csv" in files:
+            full_path = Path(os.path.join(root, "evaluation_metrics.csv"))
+            aggregation = full_path.parent.name
+            relative_parts = os.path.relpath(root, base_dir).split(os.sep)
+            dataset = next((part for part in relative_parts if part in DATASETS), None)
+            if not dataset:
+                continue  # skip if dataset not found
+            try:
+                df = pd.read_csv(full_path)
+                df.insert(0, "Aggregation", aggregation)
+                df.insert(0, "Dataset", dataset)
+                df.insert(0, "Source", os.path.relpath(root, base_dir))
+                rows.append(df)
+            except Exception as e:
+                print(f"Error reading {full_path}: {e}")
+    if rows:
+        return pd.concat(rows, ignore_index=True)
+    else:
+        print("No evaluation_metrics.csv files found.")
+        return pd.DataFrame()
+
+def merge_result_pickles(data1, data2):
+    merged = {}
+    for source in [data1, data2]:
+        for ds_name, ds_dict in source.items():
+            merged.setdefault(ds_name, {})
+            if 'id_maps' in ds_dict:
+                if 'id_maps' in merged[ds_name]:
+                    assert merged[ds_name]['id_maps'] == ds_dict['id_maps'], f"ID maps mismatch in dataset {ds_name}"
+                else:
+                    merged[ds_name]['id_maps'] = ds_dict['id_maps']
+            for agg_method, agg_dict in ds_dict.items():
+                if agg_method == 'id_maps':
+                    continue
+                merged[ds_name].setdefault(agg_method, {})
+                for epoch, round_dict in agg_dict.items():
+                    merged[ds_name][agg_method].setdefault(epoch, {})
+                    for round_number, mu_dict in round_dict.items():
+                        merged[ds_name][agg_method][epoch].setdefault(round_number, {})
+                        for mu, res in mu_dict.items():
+                            merged[ds_name][agg_method][epoch][round_number][mu] = res
+    return merged
+
+def structural_summary_df(temp):
+    rows = []
+    for dataset, dataset_dict in temp.items():
+        if not isinstance(dataset_dict, dict):
+            continue
+        for agg_name, agg_dict in dataset_dict.items():
+            if agg_name == 'id_maps':
+                continue
+            epochs = set()
+            rounds = set()
+            mus = set()
+            for epoch, round_dict in agg_dict.items():
+                epochs.add(epoch)
+                for rnd, mu_dict in round_dict.items():
+                    rounds.add(rnd)
+                    for mu in mu_dict:
+                        mus.add(mu)
+            rows.append({
+                'Dataset': dataset,
+                'Aggregation': agg_name,
+                'n_epochs': len(epochs),
+                'max_epoch': max(epochs) if epochs else None,
+                'n_rounds': len(rounds),
+                'max_round': max(rounds) if rounds else None,
+                'n_mu': len([m for m in mus if m is not None]),
+                'max_mu': max([m for m in mus if m is not None], default=None)
+            })
+    df=pd.DataFrame(rows)
+    cent = df[df.Aggregation == 'centralized'].copy()
+    df = df[~(df.Aggregation == 'centralized')]
+    clients = df[df.Aggregation.str.startswith('client_')].copy()
+    df = df[~df.Aggregation.str.startswith('client_')]
+    return cent, clients, df
+
+
