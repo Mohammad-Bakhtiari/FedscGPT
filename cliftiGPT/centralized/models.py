@@ -18,8 +18,8 @@ from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
 
 from scgpt.model import TransformerModel
 import shutil
-from FedscGPT.base import BaseMixin
-from FedscGPT.utils import SeqDataset, seed_worker, read_h5ad, EfficientGPUContext
+from cliftiGPT.base import BaseMixin
+from cliftiGPT.utils import SeqDataset, seed_worker, read_h5ad, EfficientGPUContext
 
 
 class ScGPT(BaseMixin):

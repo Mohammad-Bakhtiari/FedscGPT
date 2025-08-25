@@ -1,8 +1,8 @@
 import __init__
 import pickle
-from FedscGPT.centralized.embedder import Embedder
-from FedscGPT.federated.embedder import FedEmbedder
-from FedscGPT.utils import plot_embedding, eval_reference_mapping, set_seed, dump_predictions
+from cliftiGPT.centralized.embedder import Embedder
+from cliftiGPT.federated.embedder import FedEmbedder
+from cliftiGPT.utils import plot_embedding, eval_reference_mapping, set_seed, dump_predictions
 from args import instantiate_args, add_observation_args, add_federated_embedding_args
 
 

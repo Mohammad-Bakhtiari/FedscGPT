@@ -2,10 +2,10 @@
 
 """
 import __init__
-from FedscGPT.utils import confusion_matrix_evaluation, split_data_by_batch, save_data_batches, set_seed
-from FedscGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
-from FedscGPT.federated.annotator import FedAnnotator
-from FedscGPT.federated.aggregator import FedAvg
+from cliftiGPT.utils import confusion_matrix_evaluation, split_data_by_batch, save_data_batches, set_seed
+from cliftiGPT.centralized.annotator import CellTypeAnnotator, Training, Inference
+from cliftiGPT.federated.annotator import FedAnnotator
+from cliftiGPT.federated.aggregator import FedAvg
 import os
 import torch
 from functools import partial
@@ -99,7 +99,7 @@ def centralized_inference(annotator=None,
                                         )
     return annotator
 
-from FedscGPT.utils import list_gpu_objects
+from cliftiGPT.utils import list_gpu_objects
 
 def federated_finetune(**kwargs):
     annotator = fed_prep(**kwargs)

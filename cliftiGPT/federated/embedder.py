@@ -3,9 +3,9 @@ import hashlib
 import numpy as np
 import torch
 import crypten
-from FedscGPT.base import FedBase
-from FedscGPT.utils import read_h5ad, top_k_encrypted_distances, top_k_ind_selection
-from FedscGPT.centralized.embedder import Embedder
+from cliftiGPT.base import FedBase
+from cliftiGPT.utils import read_h5ad, top_k_encrypted_distances, top_k_ind_selection
+from cliftiGPT.centralized.embedder import Embedder
 
 
 class ClientEmbedder(Embedder):

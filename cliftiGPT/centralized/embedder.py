@@ -7,8 +7,8 @@ import numpy as np
 from torch.utils.data import DataLoader, SequentialSampler
 from scgpt.data_collator import DataCollator
 from scgpt.tasks.cell_emb import load_pretrained
-from FedscGPT.centralized.models import ScGPT
-from FedscGPT.utils import Dataset, read_h5ad, get_similar_vectors
+from cliftiGPT.centralized.models import ScGPT
+from cliftiGPT.utils import Dataset, read_h5ad, get_similar_vectors
 
 try:
     import faiss

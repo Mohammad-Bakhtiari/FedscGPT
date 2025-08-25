@@ -12,7 +12,7 @@ def assign_topN_clients(ref_adata, N, batch_map, rest=False):
 
 
 if __name__ == '__main__':
-    root_dir = '/home/bba1658/FedscGPT/data/scgpt/benchmark'
+    root_dir = 'cliftiGPT/data/scgpt/benchmark'
     celltype_key = 'cell_type'
     ref = anndata.read_h5ad(f"{root_dir}/myeloid/reference_adata.h5ad")
     query = anndata.read_h5ad(f"{root_dir}/myeloid/query_adata.h5ad")

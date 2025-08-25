@@ -8,7 +8,7 @@ from scgpt.loss import (
     criterion_neg_log_bernoulli,
 )
 from scgpt.model import TransformerModel, AdversarialDiscriminator
-from FedscGPT.utils import load_config, load_fed_config, get_logger, weighted_average, average_weights, get_cuda_device, \
+from cliftiGPT.utils import load_config, load_fed_config, get_logger, weighted_average, average_weights, get_cuda_device, \
     split_data_by_batch, save_data_batches
 
 class BaseMixin:
@@ -437,7 +437,7 @@ class FedBase:
         filename = "adata.h5ad"
         self.n_clients = len(adata.obs[batch_key].unique())
         self.client_ids = sorted(adata.obs[batch_key].unique()) if self.client_ids is None else self.client_ids
-        self.logger = get_logger(self.output_dir, "FedscGPT", self.client_ids)
+        self.logger = get_logger(self.output_dir, "cliftiGPT", self.client_ids)
         self.clients_data_dir = [f"{self.data_dir}/client_{batch}" for batch in self.client_ids]
         if not all([os.path.exists(f"{d}/{filename}") for d in self.clients_data_dir]):
             batches = split_data_by_batch(adata, batch_key, keep_vars)

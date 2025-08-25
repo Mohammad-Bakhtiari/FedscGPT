@@ -114,7 +114,7 @@ def get_stats(df, celltype_key, batch_key, celltype_mapping=None, batch_map=None
 
 
 # Dataset configuration list
-rootdir = "/home/mohammad/PycharmProjects/FedscGPT/data/"
+rootdir = "cliftiGPT/data/"
 datasets = {
     "ms": {
         "h5ad_file": "reference_annot.h5ad|query_annot.h5ad",
