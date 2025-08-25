@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
         ], default='annotation_cent_box_plt')
     parser.add_argument("--mode", choices=['centralized', 'federated'], default='centralized')
-    parser.add_argument("--root_dir", type=str, default='/home/bba1658/FedscGPT/output/annotation')
+    parser.add_argument("--root_dir", type=str, default='cliftiGPT/output/annotation')
     parser.add_argument("--metric", choices=['accuracy', 'precision', 'recall', 'macro_f1'], default="accuracy")
     parser.add_argument("--final_df", type=str)
     parser.add_argument("--final_pkl", type=str)

@@ -185,8 +185,8 @@ class CentralizedMetricPlotter:
         data = []
         for dataset, values in metrics.items():
             scgpt_acc = values.pop('scGPT')
-            fedscgpt_acc = values.pop('FedscGPT')
-            fedscgpt_smpc_acc = values.pop('FedscGPT-SMPC')
+            fedscgpt_acc = values.pop('cliftiGPT')
+            fedscgpt_smpc_acc = values.pop('cliftiGPT-SMPC')
             # Append each client's data
             for client, acc in values.items():
                 data.append({'Dataset': dataset, 'Type': client, 'Accuracy': acc})
@@ -195,9 +195,9 @@ class CentralizedMetricPlotter:
             data.append({'Dataset': dataset, 'Type': 'scGPT', 'Accuracy': scgpt_acc})
 
             # Append federated accuracy
-            data.append({'Dataset': dataset, 'Type': 'FedscGPT-SMPC', 'Accuracy': fedscgpt_smpc_acc})
+            data.append({'Dataset': dataset, 'Type': 'cliftiGPT-SMPC', 'Accuracy': fedscgpt_smpc_acc})
 
-            data.append({'Dataset': dataset, 'Type': 'FedscGPT', 'Accuracy': fedscgpt_acc})
+            data.append({'Dataset': dataset, 'Type': 'cliftiGPT', 'Accuracy': fedscgpt_acc})
 
         df = pd.DataFrame(data)
         return df
@@ -436,7 +436,7 @@ def analyze_communication_efficiency(results_file_path, centralized_file_path,
     df = df[df.Round != 0]
     centralized_df = pd.read_csv(centralized_file_path)
 
-    approach_name = 'FedscGPT-SMPC' if smpc else 'FedscGPT'
+    approach_name = 'cliftiGPT-SMPC' if smpc else 'cliftiGPT'
 
     dataset_keys = df['Dataset'].unique()
     table_data = [["Dataset"] + [f"{p}%" for p in percentages]]
@@ -1920,16 +1920,16 @@ def plot_umaps(adata, predictions_centralized, predictions_federated, labels, un
 
 
 def create_metrics_dataframe(root_dir, res_df_file):
-    # FedscGPT without SMPC
+    # cliftiGPT without SMPC
     fedscgpt = pd.read_csv(res_df_file)
     fedscgpt.dropna(inplace=True)
     fedscgpt_smpc = pd.read_csv(res_df_file.replace('.csv', '-smpc.csv'))
     fedscgpt_smpc.dropna(inplace=True)
-    assert fedscgpt.shape[0] == fedscgpt_smpc.shape[0], "FedscGPT and FedscGPT-SMPC have different number of rows"
+    assert fedscgpt.shape[0] == fedscgpt_smpc.shape[0], "cliftiGPT and cliftiGPT-SMPC have different number of rows"
     results = {}
     for ds in fedscgpt.Dataset.unique():
-        results[ds] = {"FedscGPT": find_best_performance(ds, fedscgpt),
-                       "FedscGPT-SMPC": find_best_performance(ds, fedscgpt_smpc),
+        results[ds] = {"cliftiGPT": find_best_performance(ds, fedscgpt),
+                       "cliftiGPT-SMPC": find_best_performance(ds, fedscgpt_smpc),
                        "scGPT": get_cent_performance(ds, os.path.join(root_dir, ds, 'centralized', 'results.pkl'))}
 
     rows = []
@@ -1941,9 +1941,9 @@ def create_metrics_dataframe(root_dir, res_df_file):
                     'Dataset': dataset,
                     'Approach': approach,
                     'Metric': metric,
-                    'Value': value[0] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else value,
-                    'n_epochs': value[1] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
-                    'Round': value[2] if approach in ['FedscGPT', 'FedscGPT-SMPC'] else None,
+                    'Value': value[0] if approach in ['cliftiGPT', 'cliftiGPT-SMPC'] else value,
+                    'n_epochs': value[1] if approach in ['cliftiGPT', 'cliftiGPT-SMPC'] else None,
+                    'Round': value[2] if approach in ['cliftiGPT', 'cliftiGPT-SMPC'] else None,
                 })
     # Creating the DataFrame
     df = pd.DataFrame(rows)
@@ -1993,7 +1993,7 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
         ax.tick_params(axis='both', which='major', labelsize=14)
         dataset_names = df['Dataset'].unique()
         ax.set_xticklabels([handle_ds_name(ds) for ds in dataset_names], fontsize=16)
-        annotate_bars(ax, metric_df[metric_df['Approach'].isin(['FedscGPT', 'FedscGPT-SMPC'])])
+        annotate_bars(ax, metric_df[metric_df['Approach'].isin(['cliftiGPT', 'cliftiGPT-SMPC'])])
     # Get the handles and labels from the last axis
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.05, 0.98), fontsize=16, ncol=3)
@@ -2010,13 +2010,13 @@ def plot_best_metrics(root_dir, param_tuning_df, img_format='svg'):
 
 def annotate_bars(ax, df):
     """
-    Annotate only FedscGPT / FedscGPT-SMPC bars by matching bar heights
+    Annotate only cliftiGPT / cliftiGPT-SMPC bars by matching bar heights
     and dataset index (on the x-axis).
     """
     # The datasets in plotting order
     datasets = list(df['Dataset'].unique())
     # Only annotate these approaches
-    targets = {'FedscGPT', 'FedscGPT-SMPC'}
+    targets = {'cliftiGPT', 'cliftiGPT-SMPC'}
 
     # Width used in seaborn.barplot
     bar_width = 0.6
@@ -2065,11 +2065,11 @@ def annotate_bars(ax, df):
 def best_metrics_report(df):
     # Calculate the differences between federated and centralized
     df_pivot = df.pivot_table(index=['Dataset', 'Metric'], columns='Approach', values='Value').reset_index()
-    df_pivot['Difference'] = df_pivot['FedscGPT-SMPC'] - df_pivot['scGPT']
+    df_pivot['Difference'] = df_pivot['cliftiGPT-SMPC'] - df_pivot['scGPT']
     # Calculate the percentage of centralized performance achieved by federated learning
-    df_pivot['Percentage Achieved'] = (df_pivot['FedscGPT-SMPC'] / df_pivot['scGPT']) * 100
+    df_pivot['Percentage Achieved'] = (df_pivot['cliftiGPT-SMPC'] / df_pivot['scGPT']) * 100
     # Print the difference and percentage for each metric
-    print("Differences and Percentage Achieved between FedscGPT-SMPC and scGPT for each metric:")
+    print("Differences and Percentage Achieved between cliftiGPT-SMPC and scGPT for each metric:")
     print(df_pivot[['Dataset', 'Metric', 'Difference', 'Percentage Achieved']])
     # Identify and print the maximum difference
     max_diff_row = df_pivot.loc[df_pivot['Difference'].abs().idxmax()]
@@ -2282,14 +2282,14 @@ def per_metric_ref_map_scatterplot(df, plots_dir, img_format='png', figsize=(7,5
 
 def find_federated_performance_comparison(df, federated_types=None):
     """
-    For each federated type in federated_types (default: FedscGPT & FedscGPT-SMPC),
+    For each federated type in federated_types (default: cliftiGPT & cliftiGPT-SMPC),
     compare against centralized scGPT: compute Difference, Percentage, worst case,
     and categorize higher/equal/lower.
     Returns:
         results: { federated_type: (worst_report, higher_list, equal_list, lower_list, N) }
     """
     if federated_types is None:
-        federated_types = ['FedscGPT', 'FedscGPT-SMPC']
+        federated_types = ['cliftiGPT', 'cliftiGPT-SMPC']
     results = {}
 
     for fed in federated_types:
@@ -2322,7 +2322,7 @@ def find_federated_performance_comparison(df, federated_types=None):
 
 def display_federated_performance_report(df):
     """
-    Print side-by-side comparisons of FedscGPT vs scGPT and FedscGPT-SMPC vs scGPT.
+    Print side-by-side comparisons of cliftiGPT vs scGPT and cliftiGPT-SMPC vs scGPT.
     """
     reports = find_federated_performance_comparison(df)
     for fed, (worst_report, higher, equal, lower, N) in reports.items():
@@ -2443,8 +2443,8 @@ def per_metric_annotated_scatterplot(df, plots_dir, img_format='svg', proximity_
     Plot annotated scatterplots per metric, including:
       - Per-client points (jittered + batch labels)
       - scGPT    as short horizontal dashed lines
-      - FedscGPT as diamond markers
-      - FedscGPT-SMPC as star markers
+      - cliftiGPT as diamond markers
+      - cliftiGPT-SMPC as star markers
       - Any other 'Type' as fallback X-markers
 
     Parameters:
@@ -2550,8 +2550,8 @@ def plot_legend(plots_dir, img_format='svg'):
     """
     Plot a separate figure containing only the legend for:
       – scGPT (centralized)
-      – FedscGPT (federated)
-      – FedscGPT-SMPC (federated + SMPC)
+      – cliftiGPT (federated)
+      – cliftiGPT-SMPC (federated + SMPC)
       – Clients
       – Other approaches
     """
@@ -2568,11 +2568,11 @@ def plot_legend(plots_dir, img_format='svg'):
         Line2D([0], [0],
                marker=FEDSCGPT_MARKER, color='w', markersize=10,
                markeredgecolor='black',
-               label='FedscGPT'),
+               label='cliftiGPT'),
         Line2D([0], [0],
                marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10,
                markeredgecolor='black',
-               label='FedscGPT-SMPC'),
+               label='cliftiGPT-SMPC'),
         Line2D([0], [0],
                marker='o', color='w', markersize=8,
                markeredgecolor='black',
@@ -2596,8 +2596,8 @@ def plot_legend_embedding(plots_dir, img_format='svg', layout='row'):
     """
     Plot a separate figure containing only the legend for:
       – scGPT (centralized)
-      – FedscGPT (federated)
-      – FedscGPT-SMPC (federated + SMPC)
+      – cliftiGPT (federated)
+      – cliftiGPT-SMPC (federated + SMPC)
       – Clients
 
     Args:
@@ -2660,8 +2660,8 @@ def plot_embedding_boxplot(df, img_format='svg'):
         # Separate client data and centralized/federated data
         client_data = df[(df['Metric'] == metric) & (df['Type'].str.contains('Client'))]
         scgpt = df[(df['Metric'] == metric) & (df['Type'] == 'scGPT')]
-        fedscgpt = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT')]
-        fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'FedscGPT-SMPC')]
+        fedscgpt = df[(df['Metric'] == metric) & (df['Type'] == 'cliftiGPT')]
+        fedscgpt_smpc = df[(df['Metric'] == metric) & (df['Type'] == 'cliftiGPT-SMPC')]
 
         # Prepare data for boxplot
         client_values = [client_data[client_data['Dataset'] == dataset]['Value'].values for dataset in datasets]
@@ -2679,10 +2679,10 @@ def plot_embedding_boxplot(df, img_format='svg'):
             # Centralized as dashed lines
             plt.axhline(y=scgpt[scgpt['Dataset'] == dataset]['Value'].values[0],
                         color=box['boxes'][i].get_facecolor(), linestyle='--', linewidth=2, zorder=3)
-            # FedscGPT as scatter points
+            # cliftiGPT as scatter points
             plt.scatter(i + 1, fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0],
                         color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker=FEDSCGPT_MARKER, s=100)
-            # FedscGPT-SMPC as scatter points
+            # cliftiGPT-SMPC as scatter points
             plt.scatter(i + 1, fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0],
                         color=box['boxes'][i].get_facecolor(), edgecolor='black', zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100)
 
@@ -2700,13 +2700,13 @@ def plot_embedding_boxplot(df, img_format='svg'):
         image_placeholder_instance = ImagePlaceholder()
         legend_elements = [
             Line2D([0], [0], color='black', lw=2, linestyle='--', label='scGPT'),
-            Line2D([0], [0], marker=FEDSCGPT_MARKER, color='w', markersize=10, label='FedscGPT',
+            Line2D([0], [0], marker=FEDSCGPT_MARKER, color='w', markersize=10, label='cliftiGPT',
                    markeredgecolor='black'),
-            Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10, label='FedscGPT-SMPC',
+            Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='w', markersize=10, label='cliftiGPT-SMPC',
                      markeredgecolor='black'),
             image_placeholder_instance
         ]
-        legend_labels = ['scGPT', 'FedscGPT', 'FedscGPT-SMPC', 'Clients']
+        legend_labels = ['scGPT', 'cliftiGPT', 'cliftiGPT-SMPC', 'Clients']
 
         class HandlerImage:
             def __init__(self, image):
@@ -2914,9 +2914,9 @@ def plot_umap_legend(
 #         # Separate client data and centralized/federated data
 #         df_metric = df[df['Metric'] == metric]
 #         scgpt = df_metric[df_metric['Type'] == 'scGPT']
-#         fedscgpt_smpc = df_metric[df_metric['Type'] == 'FedscGPT-SMPC']
-#         fedscgpt = df_metric[df_metric['Type'] == 'FedscGPT']
-#         client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'FedscGPT-SMPC', 'FedscGPT'])]
+#         fedscgpt_smpc = df_metric[df_metric['Type'] == 'cliftiGPT-SMPC']
+#         fedscgpt = df_metric[df_metric['Type'] == 'cliftiGPT']
+#         client_data = df_metric[~df_metric['Type'].isin(['scGPT', 'cliftiGPT-SMPC', 'cliftiGPT'])]
 #
 #         # Scatter plot for client data
 #         colors = ['lightblue', 'lightgreen', 'lightcoral', 'lightgrey', 'lightyellow']  # Extend as needed
@@ -2962,12 +2962,12 @@ def plot_umap_legend(
 #             if not fedscgpt[fedscgpt['Dataset'] == dataset].empty:
 #                 federated_value = fedscgpt[fedscgpt['Dataset'] == dataset]['Value'].values[0]
 #                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-#                             zorder=5, marker=FEDSCGPT_MARKER, s=100, label=f"FedscGPT")
+#                             zorder=5, marker=FEDSCGPT_MARKER, s=100, label=f"cliftiGPT")
 #
 #             if not fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset].empty:
 #                 federated_value = fedscgpt_smpc[fedscgpt_smpc['Dataset'] == dataset]['Value'].values[0]
 #                 plt.scatter(i + 1, federated_value, color=colors[i % len(colors)], edgecolor='black',
-#                             zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100, label=f"FedscGPT-SMPC")
+#                             zorder=5, marker=FEDSCGPT_SMPC_MARKER, s=100, label=f"cliftiGPT-SMPC")
 #
 #
 #
@@ -2983,9 +2983,9 @@ def plot_umap_legend(
 #             plt.Line2D([0], [0], marker='o', color='black', markerfacecolor='white', markersize=8, linestyle='None',
 #                         label='Clients'),
 #             plt.Line2D([0], [0], marker=FEDSCGPT_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
-#                         label='FedscGPT'),
+#                         label='cliftiGPT'),
 #             plt.Line2D([0], [0], marker=FEDSCGPT_SMPC_MARKER, color='black', markerfacecolor='white', markersize=10, linestyle='None',
-#                        label='FedscGPT-SMPC'),
+#                        label='cliftiGPT-SMPC'),
 #             plt.Line2D([0], [0], color='black', linewidth=2, linestyle='--', label='scGPT')
 #         ]
 #         legend = plt.legend(handles=custom_handles, loc='lower left', fontsize=14, frameon=True)

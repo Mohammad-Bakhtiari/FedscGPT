@@ -304,7 +304,7 @@ def add_client_logging(logger, client_id, level_num):
     logger.setLevel(min(logger.level, level_num))  # Ensure logger level includes the new custom level
 
 def get_logger(output_dir, logger_title="scGPT", client_ids=None, debug=False):
-    assert logger_title in ["scGPT", "FedscGPT"], f"Invalid logger title: {logger_title}"
+    assert logger_title in ["scGPT", "cliftiGPT"], f"Invalid logger title: {logger_title}"
     if client_ids is None:
         client_ids = []
 
@@ -329,8 +329,8 @@ def get_logger(output_dir, logger_title="scGPT", client_ids=None, debug=False):
         h.setLevel(logger.level)
         logger.addHandler(h)
 
-    # Add federated logging level if logger_title is "FedscGPT"
-    if logger_title == "FedscGPT":
+    # Add federated logging level if logger_title is "cliftiGPT"
+    if logger_title == "cliftiGPT":
         add_federated_logging(logger)
         for idx, client_id in enumerate(client_ids):
             add_client_logging(logger, client_id, BASE_CLIENT_LEVEL_NUM + idx)

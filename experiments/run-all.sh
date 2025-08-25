@@ -1,26 +1,26 @@
 #!/bin/bash
 GPU=1
 
-#chmod +x run_param_tuning.sh
-## Arguments: datasetnames, aggregation method, weighted, smpc, N_ROUNDS, GPU, epochs_values
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running parameter tuning for FedAvg with SMPC\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_param_tuning.sh "HP,MYELOID-top4+rest,MS" fedavg true true 20 $GPU 1-5
-#
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running parameter tuning for FedAvg without SMPC\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_param_tuning.sh "HP,MYELOID-top4+rest,MS" fedavg true false 20 $GPU 1-5
-#
-#
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running parameter tuning for FedProx with SMPC for MS dataset\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m
-#./run_param_tuning.sh MS fedprox true true 20 0 1-5
+chmod +x run_param_tuning.sh
+# Arguments: datasetnames, aggregation method, weighted, smpc, N_ROUNDS, GPU, epochs_values
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running parameter tuning for FedAvg with SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_param_tuning.sh "HP,MYELOID-top4+rest,MS" fedavg true true 20 $GPU 1-5
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running parameter tuning for FedAvg without SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_param_tuning.sh "HP,MYELOID-top4+rest,MS" fedavg true false 20 $GPU 1-5
 
 
-./run_param_tuning.sh "MYELOID-top5" fedavg true true 20 0 1-5
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running parameter tuning for FedProx with SMPC for MS dataset\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_param_tuning.sh MS fedprox true true 20 0 1-5
+
+
+
 
 # scalability experiments
 ./run_annotation.sh MYELOID-top5 centralized_finetune_inference 20 0 false 0
@@ -53,45 +53,45 @@ echo -e "\e[34m-------------------------------------\e[0m"
 echo -e "\e[34m Running local clients annotation with scGPT\e[0m"
 echo -e "\e[34m-------------------------------------\e[0m"
 ./run_annotation.sh all centralized_clients 20 0 false $GPU
-#
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running Federated annotation with FedscGPT using weighted FedAvg\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 false $GPU fedavg true
-#
-#
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34mRunning Federated annotation with FedscGPT using weighted FedAvg and SMPC\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 true $GPU fedavg true
-#
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running Federated annotation with FedscGPT using weighted FedProx aggregation \e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 false $GPU fedprox true 0.01
-#
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running Federated annotation with FedscGPT using weighted FedProx aggregation and SMPC \e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 true $GPU fedprox true 0.01
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running Federated annotation with cliftiGPT using weighted FedAvg\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 false $GPU fedavg true
 
 
-#chmod +x run_embedding.sh
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34m Running embedding for all modes\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34mRunning embedding for centralized\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_embedding.sh all centralized false $GPU
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34mRunning embedding for federated without SMPC\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_embedding.sh all federated_zeroshot false $GPU
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34mRunning embedding for federated with SMPC\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_embedding.sh all federated_zeroshot true $GPU
-#echo -e "\e[34m-------------------------------------\e[0m"
-#echo -e "\e[34mRunning embedding for clients local training\e[0m"
-#echo -e "\e[34m-------------------------------------\e[0m"
-#./run_embedding.sh all centralized_clients false $GPU
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning Federated annotation with cliftiGPT using weighted FedAvg and SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 true $GPU fedavg true
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running Federated annotation with cliftiGPT using weighted FedProx aggregation \e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 false $GPU fedprox true 0.01
+
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running Federated annotation with cliftiGPT using weighted FedProx aggregation and SMPC \e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_annotation.sh "LUNG,CellLine,COVID,COVID-corrected,COVID-fed-corrected" federated_finetune 1 20 true $GPU fedprox true 0.01
+
+
+chmod +x run_embedding.sh
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34m Running embedding for all modes\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for centralized\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_embedding.sh all centralized false $GPU
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for federated without SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_embedding.sh all federated_zeroshot false $GPU
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for federated with SMPC\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_embedding.sh all federated_zeroshot true $GPU
+echo -e "\e[34m-------------------------------------\e[0m"
+echo -e "\e[34mRunning embedding for clients local training\e[0m"
+echo -e "\e[34m-------------------------------------\e[0m"
+./run_embedding.sh all centralized_clients false $GPU

@@ -10,9 +10,9 @@ from scgpt.tokenizer.gene_tokenizer import GeneVocab
 from scgpt.preprocess import Preprocessor
 from scipy.sparse import issparse
 from sklearn.model_selection import train_test_split
-from FedscGPT.utils import SeqDataset, dump_results, plot, ResultsRecorder
-from FedscGPT.centralized.models import ScGPT
-from FedscGPT.utils import read_h5ad, seed_worker, EfficientGPUContext
+from cliftiGPT.utils import SeqDataset, dump_results, plot, ResultsRecorder
+from cliftiGPT.centralized.models import ScGPT
+from cliftiGPT.utils import read_h5ad, seed_worker, EfficientGPUContext
 import copy
 from functools import partial
 

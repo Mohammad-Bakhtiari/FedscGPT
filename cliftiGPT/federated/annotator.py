@@ -2,15 +2,15 @@ import copy
 import os.path
 import torch
 from typing import Dict
-from FedscGPT.base import FedBase
-from FedscGPT.centralized.annotator import Training, Inference
-from FedscGPT.utils import read_h5ad
-from FedscGPT.preprocessor.local import Preprocessor
-from FedscGPT.preprocessor.aggregation import aggregate_gene_counts, aggregate_bin_edges, aggregate_hvg_stats, \
+from cliftiGPT.base import FedBase
+from cliftiGPT.centralized.annotator import Training, Inference
+from cliftiGPT.utils import read_h5ad
+from cliftiGPT.preprocessor.local import Preprocessor
+from cliftiGPT.preprocessor.aggregation import aggregate_gene_counts, aggregate_bin_edges, aggregate_hvg_stats, \
     aggregate_local_gene_sets, aggregate_local_celltype_sets
-from FedscGPT.federated.aggregator import FedAvg
-from FedscGPT.federated.client import Client
-from FedscGPT.centralized.annotator import Training
+from cliftiGPT.federated.aggregator import FedAvg
+from cliftiGPT.federated.client import Client
+from cliftiGPT.centralized.annotator import Training
 
 class ClientAnnotator(Client, Training):
     """

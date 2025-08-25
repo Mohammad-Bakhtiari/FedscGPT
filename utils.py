@@ -99,5 +99,5 @@ def prep_hp(adata, adata_test):
     adata = adata[adata.obs['Celltype'].isin(cell_types)].copy()
     adata.obs.Celltype = adata.obs.Celltype.cat.set_categories(cell_types)
     adata_test.obs.Celltype = adata_test.obs.Celltype.cat.set_categories(cell_types)
-    adata.write("/home/bba1658/FedscGPT/data/benchmark/hp/reference_refined.h5ad")
-    adata_test.write("/home/bba1658/FedscGPT/data/benchmark/hp/query.h5ad")
+    adata.write("cliftiGPT/data/benchmark/hp/reference_refined.h5ad")
+    adata_test.write("cliftiGPT/data/benchmark/hp/query.h5ad")

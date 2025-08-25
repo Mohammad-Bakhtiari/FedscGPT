@@ -1,4 +1,4 @@
-from FedscGPT.utils import check_weights_nan
+from cliftiGPT.utils import check_weights_nan
 import crypten
 import torch
 

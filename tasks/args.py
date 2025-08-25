@@ -3,7 +3,7 @@ import argparse
 
 
 def instantiate_args():
-    HOME_DIR = "/home/bba1658/FedscGPT"
+    HOME_DIR = "cliftiGPT"
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, choices=['centralized', 'federated_finetune', 'federated_zeroshot',
                                                      'centralized_finetune_inference','centralized_inference', 'federated_inference',
